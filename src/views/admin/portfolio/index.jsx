@@ -13,7 +13,7 @@ import {
 } from '@chakra-ui/react';
 import Card from 'components/card/Card.js';
 import { MdTrendingUp } from 'react-icons/md';
-import aiApi from 'lib/aiApi';
+import { request } from 'lib/api';
 
 // Predefined list of popular stocks
 const AVAILABLE_STOCKS = [
@@ -51,6 +51,8 @@ export default function PortfolioCreator() {
   const brandColor = useColorModeValue('brand.500', 'brand.400');
   const cardBg = useColorModeValue('white', 'navy.800');
   const borderColor = useColorModeValue('gray.200', 'whiteAlpha.200');
+  const selectedStockBg = useColorModeValue('brand.50', 'brand.900');
+  const preBlockBg = useColorModeValue('gray.50', 'navy.900');
 
   const handleStockToggle = (symbol) => {
     setSelectedStocks((prev) =>
@@ -84,11 +86,11 @@ export default function PortfolioCreator() {
     setAnalysisResult(null);
 
     try {
-      const response = await aiApi.post('/api/portfolio/analyze', {
+      const data = await request.post('/ai/portfolio/analyze', {
         stocks: selectedStocks,
       });
 
-      setAnalysisResult(response.data);
+      setAnalysisResult(data);
       toast({
         title: 'Portfolio analysis complete',
         description: `Analyzed ${selectedStocks.length} stocks successfully.`,
@@ -100,7 +102,7 @@ export default function PortfolioCreator() {
       console.error('Portfolio analysis error:', error);
       toast({
         title: 'Analysis failed',
-        description: error.response?.data?.detail || 'Failed to analyze portfolio. Please try again.',
+        description: error.message || 'Failed to analyze portfolio. Please try again.',
         status: 'error',
         duration: 5000,
         isClosable: true,
@@ -174,7 +176,7 @@ export default function PortfolioCreator() {
                   borderRadius="10px"
                   bg={
                     selectedStocks.includes(stock.symbol)
-                      ? useColorModeValue('brand.50', 'brand.900')
+                      ? selectedStockBg
                       : 'transparent'
                   }
                   cursor="pointer"
@@ -247,7 +249,7 @@ export default function PortfolioCreator() {
           <Box
             as="pre"
             p="20px"
-            bg={useColorModeValue('gray.50', 'navy.900')}
+            bg={preBlockBg}
             borderRadius="10px"
             overflow="auto"
             fontSize="sm"

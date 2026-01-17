@@ -12,7 +12,7 @@ const AuthContext = createContext(null);
 
 // Get BE origin (strip trailing "/api")
 function getBackendOrigin() {
-  const base = (import.meta?.env?.VITE_BE_API_URL || process.env.REACT_APP_BE_API_URL || '').trim();
+  const base = (process.env.REACT_APP_BE_API_URL || '').trim();
   if (!base) return '';
   try {
     const u = new URL(base, window.location.origin);
