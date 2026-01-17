@@ -13,7 +13,7 @@ import {
 } from '@chakra-ui/react';
 import Card from 'components/card/Card.js';
 import { MdTrendingUp } from 'react-icons/md';
-import api from 'lib/api';
+import aiApi from 'lib/aiApi';
 
 // Predefined list of popular stocks
 const AVAILABLE_STOCKS = [
@@ -84,7 +84,7 @@ export default function PortfolioCreator() {
     setAnalysisResult(null);
 
     try {
-      const response = await api.post('/api/portfolio/analyze', {
+      const response = await aiApi.post('/api/portfolio/analyze', {
         stocks: selectedStocks,
       });
 
