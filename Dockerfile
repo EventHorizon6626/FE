@@ -9,7 +9,8 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install ALL dependencies including devDependencies (needed for build)
-RUN npm install --legacy-peer-deps
+# Force install ajv@8 first to resolve dependency conflicts
+RUN npm install --legacy-peer-deps --force
 
 # Copy source code
 COPY . .
