@@ -29,20 +29,21 @@ jobs:
             cd ${{ secrets.DEPLOY_PATH }}
 
             # Pull latest changes from GitHub
-            echo "📥 Pulling latest code from GitHub..."
+            echo "📥 Pulling latest frontend code..."
             cd FE
             git pull origin master
 
-            # Navigate back to root for docker-compose
-            cd ..
+            echo "📥 Pulling latest backend code..."
+            cd ../Event-Horizon-AI
+            git pull origin main
 
-            # Rebuild and restart frontend container
-            echo "🐳 Rebuilding and restarting frontend container..."
-            docker-compose up -d --build frontend
+            # Rebuild and restart containers
+            echo "🐳 Rebuilding and restarting containers..."
+            docker-compose up -d --build
 
             # Show status
             echo "✅ Deployment complete!"
-            docker-compose ps frontend
+            docker-compose ps
 
             # Clean up old images
             echo "🧹 Cleaning up old Docker images..."
