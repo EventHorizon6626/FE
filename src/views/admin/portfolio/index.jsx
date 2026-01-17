@@ -10,10 +10,16 @@ import {
   Checkbox,
   useToast,
   Spinner,
+  Tabs,
+  TabList,
+  TabPanels,
+  Tab,
+  TabPanel,
 } from '@chakra-ui/react';
 import Card from 'components/card/Card.js';
 import { MdTrendingUp } from 'react-icons/md';
 import { request } from 'lib/api';
+import Chart from 'react-apexcharts';
 
 // Predefined list of popular stocks
 const AVAILABLE_STOCKS = [
@@ -43,6 +49,8 @@ export default function PortfolioCreator() {
   const [selectedStocks, setSelectedStocks] = useState([]);
   const [loading, setLoading] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
+  const [chartData, setChartData] = useState(null);
+  const [loadingCharts, setLoadingCharts] = useState(false);
   const toast = useToast();
 
   // Chakra Color Mode
@@ -84,13 +92,22 @@ export default function PortfolioCreator() {
 
     setLoading(true);
     setAnalysisResult(null);
+    setChartData(null);
 
     try {
-      const data = await request.post('/ai/portfolio/analyze', {
-        stocks: selectedStocks,
-      });
+      // Fetch portfolio analysis and chart data in parallel
+      const [analysisData, chartDataResponse] = await Promise.all([
+        request.post('/ai/portfolio/analyze', {
+          stocks: selectedStocks,
+        }),
+        request.post('/ai/chart', {
+          stocks: selectedStocks,
+        }),
+      ]);
 
-      setAnalysisResult(data);
+      setAnalysisResult(analysisData);
+      setChartData(chartDataResponse);
+
       toast({
         title: 'Portfolio analysis complete',
         description: `Analyzed ${selectedStocks.length} stocks successfully.`,
@@ -119,6 +136,79 @@ export default function PortfolioCreator() {
     acc[stock.sector].push(stock);
     return acc;
   }, {});
+
+  // Convert chart data to ApexCharts format
+  const formatChartData = (symbol) => {
+    if (!chartData || !chartData.result || !chartData.result.chart_data) {
+      return null;
+    }
+
+    const stockData = chartData.result.chart_data[symbol];
+    if (!stockData || !stockData.candles) {
+      return null;
+    }
+
+    // Convert to candlestick format
+    const series = [{
+      name: symbol,
+      data: stockData.candles.map(candle => ({
+        x: new Date(candle.date),
+        y: [candle.open, candle.high, candle.low, candle.close]
+      }))
+    }];
+
+    const options = {
+      chart: {
+        type: 'candlestick',
+        height: 350,
+        toolbar: {
+          show: true
+        }
+      },
+      title: {
+        text: `${symbol} - ${stockData.period || '1mo'}`,
+        align: 'left',
+        style: {
+          color: textColor
+        }
+      },
+      xaxis: {
+        type: 'datetime',
+        labels: {
+          style: {
+            colors: textColorSecondary
+          }
+        }
+      },
+      yaxis: {
+        tooltip: {
+          enabled: true
+        },
+        labels: {
+          formatter: (value) => `$${value.toFixed(2)}`,
+          style: {
+            colors: textColorSecondary
+          }
+        }
+      },
+      plotOptions: {
+        candlestick: {
+          colors: {
+            upward: '#26A69A',
+            downward: '#EF5350'
+          }
+        }
+      },
+      tooltip: {
+        theme: 'dark'
+      },
+      grid: {
+        borderColor: borderColor
+      }
+    };
+
+    return { series, options };
+  };
 
   return (
     <Box pt={{ base: '130px', md: '80px', xl: '80px' }}>
@@ -244,19 +334,63 @@ export default function PortfolioCreator() {
       {analysisResult && !loading && (
         <Card bg={cardBg}>
           <Text color={textColor} fontSize="xl" fontWeight="700" mb="20px">
-            Analysis Results
+            Portfolio Analysis Results
           </Text>
-          <Box
-            as="pre"
-            p="20px"
-            bg={preBlockBg}
-            borderRadius="10px"
-            overflow="auto"
-            fontSize="sm"
-            color={textColor}
-          >
-            {JSON.stringify(analysisResult, null, 2)}
-          </Box>
+
+          <Tabs variant="enclosed" colorScheme="brand">
+            <TabList>
+              <Tab>Charts</Tab>
+              <Tab>Raw Data</Tab>
+            </TabList>
+
+            <TabPanels>
+              {/* Charts Tab */}
+              <TabPanel>
+                {chartData && chartData.result && chartData.result.chart_data ? (
+                  <SimpleGrid columns={{ base: 1, lg: 2 }} spacing="20px">
+                    {selectedStocks.map((symbol) => {
+                      const chartConfig = formatChartData(symbol);
+                      if (!chartConfig) {
+                        return (
+                          <Box key={symbol} p="20px" border="1px solid" borderColor={borderColor} borderRadius="10px">
+                            <Text color={textColorSecondary}>No chart data available for {symbol}</Text>
+                          </Box>
+                        );
+                      }
+
+                      return (
+                        <Box key={symbol} p="15px" border="1px solid" borderColor={borderColor} borderRadius="10px">
+                          <Chart
+                            options={chartConfig.options}
+                            series={chartConfig.series}
+                            type="candlestick"
+                            height={350}
+                          />
+                        </Box>
+                      );
+                    })}
+                  </SimpleGrid>
+                ) : (
+                  <Text color={textColorSecondary}>No chart data available</Text>
+                )}
+              </TabPanel>
+
+              {/* Raw Data Tab */}
+              <TabPanel>
+                <Box
+                  as="pre"
+                  p="20px"
+                  bg={preBlockBg}
+                  borderRadius="10px"
+                  overflow="auto"
+                  fontSize="sm"
+                  color={textColor}
+                >
+                  {JSON.stringify(analysisResult, null, 2)}
+                </Box>
+              </TabPanel>
+            </TabPanels>
+          </Tabs>
         </Card>
       )}
     </Box>
