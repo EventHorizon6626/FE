@@ -1,0 +1,61 @@
+name: Deploy Frontend to VPS
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy to Production Server
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to VPS via SSH
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          script: |
+            echo "🚀 Starting deployment..."
+
+            # Navigate to project directory
+            cd ${{ secrets.DEPLOY_PATH }}
+
+            # Pull latest changes from GitHub
+            echo "📥 Pulling latest code from GitHub..."
+            cd FE
+            git pull origin master
+
+            # Navigate back to root for docker-compose
+            cd ..
+
+            # Rebuild and restart frontend container
+            echo "🐳 Rebuilding and restarting frontend container..."
+            docker-compose up -d --build frontend
+
+            # Show status
+            echo "✅ Deployment complete!"
+            docker-compose ps frontend
+
+            # Clean up old images
+            echo "🧹 Cleaning up old Docker images..."
+            docker image prune -f
+
+      - name: Deployment Status
+        if: success()
+        run: |
+          echo "✅ Frontend successfully deployed to production!"
+          echo "🌐 Your application should be live now"
+
+      - name: Deployment Failed
+        if: failure()
+        run: |
+          echo "❌ Deployment failed! Check the logs above for details."
+          exit 1
