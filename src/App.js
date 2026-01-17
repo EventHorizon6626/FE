@@ -1,7 +1,6 @@
 // src/App.js
 import './assets/css/App.css';
-import { Routes, Route, Navigate } from 'react-router-dom';
-import {} from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
 import AuthLayout from './layouts/auth';
 import AdminLayout from './layouts/admin';
 import RTLLayout from './layouts/rtl';
@@ -11,7 +10,6 @@ import {
 } from '@chakra-ui/react';
 import initialTheme from './theme/theme'; //  { themeGreen }
 import { useState } from 'react';
-import ProtectedRoute from './auth/ProtectedRoute';
 import GuestRoute from './auth/GuestRoute';
 
 // Chakra imports

@@ -11,8 +11,6 @@ import {
   Text,
   useColorModeValue,
   useColorMode,
-  Box,
-  IconButton,
 } from '@chakra-ui/react';
 
 // Custom Components
@@ -20,13 +18,13 @@ import { ItemContent } from 'components/menu/ItemContent';
 import { SearchBar } from 'components/navbar/searchBar/SearchBar';
 import { SidebarResponsive } from 'components/sidebar/Sidebar';
 import PropTypes from 'prop-types';
-import React, { useMemo } from 'react';
+import React from 'react';
 
 // Assets
 import { MdNotificationsNone, MdInfoOutline } from 'react-icons/md';
 import { IoMdMoon, IoMdSunny } from 'react-icons/io';
 import { FaEthereum } from 'react-icons/fa';
-import { FiWallet, FiPlus } from 'react-icons/fi';
+import { FiPlus } from 'react-icons/fi';
 
 import routes from 'routes';
 import { useAuth } from 'context/AuthContext';
