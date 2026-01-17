@@ -37,13 +37,22 @@ jobs:
             cd ../Event-Horizon-AI
             git pull origin main
 
-            # Rebuild and restart containers
-            echo "🐳 Rebuilding and restarting containers..."
+            # Deploy backend first (creates shared network)
+            echo "🐳 Deploying backend..."
+            cd ../Event-Horizon-AI
+            docker-compose up -d --build
+
+            # Deploy frontend (joins existing network)
+            echo "🐳 Deploying frontend..."
+            cd ../FE
             docker-compose up -d --build
 
             # Show status
             echo "✅ Deployment complete!"
-            docker-compose ps
+            echo "Backend status:"
+            cd ../Event-Horizon-AI && docker-compose ps
+            echo "Frontend status:"
+            cd ../FE && docker-compose ps
 
             # Clean up old images
             echo "🧹 Cleaning up old Docker images..."

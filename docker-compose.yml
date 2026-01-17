@@ -1,0 +1,21 @@
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - REACT_APP_BE_API_URL=${REACT_APP_BE_API_URL:-http://localhost:4000}
+    container_name: eventhorizon-frontend
+    ports:
+      - "80:80"
+    environment:
+      - REACT_APP_BE_API_URL=${REACT_APP_BE_API_URL:-http://localhost:4000}
+      - NODE_ENV=production
+    restart: unless-stopped
+    networks:
+      - eventhorizon-network
+
+networks:
+  eventhorizon-network:
+    name: eventhorizon-network
+    external: true
