@@ -8,14 +8,14 @@ on:
 
 jobs:
   deploy:
-    name: Deploy to Production Server
+    name: Deploy Frontend Only
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Deploy to VPS via SSH
+      - name: Deploy Frontend to VPS via SSH
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -23,36 +23,22 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SSH_PORT }}
           script: |
-            echo "🚀 Starting deployment..."
+            echo "🚀 Starting Frontend deployment..."
 
-            # Navigate to project directory
-            cd ${{ secrets.DEPLOY_PATH }}
+            # Navigate to FE directory
+            cd ${{ secrets.DEPLOY_PATH }}/FE
 
-            # Pull latest changes from GitHub
+            # Pull latest frontend code
             echo "📥 Pulling latest frontend code..."
-            cd FE
             git pull origin master
 
-            echo "📥 Pulling latest backend code..."
-            cd ../Event-Horizon-AI
-            git pull origin main
-
-            # Deploy backend first (creates shared network)
-            echo "🐳 Deploying backend..."
-            cd ../Event-Horizon-AI
-            docker-compose up -d --build
-
-            # Deploy frontend (joins existing network)
-            echo "🐳 Deploying frontend..."
-            cd ../FE
+            # Deploy frontend
+            echo "🐳 Building and deploying frontend..."
             docker-compose up -d --build
 
             # Show status
-            echo "✅ Deployment complete!"
-            echo "Backend status:"
-            cd ../Event-Horizon-AI && docker-compose ps
-            echo "Frontend status:"
-            cd ../FE && docker-compose ps
+            echo "✅ Frontend deployment complete!"
+            docker-compose ps
 
             # Clean up old images
             echo "🧹 Cleaning up old Docker images..."
@@ -62,10 +48,10 @@ jobs:
         if: success()
         run: |
           echo "✅ Frontend successfully deployed to production!"
-          echo "🌐 Your application should be live now"
+          echo "🌐 Site should be live at http://your-server-ip"
 
       - name: Deployment Failed
         if: failure()
         run: |
-          echo "❌ Deployment failed! Check the logs above for details."
+          echo "❌ Frontend deployment failed! Check the logs above for details."
           exit 1
