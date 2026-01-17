@@ -10,6 +10,7 @@ import {
 } from 'react-icons/md';
 
 // Admin Imports
+import PortfolioCreator from 'views/admin/portfolio';
 import MainDashboard from 'views/admin/default';
 import OldDashboard from 'views/admin/oldDashboard';
 import NFTMarketplace from 'views/admin/marketplace';
@@ -23,10 +24,18 @@ import SignInCentered from 'views/auth/signIn';
 const routes = [
   // ----- PROTECTED (requiresAuth: true) -----
   {
-    name: 'Home',
+    name: 'Portfolio',
     layout: '/',
     path: '/',
     icon: <Icon as={MdHome} width="20px" height="20px" color="inherit" />,
+    component: <PortfolioCreator />,
+    requiresAuth: false,
+  },
+  {
+    name: 'Dashboard',
+    layout: '/',
+    path: '/dashboard',
+    icon: <Icon as={MdBarChart} width="20px" height="20px" color="inherit" />,
     component: <MainDashboard />,
     requiresAuth: false,
   },
