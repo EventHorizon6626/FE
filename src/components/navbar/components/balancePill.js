@@ -16,7 +16,7 @@ import { useAuth } from 'context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { USDTIcon } from 'components/icons/Icons';
 
-const BalancePill = ({}) => {
+const BalancePill = () => {
   const user = useAuth()?.user || {};
   const balanceVndRaw = user?.wallet?.vnd?.available ?? user?.balanceVnd ?? 0;
   const navigate = useNavigate();

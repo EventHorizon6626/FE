@@ -24,7 +24,6 @@ import React from 'react';
 import { MdNotificationsNone, MdInfoOutline } from 'react-icons/md';
 import { IoMdMoon, IoMdSunny } from 'react-icons/io';
 import { FaEthereum } from 'react-icons/fa';
-import { FiPlus } from 'react-icons/fi';
 
 import routes from 'routes';
 import { useAuth } from 'context/AuthContext';

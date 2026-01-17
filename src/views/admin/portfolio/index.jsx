@@ -1,25 +1,24 @@
-import React, { useState } from 'react';
 import {
   Box,
   Button,
+  Checkbox,
   Flex,
-  Grid,
+  SimpleGrid,
+  Spinner,
+  Tab,
+  TabList,
+  TabPanel,
+  TabPanels,
+  Tabs,
   Text,
   useColorModeValue,
-  SimpleGrid,
-  Checkbox,
   useToast,
-  Spinner,
-  Tabs,
-  TabList,
-  TabPanels,
-  Tab,
-  TabPanel,
 } from '@chakra-ui/react';
 import Card from 'components/card/Card.js';
-import { MdTrendingUp } from 'react-icons/md';
 import { request } from 'lib/api';
+import { useState } from 'react';
 import Chart from 'react-apexcharts';
+import { MdTrendingUp } from 'react-icons/md';
 
 // Predefined list of popular stocks
 const AVAILABLE_STOCKS = [
@@ -50,7 +49,6 @@ export default function PortfolioCreator() {
   const [loading, setLoading] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
   const [chartData, setChartData] = useState(null);
-  const [loadingCharts, setLoadingCharts] = useState(false);
   const toast = useToast();
 
   // Chakra Color Mode
@@ -66,7 +64,7 @@ export default function PortfolioCreator() {
     setSelectedStocks((prev) =>
       prev.includes(symbol)
         ? prev.filter((s) => s !== symbol)
-        : [...prev, symbol]
+        : [...prev, symbol],
     );
   };
 
@@ -119,7 +117,8 @@ export default function PortfolioCreator() {
       console.error('Portfolio analysis error:', error);
       toast({
         title: 'Analysis failed',
-        description: error.message || 'Failed to analyze portfolio. Please try again.',
+        description:
+          error.message || 'Failed to analyze portfolio. Please try again.',
         status: 'error',
         duration: 5000,
         isClosable: true,
@@ -149,62 +148,64 @@ export default function PortfolioCreator() {
     }
 
     // Convert to candlestick format
-    const series = [{
-      name: symbol,
-      data: stockData.candles.map(candle => ({
-        x: new Date(candle.date),
-        y: [candle.open, candle.high, candle.low, candle.close]
-      }))
-    }];
+    const series = [
+      {
+        name: symbol,
+        data: stockData.candles.map((candle) => ({
+          x: new Date(candle.date),
+          y: [candle.open, candle.high, candle.low, candle.close],
+        })),
+      },
+    ];
 
     const options = {
       chart: {
         type: 'candlestick',
         height: 350,
         toolbar: {
-          show: true
-        }
+          show: true,
+        },
       },
       title: {
         text: `${symbol} - ${stockData.period || '1mo'}`,
         align: 'left',
         style: {
-          color: textColor
-        }
+          color: textColor,
+        },
       },
       xaxis: {
         type: 'datetime',
         labels: {
           style: {
-            colors: textColorSecondary
-          }
-        }
+            colors: textColorSecondary,
+          },
+        },
       },
       yaxis: {
         tooltip: {
-          enabled: true
+          enabled: true,
         },
         labels: {
           formatter: (value) => `$${value.toFixed(2)}`,
           style: {
-            colors: textColorSecondary
-          }
-        }
+            colors: textColorSecondary,
+          },
+        },
       },
       plotOptions: {
         candlestick: {
           colors: {
             upward: '#26A69A',
-            downward: '#EF5350'
-          }
-        }
+            downward: '#EF5350',
+          },
+        },
       },
       tooltip: {
-        theme: 'dark'
+        theme: 'dark',
       },
       grid: {
-        borderColor: borderColor
-      }
+        borderColor: borderColor,
+      },
     };
 
     return { series, options };
@@ -252,7 +253,10 @@ export default function PortfolioCreator() {
             >
               {sector}
             </Text>
-            <SimpleGrid columns={{ base: 1, md: 2, lg: 3, xl: 4 }} spacing="15px">
+            <SimpleGrid
+              columns={{ base: 1, md: 2, lg: 3, xl: 4 }}
+              spacing="15px"
+            >
               {stocks.map((stock) => (
                 <Flex
                   key={stock.symbol}
@@ -346,20 +350,36 @@ export default function PortfolioCreator() {
             <TabPanels>
               {/* Charts Tab */}
               <TabPanel>
-                {chartData && chartData.result && chartData.result.chart_data ? (
+                {chartData &&
+                chartData.result &&
+                chartData.result.chart_data ? (
                   <SimpleGrid columns={{ base: 1, lg: 2 }} spacing="20px">
                     {selectedStocks.map((symbol) => {
                       const chartConfig = formatChartData(symbol);
                       if (!chartConfig) {
                         return (
-                          <Box key={symbol} p="20px" border="1px solid" borderColor={borderColor} borderRadius="10px">
-                            <Text color={textColorSecondary}>No chart data available for {symbol}</Text>
+                          <Box
+                            key={symbol}
+                            p="20px"
+                            border="1px solid"
+                            borderColor={borderColor}
+                            borderRadius="10px"
+                          >
+                            <Text color={textColorSecondary}>
+                              No chart data available for {symbol}
+                            </Text>
                           </Box>
                         );
                       }
 
                       return (
-                        <Box key={symbol} p="15px" border="1px solid" borderColor={borderColor} borderRadius="10px">
+                        <Box
+                          key={symbol}
+                          p="15px"
+                          border="1px solid"
+                          borderColor={borderColor}
+                          borderRadius="10px"
+                        >
                           <Chart
                             options={chartConfig.options}
                             series={chartConfig.series}
@@ -371,7 +391,9 @@ export default function PortfolioCreator() {
                     })}
                   </SimpleGrid>
                 ) : (
-                  <Text color={textColorSecondary}>No chart data available</Text>
+                  <Text color={textColorSecondary}>
+                    No chart data available
+                  </Text>
                 )}
               </TabPanel>
 
