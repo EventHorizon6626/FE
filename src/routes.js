@@ -6,16 +6,12 @@ import {
   MdPerson,
   MdHome,
   MdLock,
-  MdOutlineShoppingCart,
 } from 'react-icons/md';
 
 // Admin Imports
 import PortfolioCreator from 'views/admin/portfolio';
 import MainDashboard from 'views/admin/default';
-import OldDashboard from 'views/admin/oldDashboard';
-import NFTMarketplace from 'views/admin/marketplace';
 import Profile from 'views/admin/profile';
-import DataTables from 'views/admin/dataTables';
 // import RTL from 'views/admin/rtl';
 
 // Auth Imports
@@ -37,38 +33,6 @@ const routes = [
     path: '/dashboard',
     icon: <Icon as={MdBarChart} width="20px" height="20px" color="inherit" />,
     component: <MainDashboard />,
-    requiresAuth: false,
-  },
-  {
-    name: 'Old Dashboard',
-    layout: '/',
-    path: '/old-dashboard',
-    icon: <Icon as={MdHome} width="20px" height="20px" color="inherit" />,
-    component: <OldDashboard />,
-    requiresAuth: false,
-  },
-  {
-    name: 'NFT Marketplace',
-    layout: '/',
-    path: '/nft-marketplace',
-    icon: (
-      <Icon
-        as={MdOutlineShoppingCart}
-        width="20px"
-        height="20px"
-        color="inherit"
-      />
-    ),
-    component: <NFTMarketplace />,
-    secondary: true,
-    requiresAuth: false,
-  },
-  {
-    name: 'Data Tables',
-    layout: '/',
-    icon: <Icon as={MdBarChart} width="20px" height="20px" color="inherit" />,
-    path: '/data-tables',
-    component: <DataTables />,
     requiresAuth: false,
   },
   {

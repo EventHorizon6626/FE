@@ -13,7 +13,7 @@ export function SidebarBrand() {
 
   return (
     <Flex align='center' direction='column'>
-      <APPLogo h='26px' w='175px' my='32px' color={logoColor} />
+      <APPLogo h='100px' w='100px' my='32px' color={logoColor} />
       <HSeparator mb='20px' />
     </Flex>
   );
