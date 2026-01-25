@@ -2,31 +2,30 @@ import {
   Badge,
   Box,
   Button,
+  Collapse,
   Flex,
   Grid,
   HStack,
   Icon,
   SimpleGrid,
   Spinner,
-  Stack,
   Text,
   useColorModeValue,
   useToast,
   VStack,
-  Collapse,
 } from '@chakra-ui/react';
 import Card from 'components/card/Card.js';
 import { request } from 'lib/api';
 import { useState } from 'react';
 import Chart from 'react-apexcharts';
 import {
-  MdTrendingUp,
-  MdShowChart,
+  MdAccountBalance,
   MdArticle,
   MdAssessment,
-  MdSpeed,
-  MdAccountBalance,
   MdCheckCircle,
+  MdShowChart,
+  MdSpeed,
+  MdTrendingUp,
 } from 'react-icons/md';
 
 // Minimalist Stock Analysis Card Component
@@ -150,7 +149,12 @@ function StockAnalysisCard({
                   borderRadius="6px"
                   fontSize="xs"
                 >
-                  <Text color={textColor} fontWeight="600" mb="4px" noOfLines={1}>
+                  <Text
+                    color={textColor}
+                    fontWeight="600"
+                    mb="4px"
+                    noOfLines={1}
+                  >
                     {article.title}
                   </Text>
                   <Text color={textColorSecondary} fontSize="2xs">
@@ -177,7 +181,9 @@ function StockAnalysisCard({
             justifyContent="space-between"
             rightIcon={
               <Badge colorScheme="brand" fontSize="xs">
-                {technicalData?.indicators ? Object.keys(technicalData.indicators).length : 0}
+                {technicalData?.indicators
+                  ? Object.keys(technicalData.indicators).length
+                  : 0}
               </Badge>
             }
           >
@@ -192,21 +198,28 @@ function StockAnalysisCard({
             <Box mt="10px">
               {technicalData?.indicators ? (
                 <SimpleGrid columns={2} spacing="8px">
-                  {Object.entries(technicalData.indicators).map(([key, value]) => (
-                    <Box key={key} p="10px" bg={preBlockBg} borderRadius="6px">
-                      <Text
-                        color={textColorSecondary}
-                        fontSize="2xs"
-                        fontWeight="600"
-                        mb="4px"
+                  {Object.entries(technicalData.indicators).map(
+                    ([key, value]) => (
+                      <Box
+                        key={key}
+                        p="10px"
+                        bg={preBlockBg}
+                        borderRadius="6px"
                       >
-                        {key}
-                      </Text>
-                      <Text color={textColor} fontSize="xs" noOfLines={2}>
-                        {value}
-                      </Text>
-                    </Box>
-                  ))}
+                        <Text
+                          color={textColorSecondary}
+                          fontSize="2xs"
+                          fontWeight="600"
+                          mb="4px"
+                        >
+                          {key}
+                        </Text>
+                        <Text color={textColor} fontSize="xs" noOfLines={2}>
+                          {value}
+                        </Text>
+                      </Box>
+                    ),
+                  )}
                 </SimpleGrid>
               ) : (
                 <Text color={textColorSecondary} fontSize="xs" p="10px">
@@ -273,7 +286,12 @@ function StockAnalysisCard({
             justifyContent="space-between"
           >
             <HStack spacing="8px">
-              <Icon as={MdAccountBalance} w="14px" h="14px" color={brandColor} />
+              <Icon
+                as={MdAccountBalance}
+                w="14px"
+                h="14px"
+                color={brandColor}
+              />
               <Text fontSize="xs" fontWeight="600">
                 Fundamentals
               </Text>
@@ -400,13 +418,13 @@ export default function PortfolioCreator() {
     }
   };
 
-  const groupedStocks = AVAILABLE_STOCKS.reduce((acc, stock) => {
-    if (!acc[stock.sector]) {
-      acc[stock.sector] = [];
-    }
-    acc[stock.sector].push(stock);
-    return acc;
-  }, {});
+  // const groupedStocks = AVAILABLE_STOCKS.reduce((acc, stock) => {
+  //   if (!acc[stock.sector]) {
+  //     acc[stock.sector] = [];
+  //   }
+  //   acc[stock.sector].push(stock);
+  //   return acc;
+  // }, {});
 
   // Convert chart data to ApexCharts format
   const formatChartData = (symbol) => {
@@ -499,7 +517,8 @@ export default function PortfolioCreator() {
       <Card mb="20px" bg={cardBg} p="25px">
         <Flex justify="space-between" align="center" mb="20px">
           <Text color={textColor} fontSize="sm" fontWeight="600">
-            {selectedStocks.length} Stock{selectedStocks.length !== 1 ? 's' : ''} Selected
+            {selectedStocks.length} Stock
+            {selectedStocks.length !== 1 ? 's' : ''} Selected
           </Text>
           <HStack spacing="10px">
             <Button
@@ -508,7 +527,9 @@ export default function PortfolioCreator() {
               onClick={handleSelectAll}
               color={brandColor}
             >
-              {selectedStocks.length === AVAILABLE_STOCKS.length ? 'Clear' : 'All'}
+              {selectedStocks.length === AVAILABLE_STOCKS.length
+                ? 'Clear'
+                : 'All'}
             </Button>
           </HStack>
         </Flex>
@@ -532,7 +553,10 @@ export default function PortfolioCreator() {
                 bg={isSelected ? selectedStockBg : 'transparent'}
                 cursor="pointer"
                 transition="all 0.15s"
-                _hover={{ borderColor: brandColor, transform: 'translateY(-2px)' }}
+                _hover={{
+                  borderColor: brandColor,
+                  transform: 'translateY(-2px)',
+                }}
                 onClick={() => handleStockToggle(stock.symbol)}
                 position="relative"
               >
@@ -598,50 +622,75 @@ export default function PortfolioCreator() {
             <Card bg={cardBg} p="15px">
               <HStack spacing="8px">
                 <Icon as={MdShowChart} w="16px" h="16px" color={brandColor} />
-                <Text color={textColorSecondary} fontSize="xs">Charts</Text>
+                <Text color={textColorSecondary} fontSize="xs">
+                  Charts
+                </Text>
               </HStack>
               <Text color={textColor} fontSize="lg" fontWeight="700" mt="5px">
-                {chartData?.result?.chart_data ? Object.keys(chartData.result.chart_data).length : 0}
+                {chartData?.result?.chart_data
+                  ? Object.keys(chartData.result.chart_data).length
+                  : 0}
               </Text>
             </Card>
 
             <Card bg={cardBg} p="15px">
               <HStack spacing="8px">
                 <Icon as={MdArticle} w="16px" h="16px" color={brandColor} />
-                <Text color={textColorSecondary} fontSize="xs">News</Text>
+                <Text color={textColorSecondary} fontSize="xs">
+                  News
+                </Text>
               </HStack>
               <Text color={textColor} fontSize="lg" fontWeight="700" mt="5px">
-                {analysisResult?.result?.news_data ? Object.keys(analysisResult.result.news_data).length : 0}
+                {analysisResult?.result?.news_data
+                  ? Object.keys(analysisResult.result.news_data).length
+                  : 0}
               </Text>
             </Card>
 
             <Card bg={cardBg} p="15px">
               <HStack spacing="8px">
                 <Icon as={MdAssessment} w="16px" h="16px" color={brandColor} />
-                <Text color={textColorSecondary} fontSize="xs">Earnings</Text>
+                <Text color={textColorSecondary} fontSize="xs">
+                  Earnings
+                </Text>
               </HStack>
               <Text color={textColor} fontSize="lg" fontWeight="700" mt="5px">
-                {analysisResult?.result?.earnings_data ? Object.keys(analysisResult.result.earnings_data).length : 0}
+                {analysisResult?.result?.earnings_data
+                  ? Object.keys(analysisResult.result.earnings_data).length
+                  : 0}
               </Text>
             </Card>
 
             <Card bg={cardBg} p="15px">
               <HStack spacing="8px">
                 <Icon as={MdSpeed} w="16px" h="16px" color={brandColor} />
-                <Text color={textColorSecondary} fontSize="xs">Technical</Text>
+                <Text color={textColorSecondary} fontSize="xs">
+                  Technical
+                </Text>
               </HStack>
               <Text color={textColor} fontSize="lg" fontWeight="700" mt="5px">
-                {analysisResult?.result?.technical_data ? Object.keys(analysisResult.result.technical_data).length : 0}
+                {analysisResult?.result?.technical_data
+                  ? Object.keys(analysisResult.result.technical_data).length
+                  : 0}
               </Text>
             </Card>
 
             <Card bg={cardBg} p="15px">
               <HStack spacing="8px">
-                <Icon as={MdAccountBalance} w="16px" h="16px" color={brandColor} />
-                <Text color={textColorSecondary} fontSize="xs">Fundamentals</Text>
+                <Icon
+                  as={MdAccountBalance}
+                  w="16px"
+                  h="16px"
+                  color={brandColor}
+                />
+                <Text color={textColorSecondary} fontSize="xs">
+                  Fundamentals
+                </Text>
               </HStack>
               <Text color={textColor} fontSize="lg" fontWeight="700" mt="5px">
-                {analysisResult?.result?.fundamentals_data ? Object.keys(analysisResult.result.fundamentals_data).length : 0}
+                {analysisResult?.result?.fundamentals_data
+                  ? Object.keys(analysisResult.result.fundamentals_data).length
+                  : 0}
               </Text>
             </Card>
           </SimpleGrid>
