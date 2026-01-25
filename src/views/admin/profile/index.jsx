@@ -37,7 +37,7 @@ import { request } from 'lib/api';
 import Banner from './components/Banner'; // <-- nếu khác path, sửa lại cho khớp
 import banner from 'assets/img/auth/banner.png';
 import BalanceCard from './components/BalanceCard';
-import OrdersCard from './components/OrdersCard';
+// import OrdersCard from './components/OrdersCard';
 import Projects from './components/Projects';
 import Notifications from './components/Notifications';
 import GeneralInformation from './components/General';
@@ -68,7 +68,7 @@ export default function Profile() {
 
   const [loading, setLoading] = React.useState(true);
   const [balance, setBalance] = React.useState(0);
-  const [orders, setOrders] = React.useState([]);
+  // const [orders, setOrders] = React.useState([]);
 
   const cardBg = useColorModeValue('white', 'navy.800');
   const border = useColorModeValue('#E6ECFA', 'rgba(135, 140, 189, 0.3)');
@@ -80,14 +80,9 @@ export default function Profile() {
     try {
       // BE endpoints gợi ý (đã bàn trước):
       //  - GET /wallet/balance  -> { balance: number }
-      //  - GET /orders/my?limit=50 -> { items: [...] }
-      const [b, o] = await Promise.all([
-        request.get('/wallet/balance').catch(() => ({ balance: 0 })),
-        request.get('/orders/my?limit=50').catch(() => ({ items: [] })),
-      ]);
+      const b = await request.get('/wallet/balance').catch(() => ({ balance: 0 }));
 
       setBalance(b?.balance ?? 0);
-      setOrders(o?.items ?? []);
     } finally {
       setLoading(false);
     }
@@ -120,23 +115,7 @@ export default function Profile() {
         <BalanceCard />
       </Grid>
 
-      {/* <OrdersCard orders={orders} loading={loading} />   */}
-      <Grid
-        // mb="20px"
-        // templateColumns={{
-        //   base: '1fr',
-        //   lg: 'repeat(2, 1fr)',
-        //   '2xl': '1.34fr 1.62fr 1fr',
-        // }}
-        // templateRows={{
-        //   base: '1fr',
-        //   lg: 'repeat(2, 1fr)',
-        //   '2xl': '1fr',
-        // }}
-        // gap={{ base: '20px', xl: '20px' }}
-      >
-        <OrdersCard orders={orders} loading={loading} />
-      </Grid>
+      {/* Orders section removed */}
     </Box>
   );
 }
