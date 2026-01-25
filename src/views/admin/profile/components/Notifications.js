@@ -83,14 +83,6 @@ export default function Notifications(props) {
         label="Monthly product changes"
       />
       <SwitchField
-        isChecked={true}
-        reversed={true}
-        fontSize="sm"
-        mb="20px"
-        id="9"
-        label="Subscribe to newsletter"
-      />
-      <SwitchField
         reversed={true}
         fontSize="sm"
         id="10"
