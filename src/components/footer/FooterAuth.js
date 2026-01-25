@@ -33,7 +33,7 @@ export default function Footer() {
       >
         © {year}{' '}
         <Text as="span" fontWeight="500" ms="4px">
-          Ignia Platform. All rights reserved.
+          Event Horizon. All rights reserved.
         </Text>
       </Text>
 
@@ -47,7 +47,7 @@ export default function Footer() {
             fontWeight="500"
             color={linkColor}
             _hover={{ color: accentColor }}
-            href="mailto:support@ignia.io"
+            href="mailto:support@eventhorizon.ai"
           >
             Support
           </Link>
