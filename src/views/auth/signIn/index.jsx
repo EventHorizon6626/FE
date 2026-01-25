@@ -6,25 +6,22 @@ import { NavLink, useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Box,
   Button,
-  Checkbox,
   Flex,
   FormControl,
   FormLabel,
-  Heading,
   Icon,
   Input,
   InputGroup,
   InputRightElement,
   Text,
+  VStack,
   useColorModeValue,
 } from '@chakra-ui/react';
 
 // Custom components
-import { HSeparator } from 'components/separator/Separator';
-import DefaultAuth from 'layouts/auth/Default';
+import { APPLogo } from 'components/icons/Icons';
 
 // Assets
-import illustration from 'assets/img/auth/auth.png';
 import { FcGoogle } from 'react-icons/fc';
 import { MdOutlineRemoveRedEye } from 'react-icons/md';
 import { RiEyeCloseLine } from 'react-icons/ri';
@@ -36,20 +33,10 @@ import api from 'lib/api';
 function SignIn() {
   // Chakra color mode
   const textColor = useColorModeValue('navy.700', 'white');
-  const textColorSecondary = 'gray.400';
-  const textColorDetails = useColorModeValue('navy.700', 'secondaryGray.600');
-  const textColorBrand = useColorModeValue('brand.500', 'white');
-  const brandStars = useColorModeValue('brand.500', 'brand.400');
-  const googleBg = useColorModeValue('secondaryGray.300', 'whiteAlpha.200');
+  const textColorSecondary = useColorModeValue('gray.500', 'gray.400');
+  const brandColor = useColorModeValue('brand.500', 'brand.400');
+  const googleBg = useColorModeValue('gray.100', 'whiteAlpha.100');
   const googleText = useColorModeValue('navy.700', 'white');
-  const googleHover = useColorModeValue(
-    { bg: 'gray.200' },
-    { bg: 'whiteAlpha.300' },
-  );
-  const googleActive = useColorModeValue(
-    { bg: 'secondaryGray.300' },
-    { bg: 'whiteAlpha.200' },
-  );
 
   // State
   const [show, setShow] = React.useState(false);
@@ -93,205 +80,260 @@ function SignIn() {
   };
 
   return (
-    <DefaultAuth illustrationBackground={illustration} image={illustration}>
-      <Flex
-        maxW={{ base: '100%', md: 'max-content' }}
-        w="100%"
-        mx={{ base: 'auto', lg: '0px' }}
-        me="auto"
-        h="100%"
-        alignItems="start"
-        justifyContent="center"
-        mb={{ base: '30px', md: '60px' }}
-        px={{ base: '25px', md: '0px' }}
-        mt={{ base: '40px', md: '14vh' }}
-        flexDirection="column"
+    <Flex
+      w="100vw"
+      h="100vh"
+      bg={useColorModeValue('gray.50', '#0A0A0A')}
+      align="center"
+      justify="center"
+      position="relative"
+      overflow="hidden"
+    >
+      {/* Pixel art background grid */}
+      <Box
+        position="absolute"
+        top="0"
+        left="0"
+        right="0"
+        bottom="0"
+        opacity="0.03"
+        backgroundImage={`
+          linear-gradient(${useColorModeValue('#000', '#fff')} 1px, transparent 1px),
+          linear-gradient(90deg, ${useColorModeValue('#000', '#fff')} 1px, transparent 1px)
+        `}
+        backgroundSize="20px 20px"
+        pointerEvents="none"
+      />
+
+      {/* Main container */}
+      <Box
+        maxW="400px"
+        w="full"
+        px="20px"
+        position="relative"
+        zIndex="1"
       >
-        <Box me="auto">
-          <Heading color={textColor} fontSize="36px" mb="10px">
-            Sign In
-          </Heading>
-          <Text
-            mb="12px"
-            ms="4px"
-            color={textColorSecondary}
-            fontWeight="400"
-            fontSize="md"
+        {/* Logo and Title */}
+        <VStack spacing="20px" mb="40px">
+          <APPLogo
+            h="120px"
+            w="120px"
+            color={useColorModeValue('navy.700', 'white')}
+          />
+          <VStack spacing="5px">
+            <Text
+              fontSize="2xl"
+              fontWeight="900"
+              color={textColor}
+              letterSpacing="3px"
+              fontFamily="monospace"
+              textTransform="uppercase"
+            >
+              EVENT HORIZON
+            </Text>
+            <Text
+              fontSize="xs"
+              color={textColorSecondary}
+              letterSpacing="1px"
+              fontFamily="monospace"
+            >
+              AI-POWERED PORTFOLIO ANALYSIS
+            </Text>
+          </VStack>
+        </VStack>
+
+        {/* Error message */}
+        {error && (
+          <Box
+            mb="20px"
+            p="10px"
+            bg="red.500"
+            borderRadius="4px"
+            border="2px solid"
+            borderColor="red.600"
           >
-            Enter your email and password to sign in!
-          </Text>
-          {error ? (
-            <Text ms="4px" color="red.400" fontSize="sm" fontWeight="500">
+            <Text fontSize="xs" color="white" fontFamily="monospace" textAlign="center">
               {error}
             </Text>
-          ) : null}
-        </Box>
+          </Box>
+        )}
 
-        <Flex
-          zIndex="2"
+        {/* Sign in form */}
+        <VStack
           as="form"
           onSubmit={onSubmit}
-          direction="column"
-          w={{ base: '100%', md: '420px' }}
-          maxW="100%"
-          background="transparent"
-          borderRadius="15px"
-          mx={{ base: 'auto', lg: 'unset' }}
-          me="auto"
-          mb={{ base: '20px', md: 'auto' }}
+          spacing="15px"
+          bg={useColorModeValue('white', 'navy.900')}
+          p="25px"
+          borderRadius="8px"
+          border="2px solid"
+          borderColor={useColorModeValue('gray.200', 'whiteAlpha.200')}
+          boxShadow={useColorModeValue('0 4px 0 0 #e2e8f0', '0 4px 0 0 rgba(255,255,255,0.1)')}
         >
+          {/* Google Sign In */}
           <Button
-            fontSize="sm"
-            mb="26px"
-            py="15px"
-            h="50px"
-            borderRadius="16px"
+            w="full"
+            h="45px"
             bg={googleBg}
             color={googleText}
-            fontWeight="500"
-            _hover={googleHover}
-            _active={googleActive}
-            _focus={googleActive}
+            fontWeight="600"
+            fontSize="xs"
+            fontFamily="monospace"
+            letterSpacing="1px"
+            border="2px solid"
+            borderColor={useColorModeValue('gray.300', 'whiteAlpha.300')}
+            borderRadius="4px"
+            _hover={{ transform: 'translateY(-2px)', boxShadow: 'lg' }}
+            _active={{ transform: 'translateY(0)' }}
+            transition="all 0.15s"
             onClick={onGoogle}
             isDisabled={submitting}
+            leftIcon={<Icon as={FcGoogle} w="18px" h="18px" />}
           >
-            <Icon as={FcGoogle} w="20px" h="20px" me="10px" />
-            Sign in with Google
+            SIGN IN WITH GOOGLE
           </Button>
 
-          <Flex align="center" mb="25px">
-            <HSeparator />
-            <Text color="gray.400" mx="14px">
-              or
+          {/* Divider */}
+          <Flex align="center" w="full" my="5px">
+            <Box flex="1" h="2px" bg={useColorModeValue('gray.200', 'whiteAlpha.200')} />
+            <Text
+              px="10px"
+              fontSize="2xs"
+              color={textColorSecondary}
+              fontFamily="monospace"
+              fontWeight="700"
+            >
+              OR
             </Text>
-            <HSeparator />
+            <Box flex="1" h="2px" bg={useColorModeValue('gray.200', 'whiteAlpha.200')} />
           </Flex>
 
+          {/* Email input */}
           <FormControl>
             <FormLabel
-              display="flex"
-              ms="4px"
-              fontSize="sm"
-              fontWeight="500"
+              fontSize="2xs"
+              fontWeight="700"
               color={textColor}
-              mb="8px"
+              mb="6px"
+              fontFamily="monospace"
+              letterSpacing="1px"
             >
-              Email<Text color={brandStars}>*</Text>
+              EMAIL
             </FormLabel>
             <Input
-              isRequired
-              variant="auth"
-              fontSize="sm"
               type="email"
-              placeholder="you@example.com"
-              mb="24px"
-              size="lg"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              fontSize="sm"
+              fontFamily="monospace"
+              h="45px"
+              bg={useColorModeValue('gray.50', 'navy.800')}
+              border="2px solid"
+              borderColor={useColorModeValue('gray.200', 'whiteAlpha.200')}
+              borderRadius="4px"
+              _hover={{ borderColor: brandColor }}
+              _focus={{ borderColor: brandColor, boxShadow: 'none' }}
               isDisabled={submitting}
             />
+          </FormControl>
 
+          {/* Password input */}
+          <FormControl>
             <FormLabel
-              ms="4px"
-              fontSize="sm"
-              fontWeight="500"
+              fontSize="2xs"
+              fontWeight="700"
               color={textColor}
-              display="flex"
+              mb="6px"
+              fontFamily="monospace"
+              letterSpacing="1px"
             >
-              Password<Text color={brandStars}>*</Text>
+              PASSWORD
             </FormLabel>
-            <InputGroup size="md">
+            <InputGroup>
               <Input
-                isRequired
-                fontSize="sm"
-                placeholder="Min. 8 characters"
-                mb="24px"
-                size="lg"
                 type={show ? 'text' : 'password'}
-                variant="auth"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                placeholder="Min. 8 characters"
+                fontSize="sm"
+                fontFamily="monospace"
+                h="45px"
+                bg={useColorModeValue('gray.50', 'navy.800')}
+                border="2px solid"
+                borderColor={useColorModeValue('gray.200', 'whiteAlpha.200')}
+                borderRadius="4px"
+                _hover={{ borderColor: brandColor }}
+                _focus={{ borderColor: brandColor, boxShadow: 'none' }}
                 isDisabled={submitting}
               />
-              <InputRightElement display="flex" alignItems="center" mt="4px">
+              <InputRightElement h="45px">
                 <Icon
-                  color={textColorSecondary}
-                  _hover={{ cursor: 'pointer' }}
                   as={show ? RiEyeCloseLine : MdOutlineRemoveRedEye}
+                  color={textColorSecondary}
+                  cursor="pointer"
                   onClick={handleClick}
+                  w="18px"
+                  h="18px"
                 />
               </InputRightElement>
             </InputGroup>
-
-            <Flex justifyContent="space-between" align="center" mb="24px">
-              <FormControl display="flex" alignItems="center">
-                <Checkbox
-                  id="remember-login"
-                  colorScheme="brandScheme"
-                  me="10px"
-                  isDisabled
-                />
-                <FormLabel
-                  htmlFor="remember-login"
-                  mb="0"
-                  fontWeight="normal"
-                  color={textColor}
-                  fontSize="sm"
-                >
-                  Keep me logged in
-                </FormLabel>
-              </FormControl>
-              <NavLink to="/auth/forgot-password">
-                <Text
-                  color={textColorBrand}
-                  fontSize="sm"
-                  w="124px"
-                  fontWeight="500"
-                >
-                  Forgot password?
-                </Text>
-              </NavLink>
-            </Flex>
-
-            <Button
-              type="submit"
-              fontSize="sm"
-              variant="brand"
-              fontWeight="500"
-              w="100%"
-              h="50"
-              mb="24px"
-              isLoading={submitting}
-              isDisabled={!email || !password}
-            >
-              Sign In
-            </Button>
           </FormControl>
 
-          <Flex
-            flexDirection="column"
-            justifyContent="center"
-            alignItems="start"
-            maxW="100%"
-            mt="0px"
+          {/* Submit button */}
+          <Button
+            type="submit"
+            w="full"
+            h="45px"
+            bg={brandColor}
+            color="white"
+            fontWeight="700"
+            fontSize="xs"
+            fontFamily="monospace"
+            letterSpacing="1px"
+            border="2px solid"
+            borderColor={useColorModeValue('brand.600', 'brand.500')}
+            borderRadius="4px"
+            boxShadow={useColorModeValue('0 4px 0 0 #3182ce', '0 4px 0 0 #63b3ed')}
+            _hover={{ transform: 'translateY(-2px)', boxShadow: 'lg' }}
+            _active={{ transform: 'translateY(0)', boxShadow: 'none' }}
+            transition="all 0.15s"
+            isLoading={submitting}
+            isDisabled={!email || !password}
           >
-            <Text color={textColorDetails} fontWeight="400" fontSize="14px">
-              Not registered yet?
-              <NavLink to={`/auth/sign-up?next=${encodeURIComponent(next)}`}>
-                <Text
-                  color={textColorBrand}
-                  as="span"
-                  ms="5px"
-                  fontWeight="500"
-                >
-                  Create an Account
-                </Text>
-              </NavLink>
-            </Text>
-          </Flex>
-        </Flex>
-      </Flex>
-    </DefaultAuth>
+            SIGN IN
+          </Button>
+
+          {/* Sign up link */}
+          <Text
+            fontSize="2xs"
+            color={textColorSecondary}
+            fontFamily="monospace"
+            textAlign="center"
+            mt="10px"
+          >
+            NEW USER?{' '}
+            <NavLink to={`/auth/sign-up?next=${encodeURIComponent(next)}`}>
+              <Text as="span" color={brandColor} fontWeight="700" _hover={{ textDecoration: 'underline' }}>
+                CREATE ACCOUNT
+              </Text>
+            </NavLink>
+          </Text>
+        </VStack>
+
+        {/* Footer text */}
+        <Text
+          fontSize="3xs"
+          color={textColorSecondary}
+          textAlign="center"
+          mt="20px"
+          fontFamily="monospace"
+          letterSpacing="1px"
+        >
+          © 2026 EVENT HORIZON
+        </Text>
+      </Box>
+    </Flex>
   );
 }
 

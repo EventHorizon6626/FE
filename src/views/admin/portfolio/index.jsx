@@ -1,24 +1,296 @@
 import {
+  Badge,
   Box,
   Button,
-  Checkbox,
   Flex,
+  Grid,
+  HStack,
+  Icon,
   SimpleGrid,
   Spinner,
-  Tab,
-  TabList,
-  TabPanel,
-  TabPanels,
-  Tabs,
+  Stack,
   Text,
   useColorModeValue,
   useToast,
+  VStack,
+  Collapse,
 } from '@chakra-ui/react';
 import Card from 'components/card/Card.js';
 import { request } from 'lib/api';
 import { useState } from 'react';
 import Chart from 'react-apexcharts';
-import { MdTrendingUp } from 'react-icons/md';
+import {
+  MdTrendingUp,
+  MdShowChart,
+  MdArticle,
+  MdAssessment,
+  MdSpeed,
+  MdAccountBalance,
+  MdCheckCircle,
+} from 'react-icons/md';
+
+// Minimalist Stock Analysis Card Component
+function StockAnalysisCard({
+  symbol,
+  chartData,
+  analysisResult,
+  formatChartData,
+  textColor,
+  textColorSecondary,
+  brandColor,
+  cardBg,
+  borderColor,
+  preBlockBg,
+}) {
+  const [expandedSections, setExpandedSections] = useState({
+    chart: true,
+    news: false,
+    earnings: false,
+    technical: false,
+    fundamentals: false,
+  });
+
+  const toggleSection = (section) => {
+    setExpandedSections((prev) => ({
+      ...prev,
+      [section]: !prev[section],
+    }));
+  };
+
+  const chartConfig = formatChartData(symbol);
+  const newsData = analysisResult?.result?.news_data?.[symbol];
+  const earningsData = analysisResult?.result?.earnings_data?.[symbol];
+  const technicalData = analysisResult?.result?.technical_data?.[symbol];
+  const fundamentalsData = analysisResult?.result?.fundamentals_data?.[symbol];
+
+  return (
+    <Card bg={cardBg} p="20px">
+      {/* Stock Header */}
+      <Flex justify="space-between" align="center" mb="20px">
+        <HStack spacing="10px">
+          <Text color={textColor} fontSize="xl" fontWeight="700">
+            {symbol}
+          </Text>
+          <Badge colorScheme="brand" fontSize="xs">
+            {AVAILABLE_STOCKS.find((s) => s.symbol === symbol)?.name || symbol}
+          </Badge>
+        </HStack>
+      </Flex>
+
+      <VStack spacing="15px" align="stretch">
+        {/* Chart Section */}
+        <Box>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => toggleSection('chart')}
+            w="full"
+            justifyContent="space-between"
+            rightIcon={
+              <Icon
+                as={MdShowChart}
+                transform={expandedSections.chart ? 'rotate(180deg)' : 'none'}
+                transition="all 0.2s"
+              />
+            }
+          >
+            <HStack spacing="8px">
+              <Icon as={MdShowChart} w="14px" h="14px" color={brandColor} />
+              <Text fontSize="xs" fontWeight="600">
+                Price Chart
+              </Text>
+            </HStack>
+          </Button>
+          <Collapse in={expandedSections.chart}>
+            <Box mt="10px">
+              {chartConfig ? (
+                <Chart
+                  options={chartConfig.options}
+                  series={chartConfig.series}
+                  type="candlestick"
+                  height={300}
+                />
+              ) : (
+                <Text color={textColorSecondary} fontSize="xs" p="10px">
+                  No chart data
+                </Text>
+              )}
+            </Box>
+          </Collapse>
+        </Box>
+
+        {/* News Section */}
+        <Box borderTop="1px solid" borderColor={borderColor} pt="15px">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => toggleSection('news')}
+            w="full"
+            justifyContent="space-between"
+            rightIcon={
+              <Badge colorScheme="brand" fontSize="xs">
+                {newsData?.articles?.length || 0}
+              </Badge>
+            }
+          >
+            <HStack spacing="8px">
+              <Icon as={MdArticle} w="14px" h="14px" color={brandColor} />
+              <Text fontSize="xs" fontWeight="600">
+                News Articles
+              </Text>
+            </HStack>
+          </Button>
+          <Collapse in={expandedSections.news}>
+            <VStack spacing="8px" align="stretch" mt="10px">
+              {newsData?.articles?.slice(0, 5).map((article, idx) => (
+                <Box
+                  key={idx}
+                  p="10px"
+                  bg={preBlockBg}
+                  borderRadius="6px"
+                  fontSize="xs"
+                >
+                  <Text color={textColor} fontWeight="600" mb="4px" noOfLines={1}>
+                    {article.title}
+                  </Text>
+                  <Text color={textColorSecondary} fontSize="2xs">
+                    {new Date(article.publishedAt).toLocaleDateString()}
+                  </Text>
+                </Box>
+              ))}
+              {!newsData?.articles?.length && (
+                <Text color={textColorSecondary} fontSize="xs" p="10px">
+                  No news data
+                </Text>
+              )}
+            </VStack>
+          </Collapse>
+        </Box>
+
+        {/* Technical Indicators Section */}
+        <Box borderTop="1px solid" borderColor={borderColor} pt="15px">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => toggleSection('technical')}
+            w="full"
+            justifyContent="space-between"
+            rightIcon={
+              <Badge colorScheme="brand" fontSize="xs">
+                {technicalData?.indicators ? Object.keys(technicalData.indicators).length : 0}
+              </Badge>
+            }
+          >
+            <HStack spacing="8px">
+              <Icon as={MdSpeed} w="14px" h="14px" color={brandColor} />
+              <Text fontSize="xs" fontWeight="600">
+                Technical Indicators
+              </Text>
+            </HStack>
+          </Button>
+          <Collapse in={expandedSections.technical}>
+            <Box mt="10px">
+              {technicalData?.indicators ? (
+                <SimpleGrid columns={2} spacing="8px">
+                  {Object.entries(technicalData.indicators).map(([key, value]) => (
+                    <Box key={key} p="10px" bg={preBlockBg} borderRadius="6px">
+                      <Text
+                        color={textColorSecondary}
+                        fontSize="2xs"
+                        fontWeight="600"
+                        mb="4px"
+                      >
+                        {key}
+                      </Text>
+                      <Text color={textColor} fontSize="xs" noOfLines={2}>
+                        {value}
+                      </Text>
+                    </Box>
+                  ))}
+                </SimpleGrid>
+              ) : (
+                <Text color={textColorSecondary} fontSize="xs" p="10px">
+                  No technical data
+                </Text>
+              )}
+            </Box>
+          </Collapse>
+        </Box>
+
+        {/* Earnings Section */}
+        <Box borderTop="1px solid" borderColor={borderColor} pt="15px">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => toggleSection('earnings')}
+            w="full"
+            justifyContent="space-between"
+          >
+            <HStack spacing="8px">
+              <Icon as={MdAssessment} w="14px" h="14px" color={brandColor} />
+              <Text fontSize="xs" fontWeight="600">
+                Earnings & Financials
+              </Text>
+            </HStack>
+          </Button>
+          <Collapse in={expandedSections.earnings}>
+            <Box mt="10px" p="10px" bg={preBlockBg} borderRadius="6px">
+              {earningsData ? (
+                <VStack spacing="6px" align="stretch">
+                  <HStack justify="space-between">
+                    <Text color={textColorSecondary} fontSize="2xs">
+                      Company
+                    </Text>
+                    <Text color={textColor} fontSize="xs" fontWeight="600">
+                      {earningsData.name || 'N/A'}
+                    </Text>
+                  </HStack>
+                  <HStack justify="space-between">
+                    <Text color={textColorSecondary} fontSize="2xs">
+                      Type
+                    </Text>
+                    <Text color={textColor} fontSize="xs">
+                      {earningsData.security_type || 'N/A'}
+                    </Text>
+                  </HStack>
+                </VStack>
+              ) : (
+                <Text color={textColorSecondary} fontSize="xs">
+                  No earnings data
+                </Text>
+              )}
+            </Box>
+          </Collapse>
+        </Box>
+
+        {/* Fundamentals Section */}
+        <Box borderTop="1px solid" borderColor={borderColor} pt="15px">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => toggleSection('fundamentals')}
+            w="full"
+            justifyContent="space-between"
+          >
+            <HStack spacing="8px">
+              <Icon as={MdAccountBalance} w="14px" h="14px" color={brandColor} />
+              <Text fontSize="xs" fontWeight="600">
+                Fundamentals
+              </Text>
+            </HStack>
+          </Button>
+          <Collapse in={expandedSections.fundamentals}>
+            <Box mt="10px" p="10px" bg={preBlockBg} borderRadius="6px">
+              <Text color={textColor} fontSize="xs" whiteSpace="pre-wrap">
+                {fundamentalsData?.fundamentals_text || 'No fundamentals data'}
+              </Text>
+            </Box>
+          </Collapse>
+        </Box>
+      </VStack>
+    </Card>
+  );
+}
 
 // Predefined list of popular stocks
 const AVAILABLE_STOCKS = [
@@ -213,207 +485,184 @@ export default function PortfolioCreator() {
 
   return (
     <Box pt={{ base: '130px', md: '80px', xl: '80px' }}>
-      {/* Header */}
-      <Flex mb="20px" align="center" justify="space-between">
-        <Box>
-          <Text color={textColor} fontSize="2xl" fontWeight="700">
-            Create Your Portfolio
-          </Text>
-          <Text color={textColorSecondary} fontSize="md" mt="5px">
-            Select stocks to analyze with AI-powered insights
-          </Text>
-        </Box>
-        <Button
-          variant="outline"
-          colorScheme="brand"
-          size="sm"
-          onClick={handleSelectAll}
-        >
-          {selectedStocks.length === AVAILABLE_STOCKS.length
-            ? 'Deselect All'
-            : 'Select All'}
-        </Button>
-      </Flex>
-
-      {/* Stock Selection */}
-      <Card mb="20px" bg={cardBg}>
-        <Text color={textColor} fontSize="lg" fontWeight="600" mb="20px">
-          Available Stocks ({selectedStocks.length} selected)
+      {/* Minimalist Header */}
+      <Box mb="30px">
+        <Text color={textColor} fontSize="3xl" fontWeight="700" mb="5px">
+          Portfolio Analysis
         </Text>
+        <Text color={textColorSecondary} fontSize="sm">
+          Select stocks and analyze with AI-powered insights
+        </Text>
+      </Box>
 
-        {Object.entries(groupedStocks).map(([sector, stocks]) => (
-          <Box key={sector} mb="30px">
-            <Text
+      {/* Minimalist Stock Selection */}
+      <Card mb="20px" bg={cardBg} p="25px">
+        <Flex justify="space-between" align="center" mb="20px">
+          <Text color={textColor} fontSize="sm" fontWeight="600">
+            {selectedStocks.length} Stock{selectedStocks.length !== 1 ? 's' : ''} Selected
+          </Text>
+          <HStack spacing="10px">
+            <Button
+              size="xs"
+              variant="ghost"
+              onClick={handleSelectAll}
               color={brandColor}
-              fontSize="md"
-              fontWeight="600"
-              mb="10px"
-              textTransform="uppercase"
-              letterSpacing="wide"
             >
-              {sector}
-            </Text>
-            <SimpleGrid
-              columns={{ base: 1, md: 2, lg: 3, xl: 4 }}
-              spacing="15px"
-            >
-              {stocks.map((stock) => (
-                <Flex
-                  key={stock.symbol}
-                  p="15px"
-                  border="1px solid"
-                  borderColor={
-                    selectedStocks.includes(stock.symbol)
-                      ? brandColor
-                      : borderColor
-                  }
-                  borderRadius="10px"
-                  bg={
-                    selectedStocks.includes(stock.symbol)
-                      ? selectedStockBg
-                      : 'transparent'
-                  }
-                  cursor="pointer"
-                  transition="all 0.2s"
-                  _hover={{ borderColor: brandColor }}
-                  onClick={() => handleStockToggle(stock.symbol)}
-                  align="center"
-                >
-                  <Checkbox
-                    isChecked={selectedStocks.includes(stock.symbol)}
-                    onChange={() => handleStockToggle(stock.symbol)}
-                    colorScheme="brand"
-                    mr="10px"
-                  />
-                  <Box flex="1">
-                    <Text color={textColor} fontSize="sm" fontWeight="700">
-                      {stock.symbol}
-                    </Text>
-                    <Text
-                      color={textColorSecondary}
-                      fontSize="xs"
-                      noOfLines={1}
-                    >
-                      {stock.name}
-                    </Text>
-                  </Box>
-                </Flex>
-              ))}
-            </SimpleGrid>
-          </Box>
-        ))}
-      </Card>
+              {selectedStocks.length === AVAILABLE_STOCKS.length ? 'Clear' : 'All'}
+            </Button>
+          </HStack>
+        </Flex>
 
-      {/* Create Portfolio Button */}
-      <Flex justify="center" mb="20px">
+        {/* Compact Stock Grid */}
+        <Grid
+          templateColumns="repeat(auto-fill, minmax(80px, 1fr))"
+          gap="8px"
+          mb="20px"
+        >
+          {AVAILABLE_STOCKS.map((stock) => {
+            const isSelected = selectedStocks.includes(stock.symbol);
+            return (
+              <Box
+                key={stock.symbol}
+                as="button"
+                p="10px"
+                borderRadius="8px"
+                border="1px solid"
+                borderColor={isSelected ? brandColor : borderColor}
+                bg={isSelected ? selectedStockBg : 'transparent'}
+                cursor="pointer"
+                transition="all 0.15s"
+                _hover={{ borderColor: brandColor, transform: 'translateY(-2px)' }}
+                onClick={() => handleStockToggle(stock.symbol)}
+                position="relative"
+              >
+                {isSelected && (
+                  <Icon
+                    as={MdCheckCircle}
+                    position="absolute"
+                    top="4px"
+                    right="4px"
+                    w="12px"
+                    h="12px"
+                    color={brandColor}
+                  />
+                )}
+                <Text
+                  color={textColor}
+                  fontSize="xs"
+                  fontWeight="700"
+                  textAlign="center"
+                >
+                  {stock.symbol}
+                </Text>
+              </Box>
+            );
+          })}
+        </Grid>
+
+        {/* Analyze Button */}
         <Button
           leftIcon={<MdTrendingUp />}
           colorScheme="brand"
-          size="lg"
+          size="md"
           onClick={handleCreatePortfolio}
           isLoading={loading}
           loadingText="Analyzing..."
           isDisabled={selectedStocks.length === 0}
-          px="60px"
+          w="full"
         >
-          Create Portfolio & Analyze
+          Analyze Portfolio
         </Button>
-      </Flex>
+      </Card>
 
-      {/* Analysis Results */}
+      {/* Loading State */}
       {loading && (
-        <Card bg={cardBg}>
-          <Flex align="center" justify="center" py="40px" direction="column">
-            <Spinner size="xl" color={brandColor} thickness="4px" mb="20px" />
-            <Text color={textColor} fontSize="lg" fontWeight="600">
-              Analyzing your portfolio...
+        <Card bg={cardBg} p="40px">
+          <VStack spacing="15px">
+            <Spinner size="lg" color={brandColor} thickness="3px" />
+            <Text color={textColor} fontSize="md" fontWeight="600">
+              Analyzing Portfolio
             </Text>
-            <Text color={textColorSecondary} fontSize="sm" mt="5px">
-              Fetching news, reports, and financial data
+            <Text color={textColorSecondary} fontSize="xs">
+              Collecting data from 5 sources...
             </Text>
-          </Flex>
+          </VStack>
         </Card>
       )}
 
+      {/* Minimalist Analysis Results */}
       {analysisResult && !loading && (
-        <Card bg={cardBg}>
-          <Text color={textColor} fontSize="xl" fontWeight="700" mb="20px">
-            Portfolio Analysis Results
-          </Text>
+        <VStack spacing="15px" align="stretch">
+          {/* Summary Stats */}
+          <SimpleGrid columns={{ base: 2, md: 5 }} spacing="10px">
+            <Card bg={cardBg} p="15px">
+              <HStack spacing="8px">
+                <Icon as={MdShowChart} w="16px" h="16px" color={brandColor} />
+                <Text color={textColorSecondary} fontSize="xs">Charts</Text>
+              </HStack>
+              <Text color={textColor} fontSize="lg" fontWeight="700" mt="5px">
+                {chartData?.result?.chart_data ? Object.keys(chartData.result.chart_data).length : 0}
+              </Text>
+            </Card>
 
-          <Tabs variant="enclosed" colorScheme="brand">
-            <TabList>
-              <Tab>Charts</Tab>
-              <Tab>Raw Data</Tab>
-            </TabList>
+            <Card bg={cardBg} p="15px">
+              <HStack spacing="8px">
+                <Icon as={MdArticle} w="16px" h="16px" color={brandColor} />
+                <Text color={textColorSecondary} fontSize="xs">News</Text>
+              </HStack>
+              <Text color={textColor} fontSize="lg" fontWeight="700" mt="5px">
+                {analysisResult?.result?.news_data ? Object.keys(analysisResult.result.news_data).length : 0}
+              </Text>
+            </Card>
 
-            <TabPanels>
-              {/* Charts Tab */}
-              <TabPanel>
-                {chartData &&
-                chartData.result &&
-                chartData.result.chart_data ? (
-                  <SimpleGrid columns={{ base: 1, lg: 2 }} spacing="20px">
-                    {selectedStocks.map((symbol) => {
-                      const chartConfig = formatChartData(symbol);
-                      if (!chartConfig) {
-                        return (
-                          <Box
-                            key={symbol}
-                            p="20px"
-                            border="1px solid"
-                            borderColor={borderColor}
-                            borderRadius="10px"
-                          >
-                            <Text color={textColorSecondary}>
-                              No chart data available for {symbol}
-                            </Text>
-                          </Box>
-                        );
-                      }
+            <Card bg={cardBg} p="15px">
+              <HStack spacing="8px">
+                <Icon as={MdAssessment} w="16px" h="16px" color={brandColor} />
+                <Text color={textColorSecondary} fontSize="xs">Earnings</Text>
+              </HStack>
+              <Text color={textColor} fontSize="lg" fontWeight="700" mt="5px">
+                {analysisResult?.result?.earnings_data ? Object.keys(analysisResult.result.earnings_data).length : 0}
+              </Text>
+            </Card>
 
-                      return (
-                        <Box
-                          key={symbol}
-                          p="15px"
-                          border="1px solid"
-                          borderColor={borderColor}
-                          borderRadius="10px"
-                        >
-                          <Chart
-                            options={chartConfig.options}
-                            series={chartConfig.series}
-                            type="candlestick"
-                            height={350}
-                          />
-                        </Box>
-                      );
-                    })}
-                  </SimpleGrid>
-                ) : (
-                  <Text color={textColorSecondary}>
-                    No chart data available
-                  </Text>
-                )}
-              </TabPanel>
+            <Card bg={cardBg} p="15px">
+              <HStack spacing="8px">
+                <Icon as={MdSpeed} w="16px" h="16px" color={brandColor} />
+                <Text color={textColorSecondary} fontSize="xs">Technical</Text>
+              </HStack>
+              <Text color={textColor} fontSize="lg" fontWeight="700" mt="5px">
+                {analysisResult?.result?.technical_data ? Object.keys(analysisResult.result.technical_data).length : 0}
+              </Text>
+            </Card>
 
-              {/* Raw Data Tab */}
-              <TabPanel>
-                <Box
-                  as="pre"
-                  p="20px"
-                  bg={preBlockBg}
-                  borderRadius="10px"
-                  overflow="auto"
-                  fontSize="sm"
-                  color={textColor}
-                >
-                  {JSON.stringify(analysisResult, null, 2)}
-                </Box>
-              </TabPanel>
-            </TabPanels>
-          </Tabs>
-        </Card>
+            <Card bg={cardBg} p="15px">
+              <HStack spacing="8px">
+                <Icon as={MdAccountBalance} w="16px" h="16px" color={brandColor} />
+                <Text color={textColorSecondary} fontSize="xs">Fundamentals</Text>
+              </HStack>
+              <Text color={textColor} fontSize="lg" fontWeight="700" mt="5px">
+                {analysisResult?.result?.fundamentals_data ? Object.keys(analysisResult.result.fundamentals_data).length : 0}
+              </Text>
+            </Card>
+          </SimpleGrid>
+
+          {/* Per-Stock Analysis Cards */}
+          {selectedStocks.map((symbol) => (
+            <StockAnalysisCard
+              key={symbol}
+              symbol={symbol}
+              chartData={chartData}
+              analysisResult={analysisResult}
+              formatChartData={formatChartData}
+              textColor={textColor}
+              textColorSecondary={textColorSecondary}
+              brandColor={brandColor}
+              cardBg={cardBg}
+              borderColor={borderColor}
+              preBlockBg={preBlockBg}
+            />
+          ))}
+        </VStack>
       )}
     </Box>
   );
