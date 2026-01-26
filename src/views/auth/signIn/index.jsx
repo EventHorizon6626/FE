@@ -48,7 +48,7 @@ function SignIn() {
   // Router / Auth
   const [sp] = useSearchParams();
   const navigate = useNavigate();
-  const next = sp.get('next') || '/'; // bạn nói dashboard là '/', nên để mặc định là '/'
+  const next = sp.get('next') || '/';
 
   const { login } = useAuth();
 
@@ -73,7 +73,6 @@ function SignIn() {
   };
 
   const onGoogle = () => {
-    // chuyển hướng sang BE để start OAuth
     const base = api?.defaults?.baseURL || '/api';
     const url = `${base}/auth/google/start?next=${encodeURIComponent(next)}`;
     window.location.href = url;

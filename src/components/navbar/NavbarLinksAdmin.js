@@ -74,7 +74,6 @@ export default function HeaderLinks(props) {
         borderRadius="30px"
       />
 
-      {/* ETH chip demo (giữ nguyên nếu muốn) */}
       <Flex
         bg={ethBg}
         display={secondary ? 'flex' : 'none'}

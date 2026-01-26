@@ -2,13 +2,13 @@ import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from 'context/AuthContext';
 
-const DASHBOARD_FALLBACK = '/admin/default'; // đổi nếu dashboard khác
+const DASHBOARD_FALLBACK = '/admin/default';
 
 export function RequireAuth({ children }) {
   const { user, loading } = useAuth();
   const location = useLocation();
 
-  if (loading) return null; // hoặc spinner nếu muốn
+  if (loading) return null;
   if (!user) {
     const next = encodeURIComponent(location.pathname + location.search);
     return <Navigate to={`/auth/sign-in?next=${next}`} replace />;
@@ -26,7 +26,6 @@ export function RequireGuest({ children }) {
   return children;
 }
 
-/** Optional: giới hạn theo vai trò */
 export function RequireRole({ role, children }) {
   const { user, loading } = useAuth();
   const location = useLocation();

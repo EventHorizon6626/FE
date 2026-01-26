@@ -27,10 +27,10 @@ const formatVND = n =>
 
 const StatusPill = ({ value }) => {
   const map = {
-    completed: { color: 'green', label: 'Hoàn thành' },
-    refunded: { color: 'purple', label: 'Hoàn tiền' },
-    pending: { color: 'orange', label: 'Chờ xử lý' },
-    failed: { color: 'red', label: 'Thất bại' },
+    completed: { color: 'green', label: 'Completed' },
+    refunded: { color: 'purple', label: 'Refunded' },
+    pending: { color: 'orange', label: 'Pending' },
+    failed: { color: 'red', label: 'Failed' },
   };
 
   const s = map[value] || { color: 'gray', label: value || 'N/A' };
@@ -52,7 +52,7 @@ export default function OrdersCard({ orders = [], loading }) {
           Orders
         </Text>
         <Text mt="2px" fontSize="sm" color={subtext}>
-          Danh sách đơn hàng gần đây
+          Recent order list
         </Text>
       </Box>
 
@@ -68,13 +68,13 @@ export default function OrdersCard({ orders = [], loading }) {
           <Table size="sm" variant="simple">
             <Thead>
               <Tr>
-                <Th>Mã đơn</Th>
-                <Th>Ngày mua</Th>
-                <Th>Gian hàng</Th>
-                <Th>Mặt hàng</Th>
-                <Th isNumeric>Số lượng</Th>
-                <Th isNumeric>Tổng tiền</Th>
-                <Th>Trạng thái</Th>
+                <Th>Order ID</Th>
+                <Th>Purchase Date</Th>
+                <Th>Vendor</Th>
+                <Th>Item</Th>
+                <Th isNumeric>Quantity</Th>
+                <Th isNumeric>Total</Th>
+                <Th>Status</Th>
               </Tr>
             </Thead>
 
@@ -83,7 +83,7 @@ export default function OrdersCard({ orders = [], loading }) {
                 <Tr>
                   <Td colSpan={7}>
                     <Text color={subtext} fontStyle="italic">
-                      Chưa có đơn hàng.
+                      No orders yet.
                     </Text>
                   </Td>
                 </Tr>

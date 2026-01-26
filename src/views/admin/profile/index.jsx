@@ -29,12 +29,9 @@ import { useNavigate } from 'react-router-dom';
 import Storage from 'views/admin/profile/components/Storage';
 
 import { useAuth } from 'context/AuthContext';
-// ⚠️ nếu bạn để axios wrapper ở chỗ khác, sửa lại import này cho đúng
 import { request } from 'lib/api';
 
-// (Giữ nguyên Banner hiện tại của dự án bạn)
-// Nếu dự án dùng component Banner riêng, hãy giữ import cũ của bạn:
-import Banner from './components/Banner'; // <-- nếu khác path, sửa lại cho khớp
+import Banner from './components/Banner';
 import banner from 'assets/img/auth/banner.png';
 import BalanceCard from './components/BalanceCard';
 // import OrdersCard from './components/OrdersCard';
@@ -52,10 +49,10 @@ const formatVND = (n) =>
 
 const StatusPill = ({ value }) => {
   const map = {
-    completed: { color: 'green', label: 'Hoàn thành' },
-    refunded: { color: 'purple', label: 'Hoàn tiền' },
-    pending: { color: 'orange', label: 'Chờ xử lý' },
-    failed: { color: 'red', label: 'Thất bại' },
+    completed: { color: 'green', label: 'Completed' },
+    refunded: { color: 'purple', label: 'Refunded' },
+    pending: { color: 'orange', label: 'Pending' },
+    failed: { color: 'red', label: 'Failed' },
   };
   const s = map[value] || { color: 'gray', label: value || 'N/A' };
   return <Badge colorScheme={s.color}>{s.label}</Badge>;
@@ -78,7 +75,6 @@ export default function Profile() {
   const fetchAll = React.useCallback(async () => {
     setLoading(true);
     try {
-      // BE endpoints gợi ý (đã bàn trước):
       //  - GET /wallet/balance  -> { balance: number }
       const b = await request.get('/wallet/balance').catch(() => ({ balance: 0 }));
 
@@ -94,7 +90,6 @@ export default function Profile() {
 
   return (
     <Box pt={{ base: '130px', md: '80px', xl: '80px' }}>
-      {/* ===== Banner gốc của bạn ===== */}
       <Grid
         templateColumns={{
           base: '1fr',

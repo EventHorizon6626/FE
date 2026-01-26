@@ -54,7 +54,7 @@ const routes = [
     guestOnly: true,
   },
 
-  // ----- PUBLIC (ví dụ) -----
+  // ----- PUBLIC (example) -----
   // {
   //   name: 'RTL Admin',
   //   layout: '/rtl',
