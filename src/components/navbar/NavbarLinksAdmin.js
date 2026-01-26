@@ -28,7 +28,7 @@ import { FaEthereum } from 'react-icons/fa';
 import routes from 'routes';
 import { useAuth } from 'context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import BalancePill from './components/balancePill';
+// import BalancePill from './components/balancePill';
 
 export default function HeaderLinks(props) {
   const { secondary } = props;
