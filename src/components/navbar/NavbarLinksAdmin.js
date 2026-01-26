@@ -219,7 +219,7 @@ export default function HeaderLinks(props) {
         />
       </Button>
 
-      <BalancePill />
+      {/* <BalancePill /> */}
       <Menu>
         <MenuButton p="0px">
           <Avatar
@@ -272,25 +272,39 @@ export default function HeaderLinks(props) {
             </Text>
           </Flex>
           <Flex flexDirection="column" p="10px">
-            <MenuItem
-              _hover={{ bg: 'none' }}
-              _focus={{ bg: 'none' }}
-              borderRadius="8px"
-              px="14px"
-              onClick={() => navigate('/profile')}
-            >
-              <Text fontSize="sm">Profile Settings</Text>
-            </MenuItem>
-            <MenuItem
-              _hover={{ bg: 'none' }}
-              _focus={{ bg: 'none' }}
-              color="red.400"
-              borderRadius="8px"
-              px="14px"
-              onClick={() => logout()}
-            >
-              <Text fontSize="sm">Log out</Text>
-            </MenuItem>
+            {email ? (
+              <>
+                <MenuItem
+                  _hover={{ bg: 'none' }}
+                  _focus={{ bg: 'none' }}
+                  borderRadius="8px"
+                  px="14px"
+                  onClick={() => navigate('/profile')}
+                >
+                  <Text fontSize="sm">Profile Settings</Text>
+                </MenuItem>
+                <MenuItem
+                  _hover={{ bg: 'none' }}
+                  _focus={{ bg: 'none' }}
+                  color="red.400"
+                  borderRadius="8px"
+                  px="14px"
+                  onClick={() => logout()}
+                >
+                  <Text fontSize="sm">Log out</Text>
+                </MenuItem>
+              </>
+            ) : (
+              <Button
+                colorScheme="brand"
+                size="md"
+                onClick={() => logout()}
+                loadingText="Analyzing..."
+                w="full"
+              >
+                Login now
+              </Button>
+            )}
           </Flex>
         </MenuList>
       </Menu>
