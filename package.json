@@ -39,7 +39,15 @@
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "predeploy": "npm run build",
-    "deploy": "gh-pages -d build"
+    "deploy": "gh-pages -d build",
+    "docker:build": "docker-compose build",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:restart": "docker-compose down && docker-compose up -d",
+    "docker:logs": "docker-compose logs -f",
+    "stop": "pkill -f 'react-scripts start' || true",
+    "local:deploy": "npm install && npm start",
+    "prod:deploy": "docker-compose down && docker-compose build && docker-compose up -d"
   },
   "resolutions": {
     "react-error-overlay": "6.0.9"
