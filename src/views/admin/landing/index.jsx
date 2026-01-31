@@ -1,37 +1,36 @@
-import React, { useState } from 'react';
 import {
   Box,
+  Button,
   Container,
   Flex,
-  Text,
+  HStack,
+  Icon,
+  IconButton,
+  Image,
   Input,
   InputGroup,
   InputLeftElement,
   InputRightElement,
-  Button,
-  VStack,
-  HStack,
-  Icon,
-  Image,
-  IconButton,
-  useColorModeValue,
+  Text,
+  VStack
 } from '@chakra-ui/react';
-import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
 import {
-  MdSearch,
   MdAdd,
-  MdHistory,
+  MdApps,
+  MdAttachFile,
   MdExplore,
+  MdFileDownload,
   MdGridView,
-  MdTrendingUp,
+  MdHistory,
+  MdLanguage,
+  MdMic,
   MdMoreHoriz,
   MdPerson,
-  MdFileDownload,
-  MdMic,
-  MdAttachFile,
-  MdLanguage,
-  MdApps,
+  MdSearch,
+  MdTrendingUp,
 } from 'react-icons/md';
+import { useNavigate } from 'react-router-dom';
 
 const SidebarItem = ({ icon, label, onClick }) => {
   return (

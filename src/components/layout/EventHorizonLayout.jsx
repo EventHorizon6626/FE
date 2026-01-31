@@ -1,32 +1,29 @@
-import React from 'react';
 import {
   Box,
-  Flex,
-  VStack,
-  HStack,
-  Icon,
-  Text,
-  Image,
-  IconButton,
-  useDisclosure,
   Drawer,
-  DrawerOverlay,
-  DrawerContent,
   DrawerBody,
+  DrawerContent,
+  DrawerOverlay,
+  Flex,
+  Icon,
+  IconButton,
+  Image,
+  Text,
+  useDisclosure,
+  VStack
 } from '@chakra-ui/react';
-import { useNavigate, useLocation } from 'react-router-dom';
 import {
   MdAdd,
-  MdHistory,
   MdExplore,
+  MdFileDownload,
   MdGridView,
-  MdTrendingUp,
+  MdHistory,
+  MdMenu,
   MdMoreHoriz,
   MdPerson,
-  MdFileDownload,
-  MdDashboard,
-  MdMenu,
+  MdTrendingUp
 } from 'react-icons/md';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 const SidebarItem = ({ icon, label, onClick, isActive }) => {
   return (

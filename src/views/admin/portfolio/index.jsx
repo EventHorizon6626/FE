@@ -10,9 +10,8 @@ import {
   SimpleGrid,
   Spinner,
   Text,
-  useColorModeValue,
   useToast,
-  VStack,
+  VStack
 } from '@chakra-ui/react';
 import Card from 'components/card/Card.js';
 import { request } from 'lib/api';

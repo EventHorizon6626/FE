@@ -1,11 +1,9 @@
 // src/routes.js
-import React from 'react';
 import { Icon } from '@chakra-ui/react';
 import {
-  MdBarChart,
-  MdPerson,
   MdHome,
   MdLock,
+  MdPerson
 } from 'react-icons/md';
 
 // Admin Imports
