@@ -9,8 +9,8 @@ import {
 } from 'react-icons/md';
 
 // Admin Imports
+import LandingPage from 'views/admin/landing';
 import PortfolioCreator from 'views/admin/portfolio';
-import MainDashboard from 'views/admin/default';
 import Profile from 'views/admin/profile';
 // import RTL from 'views/admin/rtl';
 
@@ -18,21 +18,23 @@ import Profile from 'views/admin/profile';
 import SignInCentered from 'views/auth/signIn';
 
 const routes = [
+  // ----- PUBLIC HOME PAGE -----
+  {
+    name: 'Home',
+    layout: '/',
+    path: '/',
+    icon: <Icon as={MdHome} width="20px" height="20px" color="inherit" />,
+    component: <LandingPage />,
+    requiresAuth: false,
+    hideInSidebar: true, // Don't show in sidebar navigation
+  },
   // ----- PROTECTED (requiresAuth: true) -----
   {
     name: 'Portfolio',
     layout: '/',
-    path: '/',
+    path: '/portfolio',
     icon: <Icon as={MdHome} width="20px" height="20px" color="inherit" />,
     component: <PortfolioCreator />,
-    requiresAuth: false,
-  },
-  {
-    name: 'Dashboard',
-    layout: '/',
-    path: '/dashboard',
-    icon: <Icon as={MdBarChart} width="20px" height="20px" color="inherit" />,
-    component: <MainDashboard />,
     requiresAuth: false,
   },
   {

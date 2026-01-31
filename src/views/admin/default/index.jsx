@@ -34,11 +34,12 @@ import tableDataTopCreators from 'views/admin/default/variables/tableDataTopCrea
 import { tableColumnsTopCreators } from 'views/admin/default/variables/tableColumnsTopCreators';
 
 export default function Marketplace() {
-  // Chakra Color Mode
-  const textColor = useColorModeValue('secondaryGray.900', 'white');
-  const textColorBrand = useColorModeValue('brand.500', 'white');
+  // Clean white theme colors (Perplexity style)
+  const textColor = '#1F2937';
+  const textColorBrand = 'teal.600';
   return (
-    <Box pt={{ base: '180px', md: '80px', xl: '80px' }}>
+    <Box minH="100vh" bg="#FAFAFA" p={{ base: '20px', md: '40px' }}>
+      <Box maxW="1400px" mx="auto">
       {/* Main Fields */}
       <Grid
         mb="20px"
@@ -289,6 +290,7 @@ export default function Marketplace() {
         </Flex>
       </Grid>
       {/* Delete Product */}
+      </Box>
     </Box>
   );
 }

@@ -28,13 +28,11 @@ export default function Banner({ banner }) {
     has2fa = false,
   } = user || {};
 
-  const textPrimary = useColorModeValue('secondaryGray.900', 'white');
-  const textSecondary = useColorModeValue('gray.400', 'gray.500');
-  const bgInfo = useColorModeValue('secondaryGray.100', 'navy.700');
-  const borderColor = useColorModeValue(
-    'white !important',
-    '#111C44 !important',
-  );
+  // Clean white theme colors (Perplexity style)
+  const textPrimary = '#1F2937';
+  const textSecondary = 'gray.600';
+  const bgInfo = 'gray.50';
+  const borderColor = 'white !important';
 
   const infoRow = (label, value, actionBtn = null) => (
     <Flex justify="space-between" align="center" w="100%">

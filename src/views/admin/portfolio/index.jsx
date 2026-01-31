@@ -63,14 +63,14 @@ function StockAnalysisCard({
   const fundamentalsData = analysisResult?.result?.fundamentals_data?.[symbol];
 
   return (
-    <Card bg={cardBg} p="20px">
+    <Card bg={cardBg} p="20px" borderRadius="12px" border="1px solid" borderColor={borderColor}>
       {/* Stock Header */}
       <Flex justify="space-between" align="center" mb="20px">
         <HStack spacing="10px">
           <Text color={textColor} fontSize="xl" fontWeight="700">
             {symbol}
           </Text>
-          <Badge colorScheme="brand" fontSize="xs">
+          <Badge colorScheme="teal" fontSize="xs">
             {AVAILABLE_STOCKS.find((s) => s.symbol === symbol)?.name || symbol}
           </Badge>
         </HStack>
@@ -85,6 +85,8 @@ function StockAnalysisCard({
             onClick={() => toggleSection('chart')}
             w="full"
             justifyContent="space-between"
+            color={textColor}
+            _hover={{ bg: 'gray.50' }}
             rightIcon={
               <Icon
                 as={MdShowChart}
@@ -127,7 +129,7 @@ function StockAnalysisCard({
             w="full"
             justifyContent="space-between"
             rightIcon={
-              <Badge colorScheme="brand" fontSize="xs">
+              <Badge colorScheme="teal" fontSize="xs">
                 {newsData?.articles?.length || 0}
               </Badge>
             }
@@ -180,7 +182,7 @@ function StockAnalysisCard({
             w="full"
             justifyContent="space-between"
             rightIcon={
-              <Badge colorScheme="brand" fontSize="xs">
+              <Badge colorScheme="teal" fontSize="xs">
                 {technicalData?.indicators
                   ? Object.keys(technicalData.indicators).length
                   : 0}
@@ -341,14 +343,14 @@ export default function PortfolioCreator() {
   const [chartData, setChartData] = useState(null);
   const toast = useToast();
 
-  // Chakra Color Mode
-  const textColor = useColorModeValue('secondaryGray.900', 'white');
-  const textColorSecondary = useColorModeValue('gray.600', 'gray.400');
-  const brandColor = useColorModeValue('brand.500', 'brand.400');
-  const cardBg = useColorModeValue('white', 'navy.800');
-  const borderColor = useColorModeValue('gray.200', 'whiteAlpha.200');
-  const selectedStockBg = useColorModeValue('brand.50', 'brand.900');
-  const preBlockBg = useColorModeValue('gray.50', 'navy.900');
+  // Clean white theme colors (Perplexity style)
+  const textColor = '#1F2937';
+  const textColorSecondary = 'gray.600';
+  const brandColor = 'teal.600';
+  const cardBg = 'white';
+  const borderColor = 'gray.200';
+  const selectedStockBg = 'teal.50';
+  const preBlockBg = 'gray.50';
 
   const handleStockToggle = (symbol) => {
     setSelectedStocks((prev) =>
@@ -502,10 +504,10 @@ export default function PortfolioCreator() {
   };
 
   return (
-    <Box pt={{ base: '130px', md: '80px', xl: '80px' }}>
+    <Box minH="100vh" bg="#FAFAFA" p={{ base: '20px', md: '40px' }}>
       {/* Minimalist Header */}
-      <Box mb="30px">
-        <Text color={textColor} fontSize="3xl" fontWeight="700" mb="5px">
+      <Box mb="30px" maxW="1400px" mx="auto">
+        <Text color={textColor} fontSize="3xl" fontWeight="600" mb="5px">
           Portfolio Analysis
         </Text>
         <Text color={textColorSecondary} fontSize="sm">
@@ -513,8 +515,9 @@ export default function PortfolioCreator() {
         </Text>
       </Box>
 
+      <Box maxW="1400px" mx="auto">
       {/* Minimalist Stock Selection */}
-      <Card mb="20px" bg={cardBg} p="25px">
+      <Card mb="20px" bg={cardBg} p="25px" borderRadius="12px" border="1px solid" borderColor={borderColor}>
         <Flex justify="space-between" align="center" mb="20px">
           <Text color={textColor} fontSize="sm" fontWeight="600">
             {selectedStocks.length} Stock
@@ -587,13 +590,19 @@ export default function PortfolioCreator() {
         {/* Analyze Button */}
         <Button
           leftIcon={<MdTrendingUp />}
-          colorScheme="brand"
+          bg="teal.600"
+          color="white"
           size="md"
           onClick={handleCreatePortfolio}
           isLoading={loading}
           loadingText="Analyzing..."
           isDisabled={selectedStocks.length === 0}
           w="full"
+          _hover={{ bg: 'teal.700' }}
+          _active={{ bg: 'teal.800' }}
+          fontWeight="600"
+          h="48px"
+          borderRadius="8px"
         >
           Analyze Portfolio
         </Button>
@@ -601,7 +610,7 @@ export default function PortfolioCreator() {
 
       {/* Loading State */}
       {loading && (
-        <Card bg={cardBg} p="40px">
+        <Card bg={cardBg} p="40px" borderRadius="12px" border="1px solid" borderColor={borderColor}>
           <VStack spacing="15px">
             <Spinner size="lg" color={brandColor} thickness="3px" />
             <Text color={textColor} fontSize="md" fontWeight="600">
@@ -619,7 +628,7 @@ export default function PortfolioCreator() {
         <VStack spacing="15px" align="stretch">
           {/* Summary Stats */}
           <SimpleGrid columns={{ base: 2, md: 5 }} spacing="10px">
-            <Card bg={cardBg} p="15px">
+            <Card bg={cardBg} p="15px" borderRadius="12px" border="1px solid" borderColor={borderColor}>
               <HStack spacing="8px">
                 <Icon as={MdShowChart} w="16px" h="16px" color={brandColor} />
                 <Text color={textColorSecondary} fontSize="xs">
@@ -633,7 +642,7 @@ export default function PortfolioCreator() {
               </Text>
             </Card>
 
-            <Card bg={cardBg} p="15px">
+            <Card bg={cardBg} p="15px" borderRadius="12px" border="1px solid" borderColor={borderColor}>
               <HStack spacing="8px">
                 <Icon as={MdArticle} w="16px" h="16px" color={brandColor} />
                 <Text color={textColorSecondary} fontSize="xs">
@@ -647,7 +656,7 @@ export default function PortfolioCreator() {
               </Text>
             </Card>
 
-            <Card bg={cardBg} p="15px">
+            <Card bg={cardBg} p="15px" borderRadius="12px" border="1px solid" borderColor={borderColor}>
               <HStack spacing="8px">
                 <Icon as={MdAssessment} w="16px" h="16px" color={brandColor} />
                 <Text color={textColorSecondary} fontSize="xs">
@@ -661,7 +670,7 @@ export default function PortfolioCreator() {
               </Text>
             </Card>
 
-            <Card bg={cardBg} p="15px">
+            <Card bg={cardBg} p="15px" borderRadius="12px" border="1px solid" borderColor={borderColor}>
               <HStack spacing="8px">
                 <Icon as={MdSpeed} w="16px" h="16px" color={brandColor} />
                 <Text color={textColorSecondary} fontSize="xs">
@@ -675,7 +684,7 @@ export default function PortfolioCreator() {
               </Text>
             </Card>
 
-            <Card bg={cardBg} p="15px">
+            <Card bg={cardBg} p="15px" borderRadius="12px" border="1px solid" borderColor={borderColor}>
               <HStack spacing="8px">
                 <Icon
                   as={MdAccountBalance}
@@ -713,6 +722,7 @@ export default function PortfolioCreator() {
           ))}
         </VStack>
       )}
+      </Box>
     </Box>
   );
 }

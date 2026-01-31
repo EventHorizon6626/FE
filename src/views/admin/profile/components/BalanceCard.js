@@ -49,11 +49,11 @@ export default function BalanceCardDual({
   const pctVnd = Math.min(100, (balanceVnd / limitVnd) * 100);
   const pctUsdt = Math.min(100, (balanceUsdt / limitUsdt) * 100);
 
-  // Colors
-  const textPrimary = useColorModeValue('secondaryGray.900', 'white');
-  const textSecondary = useColorModeValue('gray.500', 'gray.400');
-  const brandColor = useColorModeValue('brand.500', 'white');
-  const cardBg = useColorModeValue('secondaryGray.300', 'whiteAlpha.100');
+  // Clean white theme colors (Perplexity style)
+  const textPrimary = '#1F2937';
+  const textSecondary = 'gray.600';
+  const brandColor = 'teal.600';
+  const cardBg = 'gray.100';
 
   return (
     <Card mb={{ base: '0px', lg: '20px' }} align="center">

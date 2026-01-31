@@ -33,7 +33,6 @@ import { request } from 'lib/api';
 
 import Banner from './components/Banner';
 import banner from 'assets/img/auth/banner.png';
-import BalanceCard from './components/BalanceCard';
 // import OrdersCard from './components/OrdersCard';
 import Projects from './components/Projects';
 import Notifications from './components/Notifications';
@@ -63,54 +62,19 @@ export default function Profile() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const [loading, setLoading] = React.useState(true);
-  const [balance, setBalance] = React.useState(0);
-  // const [orders, setOrders] = React.useState([]);
-
-  const cardBg = useColorModeValue('white', 'navy.800');
-  const border = useColorModeValue('#E6ECFA', 'rgba(135, 140, 189, 0.3)');
-  const subtext = useColorModeValue('gray.600', 'gray.400');
-  const textPrimary = useColorModeValue('secondaryGray.900', 'white');
-
-  const fetchAll = React.useCallback(async () => {
-    setLoading(true);
-    try {
-      //  - GET /wallet/balance  -> { balance: number }
-      const b = await request.get('/wallet/balance').catch(() => ({ balance: 0 }));
-
-      setBalance(b?.balance ?? 0);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  React.useEffect(() => {
-    fetchAll();
-  }, [fetchAll]);
+  // Clean white theme colors (Perplexity style)
+  const cardBg = 'white';
+  const border = 'gray.200';
+  const subtext = 'gray.600';
+  const textPrimary = '#1F2937';
 
   return (
-    <Box pt={{ base: '130px', md: '80px', xl: '80px' }}>
-      <Grid
-        templateColumns={{
-          base: '1fr',
-          lg: '1.34fr 1fr 1.62fr',
-        }}
-        templateRows={{
-          base: 'repeat(3, 1fr)',
-          lg: '1fr',
-        }}
-        gap={{ base: '20px', xl: '20px' }}
-      >
-        <Banner gridArea="1 / 1 / 2 / 2" banner={banner} />
-        {/* <Storage
-          gridArea={{ base: '2 / 1 / 3 / 2', lg: '1 / 2 / 2 / 3' }}
-          used={25.6}
-          total={50}
-        /> */}
-        <BalanceCard />
-      </Grid>
+    <Box minH="100vh" bg="#FAFAFA" p={{ base: '20px', md: '40px' }}>
+      <Box maxW="1400px" mx="auto">
+      <Banner banner={banner} />
 
       {/* Orders section removed */}
+      </Box>
     </Box>
   );
 }
