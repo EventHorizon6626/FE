@@ -16,16 +16,11 @@ import {
 } from '@chakra-ui/react';
 import { useState } from 'react';
 import {
-  MdAdd,
   MdApps,
   MdAttachFile,
-  MdExplore,
   MdFileDownload,
-  MdGridView,
-  MdHistory,
   MdLanguage,
   MdMic,
-  MdMoreHoriz,
   MdPerson,
   MdSearch,
   MdTrendingUp,
@@ -124,19 +119,10 @@ export default function LandingPage() {
             </Box>
 
             <SidebarItem
-              icon={MdAdd}
-              label="New"
-              onClick={() => navigate('/portfolio')}
-            />
-            <SidebarItem icon={MdHistory} label="History" onClick={() => {}} />
-            <SidebarItem icon={MdExplore} label="Discover" onClick={() => {}} />
-            <SidebarItem icon={MdGridView} label="Spaces" onClick={() => {}} />
-            <SidebarItem
               icon={MdTrendingUp}
-              label="Finance"
+              label="Portfolio"
               onClick={() => navigate('/portfolio')}
             />
-            <SidebarItem icon={MdMoreHoriz} label="More" onClick={() => {}} />
           </VStack>
 
           {/* Bottom Section */}
