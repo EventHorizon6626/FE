@@ -1,14 +1,14 @@
 // src/routes.js
 import { Icon } from '@chakra-ui/react';
 import {
+  MdPerson,
   MdHome,
   MdLock,
-  MdPerson
 } from 'react-icons/md';
 
 // Admin Imports
 import LandingPage from 'views/admin/landing';
-import PortfolioCreator from 'views/admin/portfolio';
+import PortfolioAnalyzer from 'views/admin/portfolio/PortfolioAnalyzer';
 import Profile from 'views/admin/profile';
 // import RTL from 'views/admin/rtl';
 
@@ -32,7 +32,7 @@ const routes = [
     layout: '/',
     path: '/portfolio',
     icon: <Icon as={MdHome} width="20px" height="20px" color="inherit" />,
-    component: <PortfolioCreator />,
+    component: <PortfolioAnalyzer />,
     requiresAuth: false,
   },
   {

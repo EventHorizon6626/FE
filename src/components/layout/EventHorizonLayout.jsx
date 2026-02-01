@@ -1,27 +1,22 @@
 import {
   Box,
+  Flex,
+  VStack,
+  Icon,
+  Text,
+  Image,
+  IconButton,
+  useDisclosure,
   Drawer,
   DrawerBody,
   DrawerContent,
   DrawerOverlay,
-  Flex,
-  Icon,
-  IconButton,
-  Image,
-  Text,
-  useDisclosure,
-  VStack
 } from '@chakra-ui/react';
 import {
-  MdAdd,
-  MdExplore,
-  MdFileDownload,
-  MdGridView,
-  MdHistory,
-  MdMenu,
-  MdMoreHoriz,
+  MdTrendingUp,
   MdPerson,
-  MdTrendingUp
+  MdFileDownload,
+  MdMenu,
 } from 'react-icons/md';
 import { useLocation, useNavigate } from 'react-router-dom';
 
@@ -60,21 +55,11 @@ const SidebarContent = ({ navigate, currentPath }) => {
         </Box>
 
         <SidebarItem
-          icon={MdAdd}
-          label="New"
-          onClick={() => navigate('/portfolio')}
-          isActive={currentPath === '/portfolio'}
-        />
-        <SidebarItem icon={MdHistory} label="History" onClick={() => {}} />
-        <SidebarItem icon={MdExplore} label="Discover" onClick={() => {}} />
-        <SidebarItem icon={MdGridView} label="Spaces" onClick={() => {}} />
-        <SidebarItem
           icon={MdTrendingUp}
           label="Portfolio"
           onClick={() => navigate('/portfolio')}
           isActive={currentPath === '/portfolio'}
         />
-        <SidebarItem icon={MdMoreHoriz} label="More" onClick={() => {}} />
       </VStack>
 
       {/* Bottom Section */}
