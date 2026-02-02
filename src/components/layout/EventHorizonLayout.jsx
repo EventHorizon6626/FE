@@ -63,7 +63,7 @@ const SidebarContent = ({ navigate, currentPath }) => {
         />
         <SidebarItem
           icon={MdAccountTree}
-          label="Pipeline"
+          label="Horizon"
           onClick={() => navigate('/pipeline')}
           isActive={currentPath === '/pipeline'}
         />

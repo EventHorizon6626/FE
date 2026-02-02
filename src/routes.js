@@ -37,7 +37,7 @@ const routes = [
     requiresAuth: false,
   },
   {
-    name: 'Pipeline',
+    name: 'Horizon',
     layout: '/',
     path: '/pipeline',
     icon: <Icon as={MdHome} width="20px" height="20px" color="inherit" />,

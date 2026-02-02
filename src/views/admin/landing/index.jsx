@@ -126,7 +126,7 @@ export default function LandingPage() {
             />
             <SidebarItem
               icon={MdAccountTree}
-              label="Pipeline"
+              label="Horizon"
               onClick={() => navigate('/pipeline')}
             />
           </VStack>

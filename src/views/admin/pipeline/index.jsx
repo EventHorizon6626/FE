@@ -450,7 +450,7 @@ export default function PipelineBuilder() {
               </Text>
             </HStack>
             <Badge colorScheme="pink" fontSize="2xs">
-              Custom Team
+              Custom Horizon
             </Badge>
           </Box>
         ),
@@ -463,7 +463,7 @@ export default function PipelineBuilder() {
     onTeamClose();
 
     toast({
-      title: 'Team created',
+      title: 'Horizon created',
       description: `${newTeam.name} added to Analyzer Network`,
       status: 'success',
       duration: 2000,
@@ -483,9 +483,9 @@ export default function PipelineBuilder() {
 
   const handleSavePipeline = () => {
     const pipeline = { nodes, edges, customAgents, customTeams };
-    console.log('Saving pipeline:', pipeline);
+    console.log('Saving horizon:', pipeline);
     toast({
-      title: 'Pipeline saved',
+      title: 'Horizon saved',
       status: 'success',
       duration: 2000,
       isClosable: true,
@@ -513,11 +513,11 @@ export default function PipelineBuilder() {
             <HStack spacing="10px" mb="8px">
               <Icon as={MdHub} color="teal.600" boxSize="24px" />
               <Text fontSize="lg" fontWeight="bold" color="teal.900">
-                Pipeline Builder
+                Horizon
               </Text>
             </HStack>
             <Text fontSize="xs" color="teal.700">
-              Drag agents, connect teams
+              Build your multi-agent network
             </Text>
           </Box>
 
@@ -651,7 +651,7 @@ export default function PipelineBuilder() {
                 w="full"
                 onClick={onTeamOpen}
               >
-                Create Team
+                Create New Horizon
               </Button>
             </VStack>
           </Box>
@@ -674,7 +674,7 @@ export default function PipelineBuilder() {
             <VStack align="start" spacing="10px">
               <Box bg="white" p="15px" borderRadius="12px" boxShadow="md" border="1px solid" borderColor="gray.200">
                 <Text fontSize="md" fontWeight="bold" color="gray.800" mb="5px">
-                  Event Horizon Pipeline
+                  Event Horizon
                 </Text>
                 <Text fontSize="xs" color="gray.600">
                   Drop agents → Connect nodes → Save
@@ -702,7 +702,7 @@ export default function PipelineBuilder() {
           </Panel>
 
           <Panel position="top-right">
-            <Tooltip label="Save Pipeline">
+            <Tooltip label="Save Horizon">
               <IconButton
                 icon={<Icon as={MdSave} />}
                 colorScheme="teal"
@@ -816,13 +816,13 @@ export default function PipelineBuilder() {
         <DrawerOverlay />
         <DrawerContent>
           <DrawerCloseButton />
-          <DrawerHeader>Create Custom Team</DrawerHeader>
+          <DrawerHeader>Create New Horizon</DrawerHeader>
 
           <DrawerBody>
             <VStack spacing="20px" align="stretch">
               <FormControl isRequired>
                 <FormLabel fontSize="sm" fontWeight="600">
-                  Team Name
+                  Horizon Name
                 </FormLabel>
                 <Input
                   placeholder="e.g., Momentum Traders"
@@ -836,7 +836,7 @@ export default function PipelineBuilder() {
                   Description
                 </FormLabel>
                 <Textarea
-                  placeholder="What does this team do?"
+                  placeholder="What does this horizon do?"
                   value={newTeam.description}
                   onChange={(e) => setNewTeam({ ...newTeam, description: e.target.value })}
                   rows={3}
@@ -844,13 +844,13 @@ export default function PipelineBuilder() {
               </FormControl>
 
               <Button colorScheme="purple" onClick={handleCreateTeam}>
-                Create Team
+                Create Horizon
               </Button>
 
               <Box p="15px" bg="blue.50" borderRadius="8px" border="1px solid" borderColor="blue.200">
                 <Text fontSize="xs" color="blue.800">
-                  <strong>Tip:</strong> After creating a team, drag agents onto it and
-                  connect teams with lines to build your custom analyzer network.
+                  <strong>Tip:</strong> After creating a horizon, drag agents onto it and
+                  connect horizons with lines to build your custom analyzer network.
                 </Text>
               </Box>
             </VStack>
