@@ -533,7 +533,7 @@ export default function PipelineBuilder() {
               <TabPanel p="15px">
                 <VStack spacing="12px" align="stretch">
                   <Text fontSize="xs" fontWeight="600" color="gray.500" textTransform="uppercase">
-                    Data Pipeline Agents
+                    Data Agents
                   </Text>
                   {BUILTIN_AGENTS.filter((a) => a.system === 'data').map((agent) => (
                     <Box
@@ -548,11 +548,11 @@ export default function PipelineBuilder() {
                       draggable
                       onDragStart={(e) => onDragStart(e, agent)}
                     >
-                      <HStack spacing="10px">
-                        <Icon as={agent.icon} color={`${agent.color}.600`} boxSize="20px" />
+                      <HStack spacing="10px" justify="space-between">
                         <Text fontSize="xs" fontWeight="600">
                           {agent.name}
                         </Text>
+                        <Icon as={agent.icon} color={`${agent.color}.600`} boxSize="20px" />
                       </HStack>
                     </Box>
                   ))}
@@ -560,7 +560,7 @@ export default function PipelineBuilder() {
                   <Divider />
 
                   <Text fontSize="xs" fontWeight="600" color="gray.500" textTransform="uppercase">
-                    Analyzer Network Agents
+                    Analyzer Agents
                   </Text>
                   {BUILTIN_AGENTS.filter((a) => a.system === 'analyzer').map((agent) => (
                     <Box
@@ -575,11 +575,11 @@ export default function PipelineBuilder() {
                       draggable
                       onDragStart={(e) => onDragStart(e, agent)}
                     >
-                      <HStack spacing="10px">
-                        <Icon as={agent.icon} color={`${agent.color}.600`} boxSize="20px" />
+                      <HStack spacing="10px" justify="space-between">
                         <Text fontSize="xs" fontWeight="600">
                           {agent.name}
                         </Text>
+                        <Icon as={agent.icon} color={`${agent.color}.600`} boxSize="20px" />
                       </HStack>
                     </Box>
                   ))}
@@ -609,19 +609,19 @@ export default function PipelineBuilder() {
                         onDragStart={(e) => onDragStart(e, agent)}
                       >
                         <HStack justify="space-between">
-                          <HStack spacing="10px">
+                          <Text fontSize="xs" fontWeight="600">
+                            {agent.name}
+                          </Text>
+                          <HStack spacing="8px">
                             <Icon as={agent.icon} color={`${agent.color}.600`} boxSize="18px" />
-                            <Text fontSize="xs" fontWeight="600">
-                              {agent.name}
-                            </Text>
+                            <IconButton
+                              icon={<Icon as={MdDelete} />}
+                              size="xs"
+                              variant="ghost"
+                              colorScheme="red"
+                              onClick={() => handleDeleteAgent(agent.id)}
+                            />
                           </HStack>
-                          <IconButton
-                            icon={<Icon as={MdDelete} />}
-                            size="xs"
-                            variant="ghost"
-                            colorScheme="red"
-                            onClick={() => handleDeleteAgent(agent.id)}
-                          />
                         </HStack>
                       </Box>
                     ))
