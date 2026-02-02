@@ -24,7 +24,6 @@ import {
   MdMic,
   MdPerson,
   MdSearch,
-  MdSmartToy,
   MdTrendingUp,
 } from 'react-icons/md';
 import { useNavigate } from 'react-router-dom';
@@ -124,11 +123,6 @@ export default function LandingPage() {
               icon={MdTrendingUp}
               label="Portfolio"
               onClick={() => navigate('/portfolio')}
-            />
-            <SidebarItem
-              icon={MdSmartToy}
-              label="Agents"
-              onClick={() => navigate('/agents')}
             />
             <SidebarItem
               icon={MdAccountTree}

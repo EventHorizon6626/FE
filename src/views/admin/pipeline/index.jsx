@@ -30,6 +30,14 @@ import {
   useToast,
   IconButton,
   Tooltip,
+  Textarea,
+  Select,
+  Tabs,
+  TabList,
+  Tab,
+  TabPanels,
+  TabPanel,
+  Divider,
 } from '@chakra-ui/react';
 import {
   MdAdd,
@@ -40,150 +48,158 @@ import {
   MdTrendingUp,
   MdWarning,
   MdSave,
-  MdRefresh,
+  MdDelete,
   MdGroups,
+  MdDataset,
+  MdHub,
+  MdSmartToy,
 } from 'react-icons/md';
 
-// Agent types available in library
-const AGENT_LIBRARY = [
-  // System 1 agents
+// Built-in agents
+const BUILTIN_AGENTS = [
   {
     id: 'candlestick',
     name: 'Candlestick Agent',
     type: 'data_retriever',
-    system: 1,
+    system: 'data',
     icon: MdShowChart,
     color: 'blue',
+    isBuiltin: true,
   },
   {
     id: 'earnings',
     name: 'Earnings Agent',
     type: 'data_retriever',
-    system: 1,
+    system: 'data',
     icon: MdAccountBalance,
     color: 'green',
+    isBuiltin: true,
   },
   {
     id: 'news',
     name: 'News Agent',
     type: 'news_agent',
-    system: 1,
+    system: 'data',
     icon: MdArticle,
     color: 'orange',
+    isBuiltin: true,
   },
   {
     id: 'technical',
     name: 'Technical Agent',
     type: 'technical_agent',
-    system: 1,
+    system: 'data',
     icon: MdSpeed,
     color: 'purple',
+    isBuiltin: true,
   },
   {
     id: 'fundamentals',
     name: 'Fundamentals Agent',
     type: 'financial_metrics',
-    system: 1,
+    system: 'data',
     icon: MdAccountBalance,
     color: 'teal',
+    isBuiltin: true,
   },
-  // System 2 agents
   {
     id: 'bull_researcher',
     name: 'Bull Researcher',
     type: 'strategy_agent',
-    system: 2,
+    system: 'analyzer',
     icon: MdTrendingUp,
     color: 'green',
+    isBuiltin: true,
   },
   {
     id: 'bear_researcher',
     name: 'Bear Researcher',
     type: 'strategy_agent',
-    system: 2,
+    system: 'analyzer',
     icon: MdWarning,
     color: 'red',
+    isBuiltin: true,
   },
-  {
-    id: 'risk_manager',
-    name: 'Risk Manager',
-    type: 'risk_manager',
-    system: 2,
-    icon: MdWarning,
-    color: 'orange',
-  },
+];
+
+const AGENT_CATEGORIES = [
+  { value: 'data_retriever', label: '📊 Data Retriever', system: 'data' },
+  { value: 'news_agent', label: '📰 News Agent', system: 'data' },
+  { value: 'technical_agent', label: '📈 Technical Agent', system: 'data' },
+  { value: 'financial_metrics', label: '💰 Financial Metrics', system: 'data' },
+  { value: 'api_connector', label: '🔗 API Connector', system: 'data' },
+  { value: 'strategy_agent', label: '🎯 Strategy Agent', system: 'analyzer' },
+  { value: 'risk_manager', label: '⚖️ Risk Manager', system: 'analyzer' },
+  { value: 'custom_analyzer', label: '🤖 Custom Analyzer', system: 'analyzer' },
+];
+
+const MODELS = [
+  { value: 'gpt-4', label: 'GPT-4' },
+  { value: 'gpt-4-turbo', label: 'GPT-4 Turbo' },
+  { value: 'claude-3-opus', label: 'Claude 3 Opus' },
+  { value: 'claude-3-sonnet', label: 'Claude 3 Sonnet' },
 ];
 
 // Initial pipeline structure
 const initialNodes = [
-  // System 1 - Fixed Stages
+  // Event Horizon Data Pipeline (unified System 1)
   {
-    id: 'stage1',
+    id: 'data-pipeline',
     type: 'default',
-    position: { x: 100, y: 100 },
+    position: { x: 250, y: 100 },
     data: {
       label: (
-        <Box p="15px" bg="blue.50" borderRadius="8px" border="2px solid" borderColor="blue.400">
-          <Text fontSize="sm" fontWeight="bold" color="blue.800">
-            Stage 1: Data Retrieval
+        <Box
+          p="30px"
+          bg="linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
+          borderRadius="16px"
+          boxShadow="xl"
+          minW="350px"
+        >
+          <HStack spacing="12px" mb="8px">
+            <Icon as={MdDataset} color="white" boxSize="28px" />
+            <Text fontSize="lg" fontWeight="bold" color="white">
+              Event Horizon Data Pipeline
+            </Text>
+          </HStack>
+          <Text fontSize="xs" color="whiteAlpha.800" mb="12px">
+            Stage 1 → Stage 2 → Stage 3 (Unified)
           </Text>
-          <Badge colorScheme="blue" fontSize="xs" mt="4px">
-            Drop agents here
-          </Badge>
+          <HStack spacing="8px">
+            <Badge colorScheme="purple" bg="whiteAlpha.300" color="white" fontSize="xs">
+              5 Built-in Agents
+            </Badge>
+            <Badge colorScheme="purple" bg="whiteAlpha.300" color="white" fontSize="xs">
+              Drop custom agents here
+            </Badge>
+          </HStack>
         </Box>
       ),
     },
     draggable: false,
   },
-  {
-    id: 'stage2',
-    type: 'default',
-    position: { x: 400, y: 100 },
-    data: {
-      label: (
-        <Box p="15px" bg="purple.50" borderRadius="8px" border="2px solid" borderColor="purple.400">
-          <Text fontSize="sm" fontWeight="bold" color="purple.800">
-            Stage 2: Normalization
-          </Text>
-          <Badge colorScheme="purple" fontSize="xs" mt="4px">
-            Fixed pipeline
-          </Badge>
-        </Box>
-      ),
-    },
-    draggable: false,
-  },
-  {
-    id: 'stage3',
-    type: 'default',
-    position: { x: 700, y: 100 },
-    data: {
-      label: (
-        <Box p="15px" bg="green.50" borderRadius="8px" border="2px solid" borderColor="green.400">
-          <Text fontSize="sm" fontWeight="bold" color="green.800">
-            Stage 3: LLM Features
-          </Text>
-          <Badge colorScheme="green" fontSize="xs" mt="4px">
-            Fixed pipeline
-          </Badge>
-        </Box>
-      ),
-    },
-    draggable: false,
-  },
-  // System 2 - Default Teams
+  // Analyzer Network (System 2) - Default Teams
   {
     id: 'team1',
     type: 'default',
-    position: { x: 100, y: 400 },
+    position: { x: 100, y: 350 },
     data: {
       label: (
-        <Box p="15px" bg="orange.50" borderRadius="8px" border="2px solid" borderColor="orange.400" minW="150px">
-          <Text fontSize="sm" fontWeight="bold" color="orange.800">
-            Team 1: Analysts
-          </Text>
-          <Badge colorScheme="orange" fontSize="xs" mt="4px">
-            4 agents
+        <Box
+          p="20px"
+          bg="linear-gradient(135deg, #f093fb 0%, #f5576c 100%)"
+          borderRadius="12px"
+          boxShadow="lg"
+          minW="140px"
+        >
+          <HStack spacing="8px" mb="6px">
+            <Icon as={MdGroups} color="white" boxSize="20px" />
+            <Text fontSize="sm" fontWeight="bold" color="white">
+              Analysts
+            </Text>
+          </HStack>
+          <Badge bg="whiteAlpha.300" color="white" fontSize="2xs">
+            Team 1
           </Badge>
         </Box>
       ),
@@ -192,15 +208,24 @@ const initialNodes = [
   {
     id: 'team2',
     type: 'default',
-    position: { x: 300, y: 400 },
+    position: { x: 280, y: 350 },
     data: {
       label: (
-        <Box p="15px" bg="orange.50" borderRadius="8px" border="2px solid" borderColor="orange.400" minW="150px">
-          <Text fontSize="sm" fontWeight="bold" color="orange.800">
-            Team 2: Researchers
-          </Text>
-          <Badge colorScheme="orange" fontSize="xs" mt="4px">
-            Drop agents here
+        <Box
+          p="20px"
+          bg="linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)"
+          borderRadius="12px"
+          boxShadow="lg"
+          minW="140px"
+        >
+          <HStack spacing="8px" mb="6px">
+            <Icon as={MdGroups} color="white" boxSize="20px" />
+            <Text fontSize="sm" fontWeight="bold" color="white">
+              Researchers
+            </Text>
+          </HStack>
+          <Badge bg="whiteAlpha.300" color="white" fontSize="2xs">
+            Team 2
           </Badge>
         </Box>
       ),
@@ -209,15 +234,24 @@ const initialNodes = [
   {
     id: 'team3',
     type: 'default',
-    position: { x: 500, y: 400 },
+    position: { x: 460, y: 350 },
     data: {
       label: (
-        <Box p="15px" bg="orange.50" borderRadius="8px" border="2px solid" borderColor="orange.400" minW="150px">
-          <Text fontSize="sm" fontWeight="bold" color="orange.800">
-            Team 3: Risk Mgmt
-          </Text>
-          <Badge colorScheme="orange" fontSize="xs" mt="4px">
-            Drop agents here
+        <Box
+          p="20px"
+          bg="linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)"
+          borderRadius="12px"
+          boxShadow="lg"
+          minW="140px"
+        >
+          <HStack spacing="8px" mb="6px">
+            <Icon as={MdGroups} color="white" boxSize="20px" />
+            <Text fontSize="sm" fontWeight="bold" color="white">
+              Risk Mgmt
+            </Text>
+          </HStack>
+          <Badge bg="whiteAlpha.300" color="white" fontSize="2xs">
+            Team 3
           </Badge>
         </Box>
       ),
@@ -226,15 +260,24 @@ const initialNodes = [
   {
     id: 'team4',
     type: 'default',
-    position: { x: 700, y: 400 },
+    position: { x: 640, y: 350 },
     data: {
       label: (
-        <Box p="15px" bg="orange.50" borderRadius="8px" border="2px solid" borderColor="orange.400" minW="150px">
-          <Text fontSize="sm" fontWeight="bold" color="orange.800">
-            Team 4: Trader
-          </Text>
-          <Badge colorScheme="orange" fontSize="xs" mt="4px">
-            Final decision
+        <Box
+          p="20px"
+          bg="linear-gradient(135deg, #fa709a 0%, #fee140 100%)"
+          borderRadius="12px"
+          boxShadow="lg"
+          minW="140px"
+        >
+          <HStack spacing="8px" mb="6px">
+            <Icon as={MdGroups} color="white" boxSize="20px" />
+            <Text fontSize="sm" fontWeight="bold" color="white">
+              Trader
+            </Text>
+          </HStack>
+          <Badge bg="whiteAlpha.300" color="white" fontSize="2xs">
+            Team 4
           </Badge>
         </Box>
       ),
@@ -242,16 +285,27 @@ const initialNodes = [
   },
 ];
 
-const initialEdges = [
-  { id: 'e1-2', source: 'stage1', target: 'stage2', animated: true },
-  { id: 'e2-3', source: 'stage2', target: 'stage3', animated: true },
-];
+const initialEdges = [];
 
 export default function PipelineBuilder() {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
-  const { isOpen, onOpen, onClose } = useDisclosure();
-  const [newTeamName, setNewTeamName] = useState('');
+  const [customAgents, setCustomAgents] = useState([]);
+  const [customTeams, setCustomTeams] = useState([]);
+
+  const { isOpen: isAgentOpen, onOpen: onAgentOpen, onClose: onAgentClose } = useDisclosure();
+  const { isOpen: isTeamOpen, onOpen: onTeamOpen, onClose: onTeamClose } = useDisclosure();
+
+  const [newAgent, setNewAgent] = useState({
+    name: '',
+    description: '',
+    category: 'data_retriever',
+    system: 'data',
+    model: 'gpt-4',
+  });
+
+  const [newTeam, setNewTeam] = useState({ name: '', description: '' });
+
   const toast = useToast();
 
   const onConnect = useCallback(
@@ -259,49 +313,45 @@ export default function PipelineBuilder() {
     [setEdges]
   );
 
-  // Handle drag start from library
+  // Drag and drop handlers
   const onDragStart = (event, agent) => {
     event.dataTransfer.setData('application/reactflow', JSON.stringify(agent));
     event.dataTransfer.effectAllowed = 'move';
   };
 
-  // Handle drop on canvas
   const onDrop = useCallback(
     (event) => {
       event.preventDefault();
-
-      const agent = JSON.parse(
-        event.dataTransfer.getData('application/reactflow')
-      );
+      const agent = JSON.parse(event.dataTransfer.getData('application/reactflow'));
 
       const position = {
-        x: event.clientX - 250,
+        x: event.clientX - 280,
         y: event.clientY - 100,
       };
 
       const newNode = {
-        id: `${agent.id}-${Date.now()}`,
+        id: `agent-${Date.now()}`,
         type: 'default',
         position,
         data: {
           label: (
             <Box
-              p="12px"
+              p="15px"
               bg="white"
-              borderRadius="8px"
-              border="2px solid"
+              borderRadius="12px"
+              border="3px solid"
               borderColor={`${agent.color}.400`}
-              boxShadow="md"
-              minW="120px"
+              boxShadow="lg"
+              minW="150px"
             >
-              <HStack spacing="8px">
-                <Icon as={agent.icon} color={`${agent.color}.600`} boxSize="16px" />
-                <Text fontSize="xs" fontWeight="600">
+              <HStack spacing="10px" mb="8px">
+                <Icon as={agent.icon} color={`${agent.color}.600`} boxSize="20px" />
+                <Text fontSize="sm" fontWeight="700">
                   {agent.name}
                 </Text>
               </HStack>
-              <Badge colorScheme={agent.color} fontSize="2xs" mt="4px">
-                System {agent.system}
+              <Badge colorScheme={agent.color} fontSize="xs">
+                {agent.isBuiltin ? 'Built-in' : 'Custom'}
               </Badge>
             </Box>
           ),
@@ -325,9 +375,52 @@ export default function PipelineBuilder() {
     event.dataTransfer.dropEffect = 'move';
   }, []);
 
-  // Create new team
+  // Create custom agent
+  const handleCreateAgent = () => {
+    if (!newAgent.name.trim()) {
+      toast({
+        title: 'Name required',
+        status: 'warning',
+        duration: 2000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    const agent = {
+      id: `custom-${Date.now()}`,
+      name: newAgent.name,
+      description: newAgent.description,
+      type: newAgent.category,
+      system: newAgent.system,
+      icon: MdSmartToy,
+      color: newAgent.system === 'data' ? 'blue' : 'pink',
+      isBuiltin: false,
+      model: newAgent.model,
+    };
+
+    setCustomAgents([...customAgents, agent]);
+    setNewAgent({
+      name: '',
+      description: '',
+      category: 'data_retriever',
+      system: 'data',
+      model: 'gpt-4',
+    });
+    onAgentClose();
+
+    toast({
+      title: 'Agent created',
+      description: `${agent.name} added to library`,
+      status: 'success',
+      duration: 2000,
+      isClosable: true,
+    });
+  };
+
+  // Create custom team
   const handleCreateTeam = () => {
-    if (!newTeamName.trim()) {
+    if (!newTeam.name.trim()) {
       toast({
         title: 'Team name required',
         status: 'warning',
@@ -337,51 +430,60 @@ export default function PipelineBuilder() {
       return;
     }
 
-    const newTeam = {
+    const team = {
       id: `team-${Date.now()}`,
       type: 'default',
-      position: { x: Math.random() * 500 + 100, y: Math.random() * 200 + 400 },
+      position: { x: Math.random() * 400 + 200, y: Math.random() * 100 + 400 },
       data: {
         label: (
           <Box
-            p="15px"
-            bg="pink.50"
-            borderRadius="8px"
-            border="2px solid"
-            borderColor="pink.400"
-            minW="150px"
+            p="20px"
+            bg="linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)"
+            borderRadius="12px"
+            boxShadow="lg"
+            minW="140px"
           >
-            <HStack justify="space-between">
-              <Text fontSize="sm" fontWeight="bold" color="pink.800">
-                {newTeamName}
+            <HStack spacing="8px" mb="6px">
+              <Icon as={MdGroups} color="gray.700" boxSize="20px" />
+              <Text fontSize="sm" fontWeight="bold" color="gray.800">
+                {newTeam.name}
               </Text>
-              <Icon as={MdGroups} color="pink.600" />
             </HStack>
-            <Badge colorScheme="pink" fontSize="xs" mt="4px">
-              Custom team
+            <Badge colorScheme="pink" fontSize="2xs">
+              Custom Team
             </Badge>
           </Box>
         ),
       },
     };
 
-    setNodes((nds) => nds.concat(newTeam));
-    setNewTeamName('');
-    onClose();
+    setNodes((nds) => nds.concat(team));
+    setCustomTeams([...customTeams, { name: newTeam.name, description: newTeam.description }]);
+    setNewTeam({ name: '', description: '' });
+    onTeamClose();
+
     toast({
       title: 'Team created',
-      description: `${newTeamName} added to System 2`,
+      description: `${newTeam.name} added to Analyzer Network`,
       status: 'success',
       duration: 2000,
       isClosable: true,
     });
   };
 
-  // Save pipeline
+  const handleDeleteAgent = (agentId) => {
+    setCustomAgents(customAgents.filter(a => a.id !== agentId));
+    toast({
+      title: 'Agent deleted',
+      status: 'info',
+      duration: 2000,
+      isClosable: true,
+    });
+  };
+
   const handleSavePipeline = () => {
-    const pipeline = { nodes, edges };
+    const pipeline = { nodes, edges, customAgents, customTeams };
     console.log('Saving pipeline:', pipeline);
-    // TODO: Send to backend
     toast({
       title: 'Pipeline saved',
       status: 'success',
@@ -390,27 +492,15 @@ export default function PipelineBuilder() {
     });
   };
 
-  // Reset pipeline
-  const handleResetPipeline = () => {
-    setNodes(initialNodes);
-    setEdges(initialEdges);
-    toast({
-      title: 'Pipeline reset',
-      status: 'info',
-      duration: 2000,
-      isClosable: true,
-    });
-  };
-
   return (
-    <Box h="100vh" position="relative">
+    <Box h="100vh" position="relative" bg="gray.50">
       {/* Left Sidebar - Agent Library */}
       <Box
         position="absolute"
         left="0"
         top="0"
         h="100%"
-        w="250px"
+        w="280px"
         bg="white"
         borderRight="2px solid"
         borderColor="gray.200"
@@ -418,83 +508,158 @@ export default function PipelineBuilder() {
         overflowY="auto"
       >
         <VStack spacing="0" align="stretch" h="full">
-          <Box p="20px" borderBottom="2px solid" borderColor="gray.200">
-            <Text fontSize="lg" fontWeight="bold" color="gray.800" mb="5px">
-              Agent Library
-            </Text>
-            <Text fontSize="xs" color="gray.600">
-              Drag agents to canvas
+          {/* Header */}
+          <Box p="20px" borderBottom="2px solid" borderColor="gray.200" bg="teal.50">
+            <HStack spacing="10px" mb="8px">
+              <Icon as={MdHub} color="teal.600" boxSize="24px" />
+              <Text fontSize="lg" fontWeight="bold" color="teal.900">
+                Pipeline Builder
+              </Text>
+            </HStack>
+            <Text fontSize="xs" color="teal.700">
+              Drag agents, connect teams
             </Text>
           </Box>
 
-          <VStack spacing="10px" p="15px" align="stretch">
-            <Text fontSize="xs" fontWeight="600" color="gray.500" textTransform="uppercase">
-              System 1 Agents
-            </Text>
-            {AGENT_LIBRARY.filter((a) => a.system === 1).map((agent) => (
-              <Box
-                key={agent.id}
-                p="12px"
-                bg="gray.50"
-                borderRadius="8px"
-                border="1px solid"
-                borderColor="gray.200"
-                cursor="grab"
-                _hover={{ bg: 'gray.100', boxShadow: 'md' }}
-                draggable
-                onDragStart={(e) => onDragStart(e, agent)}
-              >
-                <HStack spacing="8px">
-                  <Icon as={agent.icon} color={`${agent.color}.600`} boxSize="18px" />
-                  <Text fontSize="xs" fontWeight="600">
-                    {agent.name}
-                  </Text>
-                </HStack>
-              </Box>
-            ))}
+          {/* Tabs for agents */}
+          <Tabs size="sm" variant="enclosed" colorScheme="teal">
+            <TabList px="10px" pt="10px">
+              <Tab fontSize="xs">Built-in</Tab>
+              <Tab fontSize="xs">Custom</Tab>
+            </TabList>
 
-            <Text fontSize="xs" fontWeight="600" color="gray.500" textTransform="uppercase" mt="15px">
-              System 2 Agents
-            </Text>
-            {AGENT_LIBRARY.filter((a) => a.system === 2).map((agent) => (
-              <Box
-                key={agent.id}
-                p="12px"
-                bg="gray.50"
-                borderRadius="8px"
-                border="1px solid"
-                borderColor="gray.200"
-                cursor="grab"
-                _hover={{ bg: 'gray.100', boxShadow: 'md' }}
-                draggable
-                onDragStart={(e) => onDragStart(e, agent)}
-              >
-                <HStack spacing="8px">
-                  <Icon as={agent.icon} color={`${agent.color}.600`} boxSize="18px" />
-                  <Text fontSize="xs" fontWeight="600">
-                    {agent.name}
+            <TabPanels>
+              {/* Built-in Agents */}
+              <TabPanel p="15px">
+                <VStack spacing="12px" align="stretch">
+                  <Text fontSize="xs" fontWeight="600" color="gray.500" textTransform="uppercase">
+                    Data Pipeline Agents
                   </Text>
-                </HStack>
-              </Box>
-            ))}
-          </VStack>
+                  {BUILTIN_AGENTS.filter((a) => a.system === 'data').map((agent) => (
+                    <Box
+                      key={agent.id}
+                      p="12px"
+                      bg="gray.50"
+                      borderRadius="8px"
+                      border="2px solid"
+                      borderColor="gray.200"
+                      cursor="grab"
+                      _hover={{ bg: 'gray.100', borderColor: 'teal.400', boxShadow: 'md' }}
+                      draggable
+                      onDragStart={(e) => onDragStart(e, agent)}
+                    >
+                      <HStack spacing="10px">
+                        <Icon as={agent.icon} color={`${agent.color}.600`} boxSize="20px" />
+                        <Text fontSize="xs" fontWeight="600">
+                          {agent.name}
+                        </Text>
+                      </HStack>
+                    </Box>
+                  ))}
 
+                  <Divider />
+
+                  <Text fontSize="xs" fontWeight="600" color="gray.500" textTransform="uppercase">
+                    Analyzer Network Agents
+                  </Text>
+                  {BUILTIN_AGENTS.filter((a) => a.system === 'analyzer').map((agent) => (
+                    <Box
+                      key={agent.id}
+                      p="12px"
+                      bg="gray.50"
+                      borderRadius="8px"
+                      border="2px solid"
+                      borderColor="gray.200"
+                      cursor="grab"
+                      _hover={{ bg: 'gray.100', borderColor: 'teal.400', boxShadow: 'md' }}
+                      draggable
+                      onDragStart={(e) => onDragStart(e, agent)}
+                    >
+                      <HStack spacing="10px">
+                        <Icon as={agent.icon} color={`${agent.color}.600`} boxSize="20px" />
+                        <Text fontSize="xs" fontWeight="600">
+                          {agent.name}
+                        </Text>
+                      </HStack>
+                    </Box>
+                  ))}
+                </VStack>
+              </TabPanel>
+
+              {/* Custom Agents */}
+              <TabPanel p="15px">
+                <VStack spacing="10px" align="stretch">
+                  {customAgents.length === 0 ? (
+                    <Box p="20px" textAlign="center">
+                      <Text fontSize="xs" color="gray.500">
+                        No custom agents yet
+                      </Text>
+                    </Box>
+                  ) : (
+                    customAgents.map((agent) => (
+                      <Box
+                        key={agent.id}
+                        p="12px"
+                        bg="gray.50"
+                        borderRadius="8px"
+                        border="2px solid"
+                        borderColor="gray.200"
+                        cursor="grab"
+                        draggable
+                        onDragStart={(e) => onDragStart(e, agent)}
+                      >
+                        <HStack justify="space-between">
+                          <HStack spacing="10px">
+                            <Icon as={agent.icon} color={`${agent.color}.600`} boxSize="18px" />
+                            <Text fontSize="xs" fontWeight="600">
+                              {agent.name}
+                            </Text>
+                          </HStack>
+                          <IconButton
+                            icon={<Icon as={MdDelete} />}
+                            size="xs"
+                            variant="ghost"
+                            colorScheme="red"
+                            onClick={() => handleDeleteAgent(agent.id)}
+                          />
+                        </HStack>
+                      </Box>
+                    ))
+                  )}
+                </VStack>
+              </TabPanel>
+            </TabPanels>
+          </Tabs>
+
+          {/* Action Buttons */}
           <Box mt="auto" p="15px" borderTop="2px solid" borderColor="gray.200">
-            <Button
-              leftIcon={<Icon as={MdAdd} />}
-              size="sm"
-              colorScheme="teal"
-              w="full"
-              onClick={onOpen}
-            >
-              Create Team
-            </Button>
+            <VStack spacing="10px">
+              <Button
+                leftIcon={<Icon as={MdAdd} />}
+                size="sm"
+                colorScheme="teal"
+                w="full"
+                onClick={onAgentOpen}
+              >
+                Create Agent
+              </Button>
+              <Button
+                leftIcon={<Icon as={MdGroups} />}
+                size="sm"
+                colorScheme="purple"
+                variant="outline"
+                w="full"
+                onClick={onTeamOpen}
+              >
+                Create Team
+              </Button>
+            </VStack>
           </Box>
         </VStack>
       </Box>
 
       {/* Main Canvas */}
-      <Box ml="250px" h="100%">
+      <Box ml="280px" h="100%">
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -506,76 +671,186 @@ export default function PipelineBuilder() {
           fitView
         >
           <Panel position="top-left">
-            <Box bg="white" p="15px" borderRadius="8px" boxShadow="md">
-              <Text fontSize="lg" fontWeight="bold" color="gray.800" mb="5px">
-                Event Horizon Pipeline
-              </Text>
-              <Text fontSize="xs" color="gray.600">
-                Drag agents from library, connect with lines
-              </Text>
-            </Box>
+            <VStack align="start" spacing="10px">
+              <Box bg="white" p="15px" borderRadius="12px" boxShadow="md" border="1px solid" borderColor="gray.200">
+                <Text fontSize="md" fontWeight="bold" color="gray.800" mb="5px">
+                  Event Horizon Pipeline
+                </Text>
+                <Text fontSize="xs" color="gray.600">
+                  Drop agents → Connect nodes → Save
+                </Text>
+              </Box>
+
+              <Box bg="purple.50" p="12px" borderRadius="8px" border="1px solid" borderColor="purple.200">
+                <Text fontSize="xs" fontWeight="600" color="purple.800" mb="4px">
+                  📊 Data Pipeline (Fixed)
+                </Text>
+                <Text fontSize="2xs" color="purple.700">
+                  Stage 1→2→3 unified. Add custom agents to Stage 1.
+                </Text>
+              </Box>
+
+              <Box bg="pink.50" p="12px" borderRadius="8px" border="1px solid" borderColor="pink.200">
+                <Text fontSize="xs" fontWeight="600" color="pink.800" mb="4px">
+                  🧠 Analyzer Network (Flexible)
+                </Text>
+                <Text fontSize="2xs" color="pink.700">
+                  4 default teams + create unlimited custom teams.
+                </Text>
+              </Box>
+            </VStack>
           </Panel>
 
           <Panel position="top-right">
-            <HStack spacing="10px">
-              <Tooltip label="Save Pipeline">
-                <IconButton
-                  icon={<Icon as={MdSave} />}
-                  colorScheme="teal"
-                  onClick={handleSavePipeline}
-                  size="md"
-                />
-              </Tooltip>
-              <Tooltip label="Reset Pipeline">
-                <IconButton
-                  icon={<Icon as={MdRefresh} />}
-                  colorScheme="gray"
-                  onClick={handleResetPipeline}
-                  size="md"
-                />
-              </Tooltip>
-            </HStack>
+            <Tooltip label="Save Pipeline">
+              <IconButton
+                icon={<Icon as={MdSave} />}
+                colorScheme="teal"
+                onClick={handleSavePipeline}
+                size="lg"
+                boxShadow="lg"
+              />
+            </Tooltip>
           </Panel>
 
           <Controls />
           <MiniMap />
-          <Background variant="dots" gap={12} size={1} />
+          <Background variant="dots" gap={16} size={1} />
         </ReactFlow>
       </Box>
 
-      {/* Create Team Modal */}
-      <Drawer isOpen={isOpen} placement="right" onClose={onClose}>
+      {/* Create Agent Drawer */}
+      <Drawer isOpen={isAgentOpen} placement="right" onClose={onAgentClose} size="md">
         <DrawerOverlay />
         <DrawerContent>
           <DrawerCloseButton />
-          <DrawerHeader>Create New Team</DrawerHeader>
+          <DrawerHeader>Create Custom Agent</DrawerHeader>
 
           <DrawerBody>
             <VStack spacing="20px" align="stretch">
+              <FormControl isRequired>
+                <FormLabel fontSize="sm" fontWeight="600">
+                  Agent Name
+                </FormLabel>
+                <Input
+                  placeholder="e.g., Crypto Price Fetcher"
+                  value={newAgent.name}
+                  onChange={(e) => setNewAgent({ ...newAgent, name: e.target.value })}
+                />
+              </FormControl>
+
               <FormControl>
+                <FormLabel fontSize="sm" fontWeight="600">
+                  Description
+                </FormLabel>
+                <Textarea
+                  placeholder="What does this agent do?"
+                  value={newAgent.description}
+                  onChange={(e) => setNewAgent({ ...newAgent, description: e.target.value })}
+                  rows={3}
+                />
+              </FormControl>
+
+              <FormControl isRequired>
+                <FormLabel fontSize="sm" fontWeight="600">
+                  System
+                </FormLabel>
+                <Select
+                  value={newAgent.system}
+                  onChange={(e) => {
+                    const system = e.target.value;
+                    setNewAgent({
+                      ...newAgent,
+                      system,
+                      category: system === 'data' ? 'data_retriever' : 'strategy_agent'
+                    });
+                  }}
+                >
+                  <option value="data">Event Horizon Data Pipeline</option>
+                  <option value="analyzer">Analyzer Network</option>
+                </Select>
+              </FormControl>
+
+              <FormControl isRequired>
+                <FormLabel fontSize="sm" fontWeight="600">
+                  Category
+                </FormLabel>
+                <Select
+                  value={newAgent.category}
+                  onChange={(e) => setNewAgent({ ...newAgent, category: e.target.value })}
+                >
+                  {AGENT_CATEGORIES.filter(c => c.system === newAgent.system).map((cat) => (
+                    <option key={cat.value} value={cat.value}>
+                      {cat.label}
+                    </option>
+                  ))}
+                </Select>
+              </FormControl>
+
+              <FormControl isRequired>
+                <FormLabel fontSize="sm" fontWeight="600">
+                  Model
+                </FormLabel>
+                <Select
+                  value={newAgent.model}
+                  onChange={(e) => setNewAgent({ ...newAgent, model: e.target.value })}
+                >
+                  {MODELS.map((model) => (
+                    <option key={model.value} value={model.value}>
+                      {model.label}
+                    </option>
+                  ))}
+                </Select>
+              </FormControl>
+
+              <Button colorScheme="teal" onClick={handleCreateAgent}>
+                Create Agent
+              </Button>
+            </VStack>
+          </DrawerBody>
+        </DrawerContent>
+      </Drawer>
+
+      {/* Create Team Drawer */}
+      <Drawer isOpen={isTeamOpen} placement="right" onClose={onTeamClose}>
+        <DrawerOverlay />
+        <DrawerContent>
+          <DrawerCloseButton />
+          <DrawerHeader>Create Custom Team</DrawerHeader>
+
+          <DrawerBody>
+            <VStack spacing="20px" align="stretch">
+              <FormControl isRequired>
                 <FormLabel fontSize="sm" fontWeight="600">
                   Team Name
                 </FormLabel>
                 <Input
-                  placeholder="e.g., Custom Strategy Team"
-                  value={newTeamName}
-                  onChange={(e) => setNewTeamName(e.target.value)}
-                  size="md"
+                  placeholder="e.g., Momentum Traders"
+                  value={newTeam.name}
+                  onChange={(e) => setNewTeam({ ...newTeam, name: e.target.value })}
                 />
               </FormControl>
 
-              <Button
-                leftIcon={<Icon as={MdGroups} />}
-                colorScheme="teal"
-                onClick={handleCreateTeam}
-              >
+              <FormControl>
+                <FormLabel fontSize="sm" fontWeight="600">
+                  Description
+                </FormLabel>
+                <Textarea
+                  placeholder="What does this team do?"
+                  value={newTeam.description}
+                  onChange={(e) => setNewTeam({ ...newTeam, description: e.target.value })}
+                  rows={3}
+                />
+              </FormControl>
+
+              <Button colorScheme="purple" onClick={handleCreateTeam}>
                 Create Team
               </Button>
 
               <Box p="15px" bg="blue.50" borderRadius="8px" border="1px solid" borderColor="blue.200">
                 <Text fontSize="xs" color="blue.800">
-                  <strong>Tip:</strong> After creating a team, drag agents from the library
-                  onto the canvas and connect them to your team using lines.
+                  <strong>Tip:</strong> After creating a team, drag agents onto it and
+                  connect teams with lines to build your custom analyzer network.
                 </Text>
               </Box>
             </VStack>
