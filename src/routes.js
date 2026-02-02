@@ -10,6 +10,7 @@ import {
 import LandingPage from 'views/admin/landing';
 import PortfolioAnalyzer from 'views/admin/portfolio/PortfolioAnalyzer';
 import AgentsPage from 'views/admin/agents';
+import PipelineBuilder from 'views/admin/pipeline';
 import Profile from 'views/admin/profile';
 // import RTL from 'views/admin/rtl';
 
@@ -42,6 +43,14 @@ const routes = [
     path: '/agents',
     icon: <Icon as={MdHome} width="20px" height="20px" color="inherit" />,
     component: <AgentsPage />,
+    requiresAuth: false,
+  },
+  {
+    name: 'Pipeline',
+    layout: '/',
+    path: '/pipeline',
+    icon: <Icon as={MdHome} width="20px" height="20px" color="inherit" />,
+    component: <PipelineBuilder />,
     requiresAuth: false,
   },
   {

@@ -15,6 +15,7 @@ import {
 import {
   MdTrendingUp,
   MdSmartToy,
+  MdAccountTree,
   MdPerson,
   MdFileDownload,
   MdMenu,
@@ -66,6 +67,12 @@ const SidebarContent = ({ navigate, currentPath }) => {
           label="Agents"
           onClick={() => navigate('/agents')}
           isActive={currentPath === '/agents'}
+        />
+        <SidebarItem
+          icon={MdAccountTree}
+          label="Pipeline"
+          onClick={() => navigate('/pipeline')}
+          isActive={currentPath === '/pipeline'}
         />
       </VStack>
 

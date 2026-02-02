@@ -16,6 +16,7 @@ import {
 } from '@chakra-ui/react';
 import { useState } from 'react';
 import {
+  MdAccountTree,
   MdApps,
   MdAttachFile,
   MdFileDownload,
@@ -128,6 +129,11 @@ export default function LandingPage() {
               icon={MdSmartToy}
               label="Agents"
               onClick={() => navigate('/agents')}
+            />
+            <SidebarItem
+              icon={MdAccountTree}
+              label="Pipeline"
+              onClick={() => navigate('/pipeline')}
             />
           </VStack>
 
