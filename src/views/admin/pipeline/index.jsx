@@ -532,9 +532,22 @@ export default function PipelineBuilder() {
               {/* Built-in Agents */}
               <TabPanel p="15px">
                 <VStack spacing="12px" align="stretch">
-                  <Text fontSize="xs" fontWeight="600" color="gray.500" textTransform="uppercase">
-                    Data Agents
-                  </Text>
+                  <HStack justify="space-between" align="center">
+                    <Text fontSize="xs" fontWeight="600" color="gray.500" textTransform="uppercase">
+                      Data Agents
+                    </Text>
+                    <IconButton
+                      icon={<Icon as={MdAdd} />}
+                      size="xs"
+                      colorScheme="teal"
+                      variant="ghost"
+                      aria-label="Add data agent"
+                      onClick={() => {
+                        setNewAgent({ ...newAgent, system: 'data', category: 'data_retriever' });
+                        onAgentOpen();
+                      }}
+                    />
+                  </HStack>
                   {BUILTIN_AGENTS.filter((a) => a.system === 'data').map((agent) => (
                     <Box
                       key={agent.id}
@@ -559,9 +572,22 @@ export default function PipelineBuilder() {
 
                   <Divider />
 
-                  <Text fontSize="xs" fontWeight="600" color="gray.500" textTransform="uppercase">
-                    Analyzer Agents
-                  </Text>
+                  <HStack justify="space-between" align="center">
+                    <Text fontSize="xs" fontWeight="600" color="gray.500" textTransform="uppercase">
+                      Analyzer Agents
+                    </Text>
+                    <IconButton
+                      icon={<Icon as={MdAdd} />}
+                      size="xs"
+                      colorScheme="purple"
+                      variant="ghost"
+                      aria-label="Add analyzer agent"
+                      onClick={() => {
+                        setNewAgent({ ...newAgent, system: 'analyzer', category: 'strategy_agent' });
+                        onAgentOpen();
+                      }}
+                    />
+                  </HStack>
                   {BUILTIN_AGENTS.filter((a) => a.system === 'analyzer').map((agent) => (
                     <Box
                       key={agent.id}
@@ -633,27 +659,15 @@ export default function PipelineBuilder() {
 
           {/* Action Buttons */}
           <Box mt="auto" p="15px" borderTop="2px solid" borderColor="gray.200">
-            <VStack spacing="10px">
-              <Button
-                leftIcon={<Icon as={MdAdd} />}
-                size="sm"
-                colorScheme="teal"
-                w="full"
-                onClick={onAgentOpen}
-              >
-                Create Agent
-              </Button>
-              <Button
-                leftIcon={<Icon as={MdGroups} />}
-                size="sm"
-                colorScheme="purple"
-                variant="outline"
-                w="full"
-                onClick={onTeamOpen}
-              >
-                Create New Horizon
-              </Button>
-            </VStack>
+            <Button
+              leftIcon={<Icon as={MdGroups} />}
+              size="sm"
+              colorScheme="purple"
+              w="full"
+              onClick={onTeamOpen}
+            >
+              Create New Horizon
+            </Button>
           </Box>
         </VStack>
       </Box>
