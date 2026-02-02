@@ -1,12 +1,6 @@
 import {
   Box,
   Button,
-  Table,
-  Thead,
-  Tbody,
-  Tr,
-  Th,
-  Td,
   Text,
   HStack,
   VStack,
@@ -17,7 +11,9 @@ import {
   InputLeftElement,
   Tabs,
   TabList,
+  TabPanels,
   Tab,
+  TabPanel,
   useToast,
   Modal,
   ModalOverlay,
@@ -30,6 +26,9 @@ import {
   FormLabel,
   Textarea,
   Select,
+  Switch,
+  SimpleGrid,
+  Flex,
 } from '@chakra-ui/react';
 import { useState } from 'react';
 import {
@@ -37,39 +36,102 @@ import {
   MdSearch,
   MdSmartToy,
   MdDelete,
-  MdEdit,
+  MdShowChart,
+  MdArticle,
+  MdSpeed,
+  MdTrendingUp,
+  MdWarning,
+  MdApi,
+  MdSettings,
+  MdCheckCircle,
 } from 'react-icons/md';
 import Card from 'components/card/Card.js';
 
-// Mock data for agents
-const INITIAL_AGENTS = [
+// Built-in System 1 Agents
+const BUILTIN_SYSTEM1_AGENTS = [
   {
-    id: '1',
-    name: 'portfolio-analyzer',
-    description: 'Analyzes portfolio performance and provides recommendations',
-    source: 'System 1 - Stage 3',
-    model: 'gpt-4',
-    created: '5 days ago',
-    apiId: 'agent_port_001',
+    id: 'builtin_1',
+    name: 'Price Data Retriever',
+    description: 'Fetches real-time and historical price data from Yahoo Finance',
+    category: 'Data Retriever',
+    system: 'System 1',
+    stage: 'Stage 1',
+    icon: MdShowChart,
     status: 'active',
+    isBuiltin: true,
   },
   {
-    id: '2',
-    name: 'risk-assessor',
-    description: 'Evaluates investment risk based on market data',
-    source: 'System 1 - All Stages',
-    model: 'gpt-4-turbo',
-    created: '12 days ago',
-    apiId: 'agent_risk_002',
+    id: 'builtin_2',
+    name: 'News Sentiment Analyzer',
+    description: 'Analyzes market news sentiment using NLP',
+    category: 'News Agent',
+    system: 'System 1',
+    stage: 'Stage 1',
+    icon: MdArticle,
     status: 'active',
+    isBuiltin: true,
+  },
+  {
+    id: 'builtin_3',
+    name: 'Technical Indicator Engine',
+    description: 'Calculates RSI, MACD, Moving Averages, and more',
+    category: 'Technical Agent',
+    system: 'System 1',
+    stage: 'Stage 2',
+    icon: MdSpeed,
+    status: 'active',
+    isBuiltin: true,
   },
 ];
 
-const DATA_SOURCES = [
+// Built-in System 2 Agents
+const BUILTIN_SYSTEM2_AGENTS = [
+  {
+    id: 'builtin_4',
+    name: 'Bull Researcher',
+    description: 'Generates bullish investment arguments',
+    category: 'Strategy Agent',
+    system: 'System 2',
+    stage: 'Team 2',
+    icon: MdTrendingUp,
+    status: 'active',
+    isBuiltin: true,
+  },
+  {
+    id: 'builtin_5',
+    name: 'Bear Researcher',
+    description: 'Generates bearish investment arguments',
+    category: 'Strategy Agent',
+    system: 'System 2',
+    stage: 'Team 2',
+    icon: MdWarning,
+    status: 'active',
+    isBuiltin: true,
+  },
+];
+
+const AGENT_CATEGORIES = [
+  { value: 'data_retriever', label: '📊 Data Retriever', system: 'System 1' },
+  { value: 'news_agent', label: '📰 News Agent', system: 'System 1' },
+  { value: 'technical_agent', label: '📈 Technical Agent', system: 'System 1' },
+  { value: 'financial_metrics', label: '💰 Financial Metrics', system: 'System 1' },
+  { value: 'api_connector', label: '🔗 API Connector', system: 'System 1' },
+  { value: 'strategy_agent', label: '🎯 Strategy Agent', system: 'System 2' },
+  { value: 'risk_manager', label: '⚖️ Risk Manager', system: 'System 2' },
+  { value: 'custom_analyzer', label: '🤖 Custom Analyzer', system: 'System 2' },
+];
+
+const SYSTEM1_STAGES = [
   { value: 'stage1', label: 'Stage 1 - Data Retrieval' },
   { value: 'stage2', label: 'Stage 2 - Normalization' },
   { value: 'stage3', label: 'Stage 3 - LLM Features' },
-  { value: 'all', label: 'All Stages' },
+];
+
+const SYSTEM2_TEAMS = [
+  { value: 'team1', label: 'Team 1 - Market Analysis' },
+  { value: 'team2', label: 'Team 2 - Bull/Bear Debate' },
+  { value: 'team3', label: 'Team 3 - Portfolio Optimization' },
+  { value: 'team4', label: 'Team 4 - Risk Assessment' },
 ];
 
 const MODELS = [
@@ -80,7 +142,7 @@ const MODELS = [
 ];
 
 export default function AgentsPage() {
-  const [agents, setAgents] = useState(INITIAL_AGENTS);
+  const [customAgents, setCustomAgents] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState(0);
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -90,8 +152,11 @@ export default function AgentsPage() {
   const [newAgent, setNewAgent] = useState({
     name: '',
     description: '',
-    source: 'all',
+    category: 'data_retriever',
+    system: 'System 1',
+    stage: 'stage1',
     model: 'gpt-4',
+    status: 'inactive',
   });
 
   // Colors
@@ -100,6 +165,8 @@ export default function AgentsPage() {
   const brandColor = 'teal.600';
   const cardBg = 'white';
   const borderColor = 'gray.200';
+
+  const allAgents = [...BUILTIN_SYSTEM1_AGENTS, ...BUILTIN_SYSTEM2_AGENTS, ...customAgents];
 
   const handleCreateAgent = () => {
     if (!newAgent.name.trim()) {
@@ -113,32 +180,56 @@ export default function AgentsPage() {
       return;
     }
 
+    const categoryInfo = AGENT_CATEGORIES.find((c) => c.value === newAgent.category);
     const agent = {
       id: Date.now().toString(),
-      name: newAgent.name.toLowerCase().replace(/\s+/g, '-'),
+      name: newAgent.name,
       description: newAgent.description,
-      source: DATA_SOURCES.find((s) => s.value === newAgent.source)?.label || 'All Stages',
+      category: categoryInfo?.label || 'Custom',
+      system: newAgent.system,
+      stage: newAgent.system === 'System 1'
+        ? SYSTEM1_STAGES.find(s => s.value === newAgent.stage)?.label
+        : SYSTEM2_TEAMS.find(t => t.value === newAgent.stage)?.label,
+      icon: MdSmartToy,
+      status: newAgent.status,
       model: newAgent.model,
+      isBuiltin: false,
       created: 'Just now',
-      apiId: `agent_${newAgent.name.slice(0, 4)}_${Math.random().toString(36).slice(2, 5)}`,
-      status: 'active',
     };
 
-    setAgents([agent, ...agents]);
-    setNewAgent({ name: '', description: '', source: 'all', model: 'gpt-4' });
+    setCustomAgents([agent, ...customAgents]);
+    setNewAgent({
+      name: '',
+      description: '',
+      category: 'data_retriever',
+      system: 'System 1',
+      stage: 'stage1',
+      model: 'gpt-4',
+      status: 'inactive',
+    });
     onClose();
 
     toast({
       title: 'Agent created',
-      description: `${agent.name} is now ready to use.`,
+      description: `${agent.name} is ready. Enable it to add to your pipeline.`,
       status: 'success',
       duration: 3000,
       isClosable: true,
     });
   };
 
+  const handleToggleAgent = (id) => {
+    setCustomAgents(
+      customAgents.map((agent) =>
+        agent.id === id
+          ? { ...agent, status: agent.status === 'active' ? 'inactive' : 'active' }
+          : agent
+      )
+    );
+  };
+
   const handleDeleteAgent = (id) => {
-    setAgents(agents.filter((a) => a.id !== id));
+    setCustomAgents(customAgents.filter((a) => a.id !== id));
     toast({
       title: 'Agent deleted',
       status: 'info',
@@ -147,10 +238,97 @@ export default function AgentsPage() {
     });
   };
 
-  const filteredAgents = agents.filter(
-    (agent) =>
-      agent.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      agent.description.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredAgents = (system) => {
+    return allAgents.filter(
+      (agent) =>
+        agent.system === system &&
+        (agent.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          agent.description.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
+  };
+
+  const AgentCard = ({ agent, showToggle = false }) => (
+    <Card
+      bg={cardBg}
+      p="20px"
+      borderRadius="12px"
+      border="1px solid"
+      borderColor={agent.status === 'active' ? 'teal.200' : borderColor}
+      _hover={{ boxShadow: 'md' }}
+      transition="all 0.2s"
+    >
+      <Flex justify="space-between" align="start">
+        <HStack spacing="12px" align="start" flex="1">
+          <Icon
+            as={agent.icon}
+            boxSize="24px"
+            color={agent.status === 'active' ? brandColor : 'gray.400'}
+          />
+          <VStack align="start" spacing="4px" flex="1">
+            <HStack>
+              <Text color={textColor} fontSize="md" fontWeight="600">
+                {agent.name}
+              </Text>
+              {agent.isBuiltin && (
+                <Badge colorScheme="blue" fontSize="xs">
+                  Built-in
+                </Badge>
+              )}
+            </HStack>
+            <Text color={textColorSecondary} fontSize="xs">
+              {agent.description}
+            </Text>
+            <HStack spacing="8px" mt="8px">
+              <Badge colorScheme="purple" fontSize="xs" variant="subtle">
+                {agent.category}
+              </Badge>
+              <Badge colorScheme="gray" fontSize="xs" variant="subtle">
+                {agent.stage}
+              </Badge>
+            </HStack>
+          </VStack>
+        </HStack>
+
+        <VStack spacing="8px" align="end">
+          {showToggle && !agent.isBuiltin && (
+            <Switch
+              colorScheme="teal"
+              isChecked={agent.status === 'active'}
+              onChange={() => handleToggleAgent(agent.id)}
+              size="sm"
+            />
+          )}
+          {agent.isBuiltin && (
+            <Badge
+              colorScheme={agent.status === 'active' ? 'green' : 'gray'}
+              fontSize="xs"
+            >
+              {agent.status === 'active' ? 'Always Active' : 'Inactive'}
+            </Badge>
+          )}
+          {!agent.isBuiltin && (
+            <HStack spacing="4px">
+              <Button
+                size="xs"
+                variant="ghost"
+                color={textColorSecondary}
+                onClick={() => {}}
+              >
+                <Icon as={MdSettings} />
+              </Button>
+              <Button
+                size="xs"
+                variant="ghost"
+                color="red.500"
+                onClick={() => handleDeleteAgent(agent.id)}
+              >
+                <Icon as={MdDelete} />
+              </Button>
+            </HStack>
+          )}
+        </VStack>
+      </Flex>
+    </Card>
   );
 
   return (
@@ -164,7 +342,7 @@ export default function AgentsPage() {
                 Agents
               </Text>
               <Text color={textColorSecondary} fontSize="sm">
-                Specialized AI assistants trained on Event Horizon System 1 data
+                Build your custom pipeline by plugging agents in or out
               </Text>
             </Box>
 
@@ -177,252 +355,284 @@ export default function AgentsPage() {
               _hover={{ bg: 'teal.700' }}
               fontWeight="600"
             >
-              Create agent
+              Create Agent
             </Button>
           </HStack>
         </Box>
 
-        {/* Main Card */}
-        <Card
-          bg={cardBg}
-          p="0"
-          borderRadius="12px"
-          border="1px solid"
-          borderColor={borderColor}
+        {/* Tabs */}
+        <Tabs
+          colorScheme="teal"
+          index={activeTab}
+          onChange={setActiveTab}
+          variant="enclosed"
         >
-          {/* Tabs and Search */}
-          <Box p="20px" borderBottom="1px solid" borderColor={borderColor}>
-            <HStack justify="space-between" mb="15px">
-              <Tabs
-                size="sm"
-                variant="unstyled"
-                index={activeTab}
-                onChange={setActiveTab}
+          <TabList borderColor={borderColor}>
+            <Tab
+              _selected={{
+                color: brandColor,
+                borderColor: borderColor,
+                borderBottomColor: 'white',
+                fontWeight: '600',
+              }}
+            >
+              <HStack spacing="6px">
+                <Icon as={MdShowChart} />
+                <Text fontSize="sm">System 1 Pipeline</Text>
+                <Badge colorScheme="blue" fontSize="xs" variant="subtle">
+                  {filteredAgents('System 1').length}
+                </Badge>
+              </HStack>
+            </Tab>
+            <Tab
+              _selected={{
+                color: brandColor,
+                borderColor: borderColor,
+                borderBottomColor: 'white',
+                fontWeight: '600',
+              }}
+            >
+              <HStack spacing="6px">
+                <Icon as={MdTrendingUp} />
+                <Text fontSize="sm">System 2 Decision</Text>
+                <Badge colorScheme="purple" fontSize="xs" variant="subtle">
+                  {filteredAgents('System 2').length}
+                </Badge>
+              </HStack>
+            </Tab>
+            <Tab
+              _selected={{
+                color: brandColor,
+                borderColor: borderColor,
+                borderBottomColor: 'white',
+                fontWeight: '600',
+              }}
+            >
+              <HStack spacing="6px">
+                <Icon as={MdApi} />
+                <Text fontSize="sm">Pipeline View</Text>
+              </HStack>
+            </Tab>
+          </TabList>
+
+          <TabPanels>
+            {/* System 1 Tab */}
+            <TabPanel p="0" pt="20px">
+              <Card
+                bg={cardBg}
+                p="20px"
+                borderRadius="12px"
+                border="1px solid"
+                borderColor={borderColor}
               >
-                <TabList>
-                  <Tab
-                    _selected={{
-                      color: brandColor,
-                      borderBottom: '2px solid',
-                      borderColor: brandColor,
-                    }}
-                    color={textColorSecondary}
-                    fontWeight="500"
-                    fontSize="sm"
-                  >
-                    Source
-                  </Tab>
-                  <Tab
-                    _selected={{
-                      color: brandColor,
-                      borderBottom: '2px solid',
-                      borderColor: brandColor,
-                    }}
-                    color={textColorSecondary}
-                    fontWeight="500"
-                    fontSize="sm"
-                  >
-                    Metadata
-                  </Tab>
-                </TabList>
-              </Tabs>
+                <InputGroup mb="20px">
+                  <InputLeftElement pointerEvents="none">
+                    <Icon as={MdSearch} color="gray.400" />
+                  </InputLeftElement>
+                  <Input
+                    placeholder="Search System 1 agents..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    borderRadius="8px"
+                    bg="white"
+                    borderColor={borderColor}
+                  />
+                </InputGroup>
 
-              <InputGroup maxW="300px">
-                <InputLeftElement pointerEvents="none">
-                  <Icon as={MdSearch} color="gray.400" />
-                </InputLeftElement>
-                <Input
-                  placeholder="Search agents..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  size="sm"
-                  borderRadius="6px"
-                  bg="white"
-                  borderColor={borderColor}
-                />
-              </InputGroup>
-            </HStack>
-          </Box>
+                <SimpleGrid columns={{ base: 1, md: 2 }} spacing="15px">
+                  {filteredAgents('System 1').map((agent) => (
+                    <AgentCard key={agent.id} agent={agent} showToggle={true} />
+                  ))}
+                </SimpleGrid>
 
-          {/* Agents Table */}
-          <Box overflowX="auto">
-            <Table variant="simple" size="sm">
-              <Thead>
-                <Tr>
-                  <Th
-                    borderColor={borderColor}
-                    color={textColorSecondary}
-                    fontSize="xs"
-                    textTransform="none"
-                  >
-                    Agent name
-                  </Th>
-                  <Th
-                    borderColor={borderColor}
-                    color={textColorSecondary}
-                    fontSize="xs"
-                    textTransform="none"
-                  >
-                    Source
-                  </Th>
-                  <Th
-                    borderColor={borderColor}
-                    color={textColorSecondary}
-                    fontSize="xs"
-                    textTransform="none"
-                  >
-                    Model
-                  </Th>
-                  <Th
-                    borderColor={borderColor}
-                    color={textColorSecondary}
-                    fontSize="xs"
-                    textTransform="none"
-                  >
-                    Created
-                  </Th>
-                  <Th
-                    borderColor={borderColor}
-                    color={textColorSecondary}
-                    fontSize="xs"
-                    textTransform="none"
-                  >
-                    API ID
-                  </Th>
-                  <Th
-                    borderColor={borderColor}
-                    color={textColorSecondary}
-                    fontSize="xs"
-                    textTransform="none"
-                  >
-                    Status
-                  </Th>
-                  <Th borderColor={borderColor} w="100px"></Th>
-                </Tr>
-              </Thead>
-              <Tbody>
-                {filteredAgents.map((agent) => (
-                  <Tr
-                    key={agent.id}
-                    _hover={{ bg: 'gray.50' }}
-                    cursor="pointer"
-                  >
-                    <Td borderColor={borderColor}>
-                      <VStack align="start" spacing="2px">
-                        <HStack spacing="8px">
-                          <Icon as={MdSmartToy} color={brandColor} />
-                          <Text
-                            color={textColor}
-                            fontSize="sm"
-                            fontWeight="600"
-                          >
-                            {agent.name}
-                          </Text>
-                        </HStack>
-                        {agent.description && (
-                          <Text
-                            color={textColorSecondary}
-                            fontSize="xs"
-                            noOfLines={1}
-                          >
-                            {agent.description}
-                          </Text>
-                        )}
-                      </VStack>
-                    </Td>
-                    <Td borderColor={borderColor}>
-                      <Badge
-                        colorScheme="blue"
-                        fontSize="xs"
-                        variant="subtle"
-                      >
-                        {agent.source}
-                      </Badge>
-                    </Td>
-                    <Td borderColor={borderColor}>
-                      <Badge colorScheme="purple" fontSize="xs" variant="subtle">
-                        {agent.model}
-                      </Badge>
-                    </Td>
-                    <Td borderColor={borderColor}>
-                      <Text color={textColorSecondary} fontSize="xs">
-                        {agent.created}
-                      </Text>
-                    </Td>
-                    <Td borderColor={borderColor}>
-                      <Text
-                        color={textColorSecondary}
-                        fontSize="xs"
-                        fontFamily="mono"
-                      >
-                        {agent.apiId}
-                      </Text>
-                    </Td>
-                    <Td borderColor={borderColor}>
-                      <Badge
-                        colorScheme={agent.status === 'active' ? 'green' : 'gray'}
-                        fontSize="xs"
-                      >
-                        {agent.status}
-                      </Badge>
-                    </Td>
-                    <Td borderColor={borderColor}>
-                      <HStack spacing="4px">
-                        <Button
-                          size="xs"
-                          variant="ghost"
-                          color={textColorSecondary}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            // Edit functionality
-                          }}
-                        >
-                          <Icon as={MdEdit} />
-                        </Button>
-                        <Button
-                          size="xs"
-                          variant="ghost"
-                          color="red.500"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteAgent(agent.id);
-                          }}
-                        >
-                          <Icon as={MdDelete} />
-                        </Button>
-                      </HStack>
-                    </Td>
-                  </Tr>
-                ))}
-              </Tbody>
-            </Table>
-
-            {filteredAgents.length === 0 && (
-              <Box p="40px" textAlign="center">
-                <Icon
-                  as={MdSmartToy}
-                  boxSize="48px"
-                  color="gray.300"
-                  mb="10px"
-                />
-                <Text color={textColorSecondary} fontSize="sm">
-                  {searchQuery ? 'No agents found' : 'No agents created yet'}
-                </Text>
-                {!searchQuery && (
-                  <Button
-                    size="sm"
-                    variant="link"
-                    color={brandColor}
-                    mt="10px"
-                    onClick={onOpen}
-                  >
-                    Create your first agent
-                  </Button>
+                {filteredAgents('System 1').length === 0 && (
+                  <Box p="40px" textAlign="center">
+                    <Text color={textColorSecondary} fontSize="sm">
+                      No System 1 agents found
+                    </Text>
+                  </Box>
                 )}
-              </Box>
-            )}
-          </Box>
-        </Card>
+              </Card>
+            </TabPanel>
+
+            {/* System 2 Tab */}
+            <TabPanel p="0" pt="20px">
+              <Card
+                bg={cardBg}
+                p="20px"
+                borderRadius="12px"
+                border="1px solid"
+                borderColor={borderColor}
+              >
+                <InputGroup mb="20px">
+                  <InputLeftElement pointerEvents="none">
+                    <Icon as={MdSearch} color="gray.400" />
+                  </InputLeftElement>
+                  <Input
+                    placeholder="Search System 2 agents..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    borderRadius="8px"
+                    bg="white"
+                    borderColor={borderColor}
+                  />
+                </InputGroup>
+
+                <SimpleGrid columns={{ base: 1, md: 2 }} spacing="15px">
+                  {filteredAgents('System 2').map((agent) => (
+                    <AgentCard key={agent.id} agent={agent} showToggle={true} />
+                  ))}
+                </SimpleGrid>
+
+                {filteredAgents('System 2').length === 0 && (
+                  <Box p="40px" textAlign="center">
+                    <Text color={textColorSecondary} fontSize="sm">
+                      No System 2 agents found
+                    </Text>
+                  </Box>
+                )}
+              </Card>
+            </TabPanel>
+
+            {/* Pipeline View Tab */}
+            <TabPanel p="0" pt="20px">
+              <VStack spacing="20px" align="stretch">
+                {/* System 1 Pipeline */}
+                <Card
+                  bg={cardBg}
+                  p="20px"
+                  borderRadius="12px"
+                  border="1px solid"
+                  borderColor={borderColor}
+                >
+                  <Text color={textColor} fontSize="lg" fontWeight="600" mb="15px">
+                    System 1: Data Pipeline
+                  </Text>
+                  <HStack spacing="15px" mb="15px" align="center">
+                    <VStack spacing="4px">
+                      <Box
+                        w="100px"
+                        h="60px"
+                        bg="blue.50"
+                        borderRadius="8px"
+                        border="2px solid"
+                        borderColor="blue.300"
+                        display="flex"
+                        alignItems="center"
+                        justifyContent="center"
+                      >
+                        <Text fontSize="xs" fontWeight="600" color="blue.700">
+                          Stage 1
+                        </Text>
+                      </Box>
+                      <Badge colorScheme="blue" fontSize="2xs">
+                        {allAgents.filter(a => a.stage?.includes('Stage 1')).length} agents
+                      </Badge>
+                    </VStack>
+                    <Text color="gray.400" fontSize="2xl">→</Text>
+                    <VStack spacing="4px">
+                      <Box
+                        w="100px"
+                        h="60px"
+                        bg="purple.50"
+                        borderRadius="8px"
+                        border="2px solid"
+                        borderColor="purple.300"
+                        display="flex"
+                        alignItems="center"
+                        justifyContent="center"
+                      >
+                        <Text fontSize="xs" fontWeight="600" color="purple.700">
+                          Stage 2
+                        </Text>
+                      </Box>
+                      <Badge colorScheme="purple" fontSize="2xs">
+                        {allAgents.filter(a => a.stage?.includes('Stage 2')).length} agents
+                      </Badge>
+                    </VStack>
+                    <Text color="gray.400" fontSize="2xl">→</Text>
+                    <VStack spacing="4px">
+                      <Box
+                        w="100px"
+                        h="60px"
+                        bg="green.50"
+                        borderRadius="8px"
+                        border="2px solid"
+                        borderColor="green.300"
+                        display="flex"
+                        alignItems="center"
+                        justifyContent="center"
+                      >
+                        <Text fontSize="xs" fontWeight="600" color="green.700">
+                          Stage 3
+                        </Text>
+                      </Box>
+                      <Badge colorScheme="green" fontSize="2xs">
+                        {allAgents.filter(a => a.stage?.includes('Stage 3')).length} agents
+                      </Badge>
+                    </VStack>
+                    <Text color="gray.400" fontSize="2xl">→</Text>
+                    <VStack spacing="4px">
+                      <Box
+                        w="100px"
+                        h="60px"
+                        bg="teal.50"
+                        borderRadius="8px"
+                        border="2px solid"
+                        borderColor="teal.300"
+                        display="flex"
+                        alignItems="center"
+                        justifyContent="center"
+                      >
+                        <Icon as={MdCheckCircle} boxSize="24px" color="teal.600" />
+                      </Box>
+                      <Badge colorScheme="teal" fontSize="2xs">
+                        Output
+                      </Badge>
+                    </VStack>
+                  </HStack>
+                </Card>
+
+                {/* System 2 Pipeline */}
+                <Card
+                  bg={cardBg}
+                  p="20px"
+                  borderRadius="12px"
+                  border="1px solid"
+                  borderColor={borderColor}
+                >
+                  <Text color={textColor} fontSize="lg" fontWeight="600" mb="15px">
+                    System 2: Decision Making
+                  </Text>
+                  <SimpleGrid columns={4} spacing="10px">
+                    {['Team 1', 'Team 2', 'Team 3', 'Team 4'].map((team, idx) => (
+                      <VStack key={team} spacing="4px">
+                        <Box
+                          w="full"
+                          h="60px"
+                          bg="orange.50"
+                          borderRadius="8px"
+                          border="2px solid"
+                          borderColor="orange.300"
+                          display="flex"
+                          alignItems="center"
+                          justifyContent="center"
+                        >
+                          <Text fontSize="xs" fontWeight="600" color="orange.700">
+                            {team}
+                          </Text>
+                        </Box>
+                        <Badge colorScheme="orange" fontSize="2xs">
+                          {allAgents.filter(a => a.stage?.includes(team)).length} agents
+                        </Badge>
+                      </VStack>
+                    ))}
+                  </SimpleGrid>
+                </Card>
+              </VStack>
+            </TabPanel>
+          </TabPanels>
+        </Tabs>
 
         {/* Info Card */}
         <Card
@@ -433,14 +643,22 @@ export default function AgentsPage() {
           border="1px solid"
           borderColor="blue.200"
         >
-          <Text color="blue.900" fontSize="sm" fontWeight="600" mb="5px">
-            About Event Horizon Agents
-          </Text>
-          <Text color="blue.800" fontSize="xs">
-            Agents are specialized AI assistants trained on data from Event Horizon System 1
-            (data pipeline). They can analyze stocks, assess risk, generate reports, and more
-            based on real-time market data, technical indicators, and news sentiment.
-          </Text>
+          <HStack spacing="12px" align="start">
+            <Icon as={MdApi} boxSize="20px" color="blue.600" />
+            <VStack align="start" spacing="4px">
+              <Text color="blue.900" fontSize="sm" fontWeight="600">
+                Modular Pipeline Architecture
+              </Text>
+              <Text color="blue.800" fontSize="xs">
+                <strong>System 1:</strong> Plug agents into data retrieval, normalization, or feature extraction stages.
+                Create custom agents to fetch unique data sources or calculate proprietary financial metrics.
+              </Text>
+              <Text color="blue.800" fontSize="xs">
+                <strong>System 2:</strong> Add custom decision-making agents alongside built-in researchers.
+                Your agents work together with Event Horizon's AI teams to generate trading signals.
+              </Text>
+            </VStack>
+          </HStack>
         </Card>
       </Box>
 
@@ -448,7 +666,7 @@ export default function AgentsPage() {
       <Modal isOpen={isOpen} onClose={onClose} size="lg">
         <ModalOverlay />
         <ModalContent>
-          <ModalHeader>Create New Agent</ModalHeader>
+          <ModalHeader>Create Custom Agent</ModalHeader>
           <ModalCloseButton />
           <ModalBody pb="20px">
             <VStack spacing="20px" align="stretch">
@@ -457,7 +675,7 @@ export default function AgentsPage() {
                   Agent Name
                 </FormLabel>
                 <Input
-                  placeholder="e.g., portfolio-optimizer"
+                  placeholder="e.g., Custom P/E Calculator"
                   value={newAgent.name}
                   onChange={(e) =>
                     setNewAgent({ ...newAgent, name: e.target.value })
@@ -483,20 +701,66 @@ export default function AgentsPage() {
 
               <FormControl isRequired>
                 <FormLabel fontSize="sm" fontWeight="600">
-                  Data Source
+                  System
                 </FormLabel>
                 <Select
-                  value={newAgent.source}
+                  value={newAgent.system}
                   onChange={(e) =>
-                    setNewAgent({ ...newAgent, source: e.target.value })
+                    setNewAgent({
+                      ...newAgent,
+                      system: e.target.value,
+                      stage: e.target.value === 'System 1' ? 'stage1' : 'team1'
+                    })
                   }
                   size="md"
                 >
-                  {DATA_SOURCES.map((source) => (
-                    <option key={source.value} value={source.value}>
-                      {source.label}
+                  <option value="System 1">System 1 - Data Pipeline</option>
+                  <option value="System 2">System 2 - Decision Making</option>
+                </Select>
+              </FormControl>
+
+              <FormControl isRequired>
+                <FormLabel fontSize="sm" fontWeight="600">
+                  Category
+                </FormLabel>
+                <Select
+                  value={newAgent.category}
+                  onChange={(e) =>
+                    setNewAgent({ ...newAgent, category: e.target.value })
+                  }
+                  size="md"
+                >
+                  {AGENT_CATEGORIES.filter(c => c.system === newAgent.system).map((cat) => (
+                    <option key={cat.value} value={cat.value}>
+                      {cat.label}
                     </option>
                   ))}
+                </Select>
+              </FormControl>
+
+              <FormControl isRequired>
+                <FormLabel fontSize="sm" fontWeight="600">
+                  {newAgent.system === 'System 1' ? 'Pipeline Stage' : 'Team'}
+                </FormLabel>
+                <Select
+                  value={newAgent.stage}
+                  onChange={(e) =>
+                    setNewAgent({ ...newAgent, stage: e.target.value })
+                  }
+                  size="md"
+                >
+                  {newAgent.system === 'System 1'
+                    ? SYSTEM1_STAGES.map((stage) => (
+                        <option key={stage.value} value={stage.value}>
+                          {stage.label}
+                        </option>
+                      ))
+                    : SYSTEM2_TEAMS.map((team) => (
+                        <option key={team.value} value={team.value}>
+                          {team.label}
+                        </option>
+                      ))
+                  }
                 </Select>
               </FormControl>
 
@@ -517,6 +781,22 @@ export default function AgentsPage() {
                     </option>
                   ))}
                 </Select>
+              </FormControl>
+
+              <FormControl display="flex" alignItems="center">
+                <FormLabel fontSize="sm" fontWeight="600" mb="0">
+                  Activate Immediately
+                </FormLabel>
+                <Switch
+                  colorScheme="teal"
+                  isChecked={newAgent.status === 'active'}
+                  onChange={(e) =>
+                    setNewAgent({
+                      ...newAgent,
+                      status: e.target.checked ? 'active' : 'inactive',
+                    })
+                  }
+                />
               </FormControl>
 
               <HStack justify="flex-end" spacing="10px" pt="10px">
