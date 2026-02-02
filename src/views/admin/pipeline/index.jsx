@@ -17,12 +17,12 @@ import {
   Button,
   Icon,
   Badge,
-  Drawer,
-  DrawerBody,
-  DrawerHeader,
-  DrawerOverlay,
-  DrawerContent,
-  DrawerCloseButton,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalCloseButton,
   useDisclosure,
   Input,
   FormControl,
@@ -733,14 +733,14 @@ export default function PipelineBuilder() {
         </ReactFlow>
       </Box>
 
-      {/* Create Agent Drawer */}
-      <Drawer isOpen={isAgentOpen} placement="right" onClose={onAgentClose} size="md">
-        <DrawerOverlay />
-        <DrawerContent>
-          <DrawerCloseButton />
-          <DrawerHeader>Create Custom Agent</DrawerHeader>
+      {/* Create Agent Modal */}
+      <Modal isOpen={isAgentOpen} onClose={onAgentClose} isCentered size="lg">
+        <ModalOverlay bg="blackAlpha.600" backdropFilter="blur(4px)" />
+        <ModalContent borderRadius="20px">
+          <ModalCloseButton />
+          <ModalHeader>Create Custom Agent</ModalHeader>
 
-          <DrawerBody>
+          <ModalBody pb="20px">
             <VStack spacing="20px" align="stretch">
               <FormControl isRequired>
                 <FormLabel fontSize="sm" fontWeight="600">
@@ -817,22 +817,22 @@ export default function PipelineBuilder() {
                 </Select>
               </FormControl>
 
-              <Button colorScheme="teal" onClick={handleCreateAgent}>
+              <Button colorScheme="teal" onClick={handleCreateAgent} size="lg" w="full">
                 Create Agent
               </Button>
             </VStack>
-          </DrawerBody>
-        </DrawerContent>
-      </Drawer>
+          </ModalBody>
+        </ModalContent>
+      </Modal>
 
-      {/* Create Team Drawer */}
-      <Drawer isOpen={isTeamOpen} placement="right" onClose={onTeamClose}>
-        <DrawerOverlay />
-        <DrawerContent>
-          <DrawerCloseButton />
-          <DrawerHeader>Create New Horizon</DrawerHeader>
+      {/* Create Horizon Modal */}
+      <Modal isOpen={isTeamOpen} onClose={onTeamClose} isCentered size="lg">
+        <ModalOverlay bg="blackAlpha.600" backdropFilter="blur(4px)" />
+        <ModalContent borderRadius="20px">
+          <ModalCloseButton />
+          <ModalHeader>Create New Horizon</ModalHeader>
 
-          <DrawerBody>
+          <ModalBody pb="20px">
             <VStack spacing="20px" align="stretch">
               <FormControl isRequired>
                 <FormLabel fontSize="sm" fontWeight="600">
@@ -857,7 +857,7 @@ export default function PipelineBuilder() {
                 />
               </FormControl>
 
-              <Button colorScheme="purple" onClick={handleCreateTeam}>
+              <Button colorScheme="purple" onClick={handleCreateTeam} size="lg" w="full">
                 Create Horizon
               </Button>
 
@@ -868,9 +868,9 @@ export default function PipelineBuilder() {
                 </Text>
               </Box>
             </VStack>
-          </DrawerBody>
-        </DrawerContent>
-      </Drawer>
+          </ModalBody>
+        </ModalContent>
+      </Modal>
     </Box>
   );
 }
