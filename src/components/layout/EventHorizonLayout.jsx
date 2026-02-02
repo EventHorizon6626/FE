@@ -14,6 +14,7 @@ import {
 } from '@chakra-ui/react';
 import {
   MdTrendingUp,
+  MdSmartToy,
   MdPerson,
   MdFileDownload,
   MdMenu,
@@ -59,6 +60,12 @@ const SidebarContent = ({ navigate, currentPath }) => {
           label="Portfolio"
           onClick={() => navigate('/portfolio')}
           isActive={currentPath === '/portfolio'}
+        />
+        <SidebarItem
+          icon={MdSmartToy}
+          label="Agents"
+          onClick={() => navigate('/agents')}
+          isActive={currentPath === '/agents'}
         />
       </VStack>
 
