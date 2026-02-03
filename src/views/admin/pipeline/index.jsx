@@ -211,9 +211,6 @@ export default function PipelineBuilder() {
 
   const [newTeam, setNewTeam] = useState({ name: '', description: '' });
   const [editingAgent, setEditingAgent] = useState(null); // Track which agent is being edited
-  const [selectedTeamForAgent, setSelectedTeamForAgent] = useState(null); // Track which team to add agent to
-  const [horizonName, setHorizonName] = useState('');
-  const [isEditingHorizonName, setIsEditingHorizonName] = useState(false);
   const [tempHorizonName, setTempHorizonName] = useState('');
   const [showDataAgents, setShowDataAgents] = useState(false);
   const [showTeams, setShowTeams] = useState(false);
@@ -229,11 +226,7 @@ export default function PipelineBuilder() {
     const saveTimeout = setTimeout(() => {
       const horizonName = currentHorizonName || 'Untitled';
 
-      // Find existing horizon with this name
-      const existingIndex = savedHorizons.findIndex(h => h.name === horizonName);
-
       const horizon = {
-        id: existingIndex >= 0 ? savedHorizons[existingIndex].id : Date.now(),
         name: horizonName,
         nodes,
         edges,
@@ -243,20 +236,27 @@ export default function PipelineBuilder() {
         savedAt: new Date().toISOString(),
       };
 
-      if (existingIndex >= 0) {
-        // Update existing horizon
-        const updated = [...savedHorizons];
-        updated[existingIndex] = horizon;
-        setSavedHorizons(updated);
-      } else {
-        // Add new horizon
-        setSavedHorizons([...savedHorizons, horizon]);
+      setSavedHorizons(prevHorizons => {
+        const existingIndex = prevHorizons.findIndex(h => h.name === horizonName);
+
+        if (existingIndex >= 0) {
+          // Update existing horizon
+          const updated = [...prevHorizons];
+          updated[existingIndex] = { ...horizon, id: prevHorizons[existingIndex].id };
+          return updated;
+        } else {
+          // Add new horizon
+          return [...prevHorizons, { ...horizon, id: Date.now() }];
+        }
+      });
+
+      if (!currentHorizonName) {
         setCurrentHorizonName(horizonName);
       }
     }, 1000); // Debounce auto-save by 1 second
 
     return () => clearTimeout(saveTimeout);
-  }, [nodes, edges, availableAgents, availableTeams, customAgents]);
+  }, [nodes, edges, availableAgents, availableTeams, customAgents, currentHorizonName]);
 
   const onConnect = useCallback(
     (params) => setEdges((eds) => addEdge(params, eds)),
@@ -455,25 +455,10 @@ export default function PipelineBuilder() {
       model: 'gpt-4',
     });
     setEditingAgent(null);
-    setSelectedTeamForAgent(null);
     onAgentClose();
   };
 
-  const handleEditAgent = (agent) => {
-    setEditingAgent(agent);
-    setNewAgent({
-      name: agent.name,
-      description: agent.description || '',
-      category: agent.type,
-      system: agent.system,
-      teamId: agent.teamId || null,
-      model: agent.model || 'gpt-4',
-    });
-    onAgentOpen();
-  };
-
   const handleAddAgentToTeam = (teamId) => {
-    setSelectedTeamForAgent(teamId);
     setNewAgent({
       name: '',
       description: '',
@@ -516,17 +501,6 @@ export default function PipelineBuilder() {
     });
   };
 
-
-  const handleDeleteAgent = (agentId) => {
-    setAvailableAgents(availableAgents.filter(a => a.id !== agentId));
-    setCustomAgents(customAgents.filter(a => a.id !== agentId));
-    toast({
-      title: 'Agent deleted',
-      status: 'info',
-      duration: 2000,
-      isClosable: true,
-    });
-  };
 
   const handleStartEditingName = () => {
     setTempHorizonName(currentHorizonName || 'Untitled');
