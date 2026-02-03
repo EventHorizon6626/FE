@@ -59,7 +59,7 @@ const StatusPill = ({ value }) => {
 
 // ---------------- main ----------------
 export default function Profile() {
-  const { user } = useAuth();
+  const { user = {}, logout } = useAuth();
   const navigate = useNavigate();
 
   // Clean white theme colors (Perplexity style)
@@ -74,6 +74,18 @@ export default function Profile() {
       <Banner banner={banner} />
 
       {/* Orders section removed */}
+
+      {/* Logout Button */}
+      <Box mt={0} display="flex" flexDirection="column">
+        <Button
+          colorScheme="red"
+          size="lg"
+          onClick={logout}
+          px={8}
+        >
+          Log Out
+        </Button>
+      </Box>
       </Box>
     </Box>
   );

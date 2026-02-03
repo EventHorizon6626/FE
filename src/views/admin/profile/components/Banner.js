@@ -53,7 +53,7 @@ export default function Banner({ banner }) {
   );
 
   return (
-    <Card mb={{ base: '0px', lg: '20px' }} align="center" p="0px">
+    <Card mb={{ base: '0px', lg: '12px' }} align="center" p="0px">
       {/* Banner Image */}
       <Box
         bg={`url(${banner})`}

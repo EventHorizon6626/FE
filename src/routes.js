@@ -24,7 +24,7 @@ const routes = [
     path: '/',
     icon: <Icon as={MdHome} width="20px" height="20px" color="inherit" />,
     component: <LandingPage />,
-    requiresAuth: false,
+    requiresAuth: true,
     hideInSidebar: true, // Don't show in sidebar navigation
   },
   // ----- PROTECTED (requiresAuth: true) -----
@@ -35,7 +35,7 @@ const routes = [
     path: '/pipeline',
     icon: <Icon as={MdHome} width="20px" height="20px" color="inherit" />,
     component: <PipelineBuilder />,
-    requiresAuth: false,
+    requiresAuth: true,
   },
   {
     name: 'Profile',
