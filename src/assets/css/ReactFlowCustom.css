@@ -78,13 +78,48 @@
   will-change: transform;
 }
 
-/* Selected node highlight - TEAL border */
-.react-flow__node.selected {
-  box-shadow: 0 0 0 4px #319795 !important;
+/* Fix pixel rendering quality when zooming */
+.react-flow__node {
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  backface-visibility: hidden;
+  transform-style: preserve-3d;
 }
 
-.react-flow__node.selected .chakra-box {
-  border-color: #319795 !important;
-  border-width: 4px !important;
-  box-shadow: 0 4px 12px rgba(49, 151, 149, 0.3) !important;
+/* Improve rendering quality for node content */
+.react-flow__node * {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Ensure crisp borders and shapes */
+.react-flow__node svg,
+.react-flow__node img,
+.react-flow__node canvas {
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+}
+
+/* Remove default selected node styling - handled in CustomAgentNode component */
+.react-flow__node.selected {
+  box-shadow: none !important;
+}
+
+/* Custom agent node - improve rendering */
+.custom-agent-node {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+}
+
+.custom-agent-node * {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }

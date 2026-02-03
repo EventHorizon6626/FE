@@ -35,6 +35,7 @@ import {
   MdGroups,
   MdHome,
   MdHub,
+  MdPlayArrow,
   MdSave,
   MdShowChart,
   MdSmartToy,
@@ -46,8 +47,10 @@ import ReactFlow, {
   addEdge,
   Background,
   Controls,
+  Handle,
   MiniMap,
   Panel,
+  Position,
   ReactFlowProvider,
   useEdgesState,
   useNodesState,
@@ -192,6 +195,101 @@ const MODELS = [
 const initialNodes = [];
 const initialEdges = [];
 
+// Custom Node Component with Action Toolbar
+function CustomAgentNode({ data, id, selected }) {
+  const handleDelete = (e) => {
+    e.stopPropagation();
+    if (data.onDelete) {
+      data.onDelete(id);
+    }
+  };
+
+  const handlePlay = (e) => {
+    e.stopPropagation();
+    if (data.onPlay) {
+      data.onPlay(id);
+    }
+  };
+
+  return (
+    <Box position="relative" className="custom-agent-node">
+      {/* Connection Handles */}
+      <Handle
+        type="target"
+        position={Position.Left}
+        style={{ background: '#555', width: '12px', height: '12px' }}
+      />
+      <Handle
+        type="source"
+        position={Position.Right}
+        style={{ background: '#555', width: '12px', height: '12px' }}
+      />
+      
+      <HStack spacing="0" align="stretch">
+        {/* Main Node Content */}
+        <Box
+          p="20px"
+          bg="white"
+          borderRadius="16px 0 0 16px"
+          border={selected ? "3px solid" : "3px solid"}
+          borderColor={selected ? "teal.500" : `${data.agent?.color || 'blue'}.400`}
+          boxShadow={selected ? "0 4px 12px rgba(49, 151, 149, 0.4)" : "lg"}
+          minW="200px"
+          transition="all 0.2s"
+        >
+          <HStack spacing="12px" mb="10px">
+            <Icon as={data.agent?.icon || MdSmartToy} color={`${data.agent?.color || 'blue'}.600`} boxSize="24px" />
+            <Text fontSize="md" fontWeight="700">
+              {data.agent?.name || 'Agent'}
+            </Text>
+          </HStack>
+          <Badge colorScheme={data.agent?.color || 'blue'} fontSize="sm">
+            {data.agent?.isBuiltin ? 'Built-in' : 'Custom'}
+          </Badge>
+        </Box>
+
+        {/* Action Toolbar - Always visible */}
+        <VStack
+          spacing="0"
+          borderRadius="0 12px 12px 0"
+          overflow="hidden"
+          boxShadow="lg"
+        >
+          <IconButton
+            icon={<Icon as={MdPlayArrow} />}
+            size="md"
+            colorScheme="green"
+            variant="solid"
+            borderRadius="0"
+            aria-label="Run agent"
+            onClick={handlePlay}
+            h="50%"
+            w="40px"
+            minW="40px"
+          />
+          <IconButton
+            icon={<Icon as={MdDelete} />}
+            size="md"
+            colorScheme="red"
+            variant="solid"
+            borderRadius="0"
+            aria-label="Delete agent"
+            onClick={handleDelete}
+            h="50%"
+            w="40px"
+            minW="40px"
+          />
+        </VStack>
+      </HStack>
+    </Box>
+  );
+}
+
+// Define custom node types
+const nodeTypes = {
+  agentNode: CustomAgentNode,
+};
+
 function PipelineBuilderInner() {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -288,10 +386,10 @@ function PipelineBuilderInner() {
     const selected = nodes.find((node) => node.selected);
     if (selected) {
       setSelectedNode(selected);
-      // Load node config if exists
+      // Load node config if exists (works for both old and new custom nodes)
       setNodeConfig({
-        name: selected.data?.config?.name || selected.data?.label?.props?.children?.[0]?.props?.children?.[1]?.props?.children || '',
-        description: selected.data?.config?.description || '',
+        name: selected.data?.config?.name || selected.data?.agent?.name || '',
+        description: selected.data?.config?.description || selected.data?.agent?.description || '',
         model: selected.data?.config?.model || 'gpt-4',
         temperature: selected.data?.config?.temperature || 0.7,
         maxTokens: selected.data?.config?.maxTokens || 2000,
@@ -334,6 +432,32 @@ function PipelineBuilderInner() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [nodes, setNodes, setEdges, toast]);
 
+  // Handler for node actions
+  const handleNodeDelete = useCallback((nodeId) => {
+    setNodes((nds) => nds.filter((node) => node.id !== nodeId));
+    setEdges((eds) => eds.filter((edge) => 
+      edge.source !== nodeId && edge.target !== nodeId
+    ));
+    toast({
+      title: 'Node deleted',
+      status: 'info',
+      duration: 2000,
+      isClosable: true,
+    });
+  }, [setNodes, setEdges, toast]);
+
+  const handleNodePlay = useCallback((nodeId) => {
+    const node = nodes.find((n) => n.id === nodeId);
+    toast({
+      title: 'Running agent',
+      description: `Executing ${node?.data?.agent?.name || 'agent'}...`,
+      status: 'success',
+      duration: 2000,
+      isClosable: true,
+    });
+    // Add your execution logic here
+  }, [nodes, toast]);
+
   // Instant drag handlers
   const handleAgentMouseDown = useCallback((event, agent) => {
     event.preventDefault();
@@ -348,31 +472,12 @@ function PipelineBuilderInner() {
     
     const newNode = {
       id: nodeId,
-      type: 'default',
+      type: 'agentNode',
       position,
       data: {
-        label: (
-          <Box
-            p="15px"
-            bg="white"
-            borderRadius="12px"
-            border="3px solid"
-            borderColor={`${agent.color}.400`}
-            boxShadow="lg"
-            minW="150px"
-          >
-            <HStack spacing="10px" mb="8px">
-              <Icon as={agent.icon} color={`${agent.color}.600`} boxSize="20px" />
-              <Text fontSize="sm" fontWeight="700">
-                {agent.name}
-              </Text>
-            </HStack>
-            <Badge colorScheme={agent.color} fontSize="xs">
-              {agent.isBuiltin ? 'Built-in' : 'Custom'}
-            </Badge>
-          </Box>
-        ),
-        agent: agent, // Store agent data for reference
+        agent: agent,
+        onDelete: handleNodeDelete,
+        onPlay: handleNodePlay,
         config: {
           name: agent.name,
           description: agent.description || '',
@@ -395,7 +500,7 @@ function PipelineBuilderInner() {
       duration: 2000,
       isClosable: true,
     });
-  }, [screenToFlowPosition, setNodes, toast]);
+  }, [screenToFlowPosition, setNodes, toast, handleNodeDelete, handleNodePlay]);
 
   // Handle mouse movement to update node position
   useEffect(() => {
@@ -1057,7 +1162,10 @@ function PipelineBuilderInner() {
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
-          fitView
+          nodeTypes={nodeTypes}
+          defaultViewport={{ x: 0, y: 0, zoom: 0.9 }}
+          minZoom={0.1}
+          maxZoom={2}
         >
           <Controls />
           <MiniMap />
