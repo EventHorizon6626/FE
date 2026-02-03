@@ -8,7 +8,7 @@ import {
 
 // Admin Imports
 import LandingPage from 'views/admin/landing';
-import PortfolioAnalyzer from 'views/admin/portfolio/PortfolioAnalyzer';
+// import PortfolioAnalyzer from 'views/admin/portfolio/PortfolioAnalyzer'; // Removed - now in Horizon page
 import PipelineBuilder from 'views/admin/pipeline';
 import Profile from 'views/admin/profile';
 // import RTL from 'views/admin/rtl';
@@ -28,14 +28,7 @@ const routes = [
     hideInSidebar: true, // Don't show in sidebar navigation
   },
   // ----- PROTECTED (requiresAuth: true) -----
-  {
-    name: 'Portfolio',
-    layout: '/',
-    path: '/portfolio',
-    icon: <Icon as={MdHome} width="20px" height="20px" color="inherit" />,
-    component: <PortfolioAnalyzer />,
-    requiresAuth: false,
-  },
+  // Portfolio removed - now integrated in Horizon page
   {
     name: 'Horizon',
     layout: '/',

@@ -53,6 +53,7 @@ export function SidebarLinks(props) {
         );
       } else if (
         SIDEBAR_ROUTES.includes(route.path) &&
+        !route.hideInSidebar &&
         (route.layout === '/' ||
           route.layout === '/auth' ||
           route.layout === '/rtl')

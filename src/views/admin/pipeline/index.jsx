@@ -303,6 +303,7 @@ function PipelineBuilderInner() {
   const { isOpen: isAgentOpen, onOpen: onAgentOpen, onClose: onAgentClose } = useDisclosure();
   const { isOpen: isTeamOpen, onOpen: onTeamOpen, onClose: onTeamClose } = useDisclosure();
   const { isOpen: isRenameOpen, onOpen: onRenameOpen, onClose: onRenameClose } = useDisclosure();
+  const { isOpen: isPortfolioOpen, onOpen: onPortfolioOpen, onClose: onPortfolioClose } = useDisclosure();
 
   const [newAgent, setNewAgent] = useState({
     name: '',
@@ -318,6 +319,11 @@ function PipelineBuilderInner() {
   const [tempHorizonName, setTempHorizonName] = useState('');
   const [showDataAgents, setShowDataAgents] = useState(false);
   const [showTeams, setShowTeams] = useState(false);
+  const [showPortfolio, setShowPortfolio] = useState(false);
+  const [portfolioSearch, setPortfolioSearch] = useState('');
+  const [portfolios, setPortfolios] = useState([]);
+  const [selectedStocks, setSelectedStocks] = useState([]);
+  const [editingPortfolio, setEditingPortfolio] = useState(null);
   
   const [selectedNode, setSelectedNode] = useState(null);
   const [nodeConfig, setNodeConfig] = useState({
@@ -947,7 +953,102 @@ function PipelineBuilderInner() {
           <Icon as={MdEdit} color="gray.500" boxSize="14px" />
         </HStack>
 
-        {/* 2. Data Agents - with Dropdown */}
+        {/* 2. Portfolio - with Dropdown */}
+        <Box
+          position="relative"
+          onMouseEnter={() => setShowPortfolio(true)}
+          onMouseLeave={() => setShowPortfolio(false)}
+        >
+          <HStack
+            bg="whiteAlpha.900"
+            backdropFilter="blur(10px)"
+            borderRadius="12px"
+            px="12px"
+            py="8px"
+            spacing="8px"
+            border="1px solid"
+            borderColor="whiteAlpha.400"
+            boxShadow="md"
+            cursor="pointer"
+            _hover={{ borderColor: 'green.400', boxShadow: 'lg' }}
+            transition="all 0.2s"
+          >
+            <Tooltip label="Portfolio" placement="right" hasArrow>
+              <Icon as={MdShowChart} color="green.600" boxSize="24px" />
+            </Tooltip>
+          </HStack>
+
+          {/* Portfolio Dropdown - Positioned to the right */}
+          {showPortfolio && (
+            <Box
+              position="absolute"
+              top="0"
+              left="100%"
+              pl="8px"
+            >
+              <VStack
+                bg="whiteAlpha.900"
+                backdropFilter="blur(10px)"
+                borderRadius="12px"
+                border="1px solid"
+                borderColor="whiteAlpha.400"
+                boxShadow="lg"
+                p="8px"
+                spacing="8px"
+                minW="250px"
+                maxH="400px"
+                overflowY="auto"
+              >
+                <Button
+                  leftIcon={<Icon as={MdAdd} />}
+                  colorScheme="green"
+                  size="sm"
+                  w="full"
+                  onClick={onPortfolioOpen}
+                >
+                  Build Portfolio
+                </Button>
+
+                {portfolios.length > 0 && <Divider />}
+
+                {portfolios.map((portfolio) => (
+                  <Box
+                    key={portfolio.id}
+                    p="10px"
+                    bg="white"
+                    borderRadius="8px"
+                    border="1px solid"
+                    borderColor="gray.200"
+                    cursor="pointer"
+                    _hover={{ bg: 'green.50', borderColor: 'green.400', boxShadow: 'sm' }}
+                    w="full"
+                    onClick={() => {
+                      setEditingPortfolio(portfolio);
+                      setSelectedStocks([...portfolio.stocks]);
+                      onPortfolioOpen();
+                    }}
+                  >
+                    <VStack align="start" spacing="4px">
+                      <HStack spacing="8px" w="full" justify="space-between">
+                        <Text fontSize="sm" fontWeight="600">
+                          {portfolio.name}
+                        </Text>
+                        <Badge colorScheme="green" fontSize="xs">
+                          {portfolio.stocks.length}
+                        </Badge>
+                      </HStack>
+                      <Text fontSize="xs" color="gray.600">
+                        {portfolio.stocks.join(', ') || 'Empty'}
+                      </Text>
+                    </VStack>
+                  </Box>
+                ))}
+              </VStack>
+            </Box>
+          )}
+        </Box>
+
+        {/* 3. Data Agents - with Dropdown */}
         <Box
           position="relative"
           onMouseEnter={() => setShowDataAgents(true)}
@@ -1039,7 +1140,7 @@ function PipelineBuilderInner() {
           )}
         </Box>
 
-        {/* 3. Teams - with Dropdown */}
+        {/* 4. Teams - with Dropdown */}
         <Box
           position="relative"
           onMouseEnter={() => setShowTeams(true)}
@@ -1170,24 +1271,6 @@ function PipelineBuilderInner() {
           <Controls />
           <MiniMap />
           <Background variant="dots" gap={16} size={1} />
-          
-          {/* Bottom hint text */}
-          <Panel position="bottom-center">
-            <Box
-              bg="whiteAlpha.900"
-              backdropFilter="blur(10px)"
-              borderRadius="8px"
-              px="12px"
-              py="6px"
-              border="1px solid"
-              borderColor="whiteAlpha.400"
-              boxShadow="sm"
-            >
-              <Text fontSize="xs" color="gray.600">
-                💡 Select nodes and press <Badge colorScheme="gray" fontSize="2xs">Delete</Badge> or <Badge colorScheme="gray" fontSize="2xs">Backspace</Badge> to remove them
-              </Text>
-            </Box>
-          </Panel>
 
           <Panel position="top-right">
             <Tooltip label="Back to Horizons" placement="left" hasArrow>
@@ -1541,6 +1624,129 @@ function PipelineBuilderInner() {
               />
               <Button colorScheme="teal" onClick={handleSaveHorizonName} w="full">
                 Save
+              </Button>
+            </VStack>
+          </ModalBody>
+        </ModalContent>
+      </Modal>
+
+      {/* Build Portfolio Modal */}
+      <Modal isOpen={isPortfolioOpen} onClose={() => {
+        onPortfolioClose();
+        setEditingPortfolio(null);
+        setSelectedStocks([]);
+        setPortfolioSearch('');
+      }} isCentered size="md">
+        <ModalOverlay bg="blackAlpha.600" backdropFilter="blur(4px)" />
+        <ModalContent borderRadius="20px">
+          <ModalCloseButton />
+          <ModalHeader>{editingPortfolio ? 'Edit Portfolio' : 'Build Portfolio'}</ModalHeader>
+          <ModalBody pb="20px">
+            <VStack spacing="20px" align="stretch">
+              <FormControl>
+                <FormLabel fontSize="sm" fontWeight="600">
+                  Search Stocks / Assets
+                </FormLabel>
+                <Input
+                  placeholder="Type ticker and press Enter (e.g., AAPL, TSLA)..."
+                  value={portfolioSearch}
+                  onChange={(e) => setPortfolioSearch(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && portfolioSearch.trim()) {
+                      const ticker = portfolioSearch.trim().toUpperCase();
+                      if (!selectedStocks.includes(ticker)) {
+                        setSelectedStocks([...selectedStocks, ticker]);
+                        setPortfolioSearch('');
+                      }
+                    }
+                  }}
+                  autoFocus
+                  size="lg"
+                />
+              </FormControl>
+
+              {selectedStocks.length > 0 && (
+                <VStack spacing="8px" align="stretch">
+                  <HStack justify="space-between">
+                    <Text fontSize="xs" fontWeight="600" color="gray.500">
+                      Selected Stocks ({selectedStocks.length})
+                    </Text>
+                    <Button
+                      size="xs"
+                      variant="ghost"
+                      colorScheme="red"
+                      onClick={() => setSelectedStocks([])}
+                    >
+                      Clear All
+                    </Button>
+                  </HStack>
+                  <HStack spacing="6px" flexWrap="wrap">
+                    {selectedStocks.map((stock) => (
+                      <Badge
+                        key={stock}
+                        colorScheme="green"
+                        fontSize="sm"
+                        px="8px"
+                        py="4px"
+                        borderRadius="6px"
+                        cursor="pointer"
+                        onClick={() => setSelectedStocks(selectedStocks.filter(s => s !== stock))}
+                      >
+                        {stock} ×
+                      </Badge>
+                    ))}
+                  </HStack>
+                </VStack>
+              )}
+
+              <Divider />
+
+              <Button
+                colorScheme="green"
+                size="md"
+                w="full"
+                isDisabled={selectedStocks.length === 0}
+                onClick={() => {
+                  if (editingPortfolio) {
+                    // Update existing portfolio
+                    const updatedPortfolios = portfolios.map(p =>
+                      p.id === editingPortfolio.id
+                        ? { ...p, stocks: [...selectedStocks] }
+                        : p
+                    );
+                    setPortfolios(updatedPortfolios);
+                    toast({
+                      title: 'Portfolio Updated',
+                      description: `${editingPortfolio.name} now has ${selectedStocks.length} stocks`,
+                      status: 'success',
+                      duration: 2000,
+                      isClosable: true,
+                    });
+                  } else {
+                    // Create new portfolio
+                    const portfolioName = `Portfolio ${portfolios.length + 1}`;
+                    const newPortfolio = {
+                      id: Date.now(),
+                      name: portfolioName,
+                      stocks: [...selectedStocks],
+                      createdAt: new Date().toISOString(),
+                    };
+                    setPortfolios([...portfolios, newPortfolio]);
+                    toast({
+                      title: 'Portfolio Created',
+                      description: `${portfolioName} with ${selectedStocks.length} stocks`,
+                      status: 'success',
+                      duration: 2000,
+                      isClosable: true,
+                    });
+                  }
+                  setSelectedStocks([]);
+                  setPortfolioSearch('');
+                  setEditingPortfolio(null);
+                  onPortfolioClose();
+                }}
+              >
+                {editingPortfolio ? 'Update Portfolio' : 'Create Portfolio'}
               </Button>
             </VStack>
           </ModalBody>
