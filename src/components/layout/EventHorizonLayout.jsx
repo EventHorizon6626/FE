@@ -13,7 +13,6 @@ import {
   DrawerOverlay,
 } from '@chakra-ui/react';
 import {
-  MdTrendingUp,
   MdAccountTree,
   MdPerson,
   MdFileDownload,
@@ -44,6 +43,7 @@ const SidebarItem = ({ icon, label, onClick, isActive }) => {
     </VStack>
   );
 };
+
 
 const SidebarContent = ({ navigate, currentPath }) => {
   return (
@@ -134,6 +134,7 @@ export default function EventHorizonLayout({ children, showMobileMenu = true }) 
       >
         {children}
       </Box>
+
     </Flex>
   );
 }

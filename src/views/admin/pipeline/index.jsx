@@ -58,6 +58,7 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import '../../../assets/css/ReactFlowCustom.css';
+import { searchSecurities } from 'data/securities';
 
 // Built-in agents organized by system
 const BUILTIN_AGENTS = [
@@ -321,6 +322,7 @@ function PipelineBuilderInner() {
   const [showTeams, setShowTeams] = useState(false);
   const [showPortfolio, setShowPortfolio] = useState(false);
   const [portfolioSearch, setPortfolioSearch] = useState('');
+  const [searchSuggestions, setSearchSuggestions] = useState([]);
   const [portfolios, setPortfolios] = useState([]);
   const [selectedStocks, setSelectedStocks] = useState([]);
   const [editingPortfolio, setEditingPortfolio] = useState(null);
@@ -976,6 +978,19 @@ function PipelineBuilderInner() {
             <Tooltip label="Portfolio" placement="right" hasArrow>
               <Icon as={MdShowChart} color="green.600" boxSize="24px" />
             </Tooltip>
+            <Tooltip label="Add portfolio" placement="right" hasArrow>
+              <IconButton
+                icon={<Icon as={MdAdd} />}
+                size="xs"
+                variant="ghost"
+                colorScheme="green"
+                aria-label="Add portfolio"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onPortfolioOpen();
+                }}
+              />
+            </Tooltip>
           </HStack>
 
           {/* Portfolio Dropdown - Positioned to the right */}
@@ -999,19 +1014,12 @@ function PipelineBuilderInner() {
                 maxH="400px"
                 overflowY="auto"
               >
-                <Button
-                  leftIcon={<Icon as={MdAdd} />}
-                  colorScheme="green"
-                  size="sm"
-                  w="full"
-                  onClick={onPortfolioOpen}
-                >
-                  Build Portfolio
-                </Button>
-
-                {portfolios.length > 0 && <Divider />}
-
-                {portfolios.map((portfolio) => (
+                {portfolios.length === 0 ? (
+                  <Text fontSize="xs" color="gray.600" py="8px">
+                    No portfolios yet. Click + to create one.
+                  </Text>
+                ) : (
+                  portfolios.map((portfolio) => (
                   <Box
                     key={portfolio.id}
                     p="10px"
@@ -1019,10 +1027,27 @@ function PipelineBuilderInner() {
                     borderRadius="8px"
                     border="1px solid"
                     borderColor="gray.200"
-                    cursor="pointer"
+                    cursor="grab"
                     _hover={{ bg: 'green.50', borderColor: 'green.400', boxShadow: 'sm' }}
+                    _active={{ cursor: 'grabbing' }}
                     w="full"
-                    onClick={() => {
+                    onMouseDown={(e) => {
+                      // Create a portfolio agent object for dragging
+                      const portfolioAgent = {
+                        id: portfolio.id,
+                        name: portfolio.name,
+                        type: 'portfolio',
+                        system: 'portfolio',
+                        icon: MdShowChart,
+                        color: 'green',
+                        isBuiltin: false,
+                        stocks: portfolio.stocks,
+                      };
+                      handleAgentMouseDown(e, portfolioAgent);
+                    }}
+                    onContextMenu={(e) => {
+                      // Right-click to edit
+                      e.preventDefault();
                       setEditingPortfolio(portfolio);
                       setSelectedStocks([...portfolio.stocks]);
                       onPortfolioOpen();
@@ -1037,12 +1062,13 @@ function PipelineBuilderInner() {
                           {portfolio.stocks.length}
                         </Badge>
                       </HStack>
-                      <Text fontSize="xs" color="gray.600">
+                      <Text fontSize="xs" color="gray.600" noOfLines={1}>
                         {portfolio.stocks.join(', ') || 'Empty'}
                       </Text>
                     </VStack>
                   </Box>
-                ))}
+                  ))
+                )}
               </VStack>
             </Box>
           )}
@@ -1636,8 +1662,9 @@ function PipelineBuilderInner() {
         setEditingPortfolio(null);
         setSelectedStocks([]);
         setPortfolioSearch('');
+        setSearchSuggestions([]);
       }} isCentered size="md">
-        <ModalOverlay bg="blackAlpha.600" backdropFilter="blur(4px)" />
+        <ModalOverlay bg="blackAlpha.300" />
         <ModalContent borderRadius="20px">
           <ModalCloseButton />
           <ModalHeader>{editingPortfolio ? 'Edit Portfolio' : 'Build Portfolio'}</ModalHeader>
@@ -1647,22 +1674,91 @@ function PipelineBuilderInner() {
                 <FormLabel fontSize="sm" fontWeight="600">
                   Search Stocks / Assets
                 </FormLabel>
-                <Input
-                  placeholder="Type ticker and press Enter (e.g., AAPL, TSLA)..."
-                  value={portfolioSearch}
-                  onChange={(e) => setPortfolioSearch(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && portfolioSearch.trim()) {
-                      const ticker = portfolioSearch.trim().toUpperCase();
-                      if (!selectedStocks.includes(ticker)) {
-                        setSelectedStocks([...selectedStocks, ticker]);
-                        setPortfolioSearch('');
+                <Box position="relative">
+                  <Input
+                    placeholder="Search by ticker or name (e.g., AAPL, Apple)..."
+                    value={portfolioSearch}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setPortfolioSearch(value);
+                      if (value.length > 0) {
+                        setSearchSuggestions(searchSecurities(value));
+                      } else {
+                        setSearchSuggestions([]);
                       }
-                    }
-                  }}
-                  autoFocus
-                  size="lg"
-                />
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && portfolioSearch.trim()) {
+                        const ticker = portfolioSearch.trim().toUpperCase();
+                        if (!selectedStocks.includes(ticker)) {
+                          setSelectedStocks([...selectedStocks, ticker]);
+                          setPortfolioSearch('');
+                          setSearchSuggestions([]);
+                        }
+                      }
+                      if (e.key === 'Escape') {
+                        setSearchSuggestions([]);
+                      }
+                    }}
+                    autoFocus
+                    size="lg"
+                  />
+
+                  {/* Autocomplete Suggestions Dropdown */}
+                  {searchSuggestions.length > 0 && (
+                    <VStack
+                      position="absolute"
+                      top="100%"
+                      left="0"
+                      right="0"
+                      mt="4px"
+                      bg="white"
+                      border="1px solid"
+                      borderColor="gray.200"
+                      borderRadius="8px"
+                      boxShadow="lg"
+                      maxH="300px"
+                      overflowY="auto"
+                      zIndex="1000"
+                      spacing="0"
+                      align="stretch"
+                    >
+                      {searchSuggestions.map((security) => (
+                        <Box
+                          key={security.symbol}
+                          p="12px"
+                          cursor="pointer"
+                          _hover={{ bg: 'green.50' }}
+                          borderBottom="1px solid"
+                          borderColor="gray.100"
+                          onClick={() => {
+                            if (!selectedStocks.includes(security.symbol)) {
+                              setSelectedStocks([...selectedStocks, security.symbol]);
+                            }
+                            setPortfolioSearch('');
+                            setSearchSuggestions([]);
+                          }}
+                        >
+                          <HStack justify="space-between">
+                            <VStack align="start" spacing="2px">
+                              <HStack spacing="8px">
+                                <Text fontSize="sm" fontWeight="700" color="gray.800">
+                                  {security.symbol}
+                                </Text>
+                                <Badge colorScheme="green" fontSize="xs">
+                                  {security.type}
+                                </Badge>
+                              </HStack>
+                              <Text fontSize="xs" color="gray.600" noOfLines={1}>
+                                {security.name}
+                              </Text>
+                            </VStack>
+                          </HStack>
+                        </Box>
+                      ))}
+                    </VStack>
+                  )}
+                </Box>
               </FormControl>
 
               {selectedStocks.length > 0 && (
