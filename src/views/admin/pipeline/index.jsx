@@ -28,11 +28,13 @@ import {
   MdAccountBalance,
   MdAdd,
   MdArticle,
+  MdClose,
   MdDelete,
   MdEdit,
   MdGroups,
   MdHome,
   MdHub,
+  MdSave,
   MdShowChart,
   MdSmartToy,
   MdSpeed,
@@ -214,6 +216,15 @@ export default function PipelineBuilder() {
   const [tempHorizonName, setTempHorizonName] = useState('');
   const [showDataAgents, setShowDataAgents] = useState(false);
   const [showTeams, setShowTeams] = useState(false);
+  
+  const [selectedNode, setSelectedNode] = useState(null);
+  const [nodeConfig, setNodeConfig] = useState({
+    name: '',
+    description: '',
+    model: 'gpt-4',
+    temperature: 0.7,
+    maxTokens: 2000,
+  });
 
   const toast = useToast();
 
@@ -263,7 +274,25 @@ export default function PipelineBuilder() {
     [setEdges]
   );
 
-  // Delete selected nodes with keyboard (Delete/Backspace)
+  // Track selected node for configuration panel
+  useEffect(() => {
+    const selected = nodes.find((node) => node.selected);
+    if (selected) {
+      setSelectedNode(selected);
+      // Load node config if exists
+      setNodeConfig({
+        name: selected.data?.config?.name || selected.data?.label?.props?.children?.[0]?.props?.children?.[1]?.props?.children || '',
+        description: selected.data?.config?.description || '',
+        model: selected.data?.config?.model || 'gpt-4',
+        temperature: selected.data?.config?.temperature || 0.7,
+        maxTokens: selected.data?.config?.maxTokens || 2000,
+      });
+    } else {
+      setSelectedNode(null);
+    }
+  }, [nodes]);
+
+  // Delete selected nodes and edges with keyboard (Delete/Backspace)
   useEffect(() => {
     const handleKeyDown = (event) => {
       if (event.key === 'Delete' || event.key === 'Backspace') {
@@ -505,6 +534,33 @@ export default function PipelineBuilder() {
   const handleStartEditingName = () => {
     setTempHorizonName(currentHorizonName || 'Untitled');
     onRenameOpen();
+  };
+
+  const handleSaveNodeConfig = () => {
+    if (!selectedNode) return;
+
+    setNodes((nds) =>
+      nds.map((node) => {
+        if (node.id === selectedNode.id) {
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              config: nodeConfig,
+            },
+          };
+        }
+        return node;
+      })
+    );
+
+    toast({
+      title: 'Configuration saved',
+      description: 'Node configuration updated successfully',
+      status: 'success',
+      duration: 2000,
+      isClosable: true,
+    });
   };
 
   const handleSaveHorizonName = () => {
@@ -952,7 +1008,7 @@ export default function PipelineBuilder() {
       </VStack>
 
       {/* Main Canvas */}
-      <Box h="100%">
+      <Box h="100%" position="relative" transition="all 0.3s">
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -1000,6 +1056,199 @@ export default function PipelineBuilder() {
           </Panel>
         </ReactFlow>
       </Box>
+
+      {/* Right Side Configuration Panel */}
+      {selectedNode && (
+        <Box
+          position="absolute"
+          right="0"
+          top="0"
+          h="100vh"
+          w="33.33%"
+          bg="white"
+          borderLeft="2px solid"
+          borderColor="gray.200"
+          overflowY="auto"
+          zIndex="20"
+          boxShadow="xl"
+        >
+          <VStack spacing="0" align="stretch" h="full">
+            {/* Header */}
+            <Box
+              p="20px"
+              borderBottom="2px solid"
+              borderColor="gray.200"
+              bg="teal.50"
+            >
+              <HStack justify="space-between" mb="8px">
+                <HStack spacing="10px">
+                  <Icon as={MdSmartToy} color="teal.600" boxSize="24px" />
+                  <Text fontSize="lg" fontWeight="bold" color="teal.900">
+                    Node Configuration
+                  </Text>
+                </HStack>
+                <IconButton
+                  icon={<Icon as={MdClose} />}
+                  size="sm"
+                  variant="ghost"
+                  colorScheme="gray"
+                  aria-label="Close panel"
+                  onClick={() => {
+                    setNodes((nds) =>
+                      nds.map((n) => ({ ...n, selected: false }))
+                    );
+                  }}
+                />
+              </HStack>
+              <Text fontSize="xs" color="teal.700">
+                Configure settings for this agent
+              </Text>
+            </Box>
+
+            {/* Configuration Form */}
+            <Box flex="1" p="20px">
+              <VStack spacing="20px" align="stretch">
+                {/* Node ID */}
+                <Box>
+                  <Text fontSize="xs" color="gray.500" mb="4px">
+                    Node ID
+                  </Text>
+                  <Badge colorScheme="gray" fontSize="xs">
+                    {selectedNode.id}
+                  </Badge>
+                </Box>
+
+                {/* Name */}
+                <FormControl>
+                  <FormLabel fontSize="sm" fontWeight="600">
+                    Agent Name
+                  </FormLabel>
+                  <Input
+                    placeholder="Enter agent name"
+                    value={nodeConfig.name}
+                    onChange={(e) =>
+                      setNodeConfig({ ...nodeConfig, name: e.target.value })
+                    }
+                    size="sm"
+                  />
+                </FormControl>
+
+                {/* Description */}
+                <FormControl>
+                  <FormLabel fontSize="sm" fontWeight="600">
+                    Description
+                  </FormLabel>
+                  <Textarea
+                    placeholder="What does this agent do?"
+                    value={nodeConfig.description}
+                    onChange={(e) =>
+                      setNodeConfig({
+                        ...nodeConfig,
+                        description: e.target.value,
+                      })
+                    }
+                    size="sm"
+                    rows={3}
+                  />
+                </FormControl>
+
+                {/* AI Model */}
+                <FormControl>
+                  <FormLabel fontSize="sm" fontWeight="600">
+                    AI Model
+                  </FormLabel>
+                  <Select
+                    value={nodeConfig.model}
+                    onChange={(e) =>
+                      setNodeConfig({ ...nodeConfig, model: e.target.value })
+                    }
+                    size="sm"
+                  >
+                    <option value="gpt-4">GPT-4</option>
+                    <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                    <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                    <option value="claude-3-opus">Claude 3 Opus</option>
+                    <option value="claude-3-sonnet">Claude 3 Sonnet</option>
+                    <option value="claude-3-haiku">Claude 3 Haiku</option>
+                  </Select>
+                </FormControl>
+
+                {/* Temperature */}
+                <FormControl>
+                  <FormLabel fontSize="sm" fontWeight="600">
+                    Temperature: {nodeConfig.temperature}
+                  </FormLabel>
+                  <HStack spacing="10px">
+                    <Input
+                      type="range"
+                      min="0"
+                      max="2"
+                      step="0.1"
+                      value={nodeConfig.temperature}
+                      onChange={(e) =>
+                        setNodeConfig({
+                          ...nodeConfig,
+                          temperature: parseFloat(e.target.value),
+                        })
+                      }
+                    />
+                    <Text fontSize="xs" color="gray.600" minW="40px">
+                      {nodeConfig.temperature}
+                    </Text>
+                  </HStack>
+                  <Text fontSize="xs" color="gray.500" mt="4px">
+                    Controls randomness. Lower = more focused, Higher = more creative
+                  </Text>
+                </FormControl>
+
+                {/* Max Tokens */}
+                <FormControl>
+                  <FormLabel fontSize="sm" fontWeight="600">
+                    Max Tokens
+                  </FormLabel>
+                  <Input
+                    type="number"
+                    placeholder="2000"
+                    value={nodeConfig.maxTokens}
+                    onChange={(e) =>
+                      setNodeConfig({
+                        ...nodeConfig,
+                        maxTokens: parseInt(e.target.value) || 2000,
+                      })
+                    }
+                    size="sm"
+                    min="100"
+                    max="8000"
+                    step="100"
+                  />
+                  <Text fontSize="xs" color="gray.500" mt="4px">
+                    Maximum length of the response (100-8000)
+                  </Text>
+                </FormControl>
+              </VStack>
+            </Box>
+
+            {/* Footer with Save Button */}
+            <Box
+              p="20px"
+              borderTop="2px solid"
+              borderColor="gray.200"
+              bg="gray.50"
+            >
+              <Button
+                leftIcon={<Icon as={MdSave} />}
+                colorScheme="teal"
+                size="md"
+                w="full"
+                onClick={handleSaveNodeConfig}
+                fontWeight="600"
+              >
+                Save Configuration
+              </Button>
+            </Box>
+          </VStack>
+        </Box>
+      )}
 
       {/* Create/Edit Agent Modal */}
       <Modal isOpen={isAgentOpen} onClose={() => {
