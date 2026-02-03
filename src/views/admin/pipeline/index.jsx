@@ -429,10 +429,11 @@ function PipelineBuilderInner() {
     [setEdges]
   );
 
-  // Track selected node for configuration panel
+  // Track selected node for configuration panel (only for agent nodes)
   useEffect(() => {
     const selected = nodes.find((node) => node.selected);
-    if (selected) {
+    // Only show config panel for agent nodes, not portfolio nodes
+    if (selected && selected.type === 'agentNode') {
       setSelectedNode(selected);
       // Load node config if exists (works for both old and new custom nodes)
       setNodeConfig({
@@ -498,6 +499,11 @@ function PipelineBuilderInner() {
     const node = nodes.find((n) => n.id === nodeId);
     const agentName = node?.data?.agent?.name || 'agent';
     const agentType = node?.data?.agent?.type;
+
+    console.log('[handleNodePlay] Starting execution for node:', nodeId);
+    console.log('[handleNodePlay] Total nodes:', nodes.length);
+    console.log('[handleNodePlay] Total edges:', edges.length);
+    console.log('[handleNodePlay] Edges:', edges);
 
     try {
       // Show loading toast

@@ -167,17 +167,24 @@ export const runAgent = async (agentType, inputData) => {
  * @returns {Object} Input data for the agent
  */
 export const getAgentInputData = (node, edges, nodes) => {
+  console.log('[getAgentInputData] Node ID:', node.id);
+  console.log('[getAgentInputData] Total edges:', edges.length);
+  console.log('[getAgentInputData] All edges:', edges);
+
   // Find incoming edges to this node
   const incomingEdges = edges.filter(edge => edge.target === node.id);
+  console.log('[getAgentInputData] Incoming edges:', incomingEdges);
 
   if (incomingEdges.length === 0) {
-    throw new Error('No input connected to this agent');
+    throw new Error(`No input connected to agent "${node.data.agent?.name}". Please connect a portfolio or data source to this agent.`);
   }
 
   // Get source nodes
   const sourceNodes = incomingEdges.map(edge =>
     nodes.find(n => n.id === edge.source)
-  );
+  ).filter(Boolean); // Remove undefined nodes
+
+  console.log('[getAgentInputData] Source nodes:', sourceNodes);
 
   // Extract data from source nodes
   const inputData = {
@@ -186,9 +193,13 @@ export const getAgentInputData = (node, edges, nodes) => {
   };
 
   sourceNodes.forEach(sourceNode => {
+    console.log('[getAgentInputData] Processing source node:', sourceNode.type, sourceNode.data);
+
     if (sourceNode.type === 'portfolioNode') {
       // Portfolio node provides stock list
-      inputData.stocks = sourceNode.data.portfolio?.stocks || [];
+      const stocks = sourceNode.data.portfolio?.stocks || [];
+      console.log('[getAgentInputData] Found portfolio with stocks:', stocks);
+      inputData.stocks = stocks;
     } else if (sourceNode.type === 'agentNode') {
       // Agent node provides processed data
       inputData.data = {
@@ -197,6 +208,13 @@ export const getAgentInputData = (node, edges, nodes) => {
       };
     }
   });
+
+  console.log('[getAgentInputData] Final input data:', inputData);
+
+  // Validate we have stocks
+  if (inputData.stocks.length === 0) {
+    throw new Error('No stocks found in connected portfolio. Please ensure the portfolio has stocks.');
+  }
 
   return inputData;
 };
