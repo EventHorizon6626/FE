@@ -1,0 +1,90 @@
+/* Custom cursor fixes for ReactFlow to ensure visible cursors with borders */
+
+/* Custom grab cursor with SVG - black color with white border for visibility */
+.react-flow__pane {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath fill='black' stroke='white' stroke-width='2' d='M9 11V6h2v3h2V6h2v3h2V6h2v5.5a2.5 2.5 0 01-2.5 2.5H15v4h4v2H9v-2h4v-4H9z'/%3E%3Cpath fill='black' d='M9 11V6h2v3h2V6h2v3h2V6h2v5.5a2.5 2.5 0 01-2.5 2.5H15v4h4v2H9v-2h4v-4H9z'/%3E%3C/g%3E%3C/svg%3E") 12 12, grab;
+  cursor: -webkit-grab;
+  cursor: -moz-grab;
+  cursor: grab;
+}
+
+.react-flow__pane.dragging {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath fill='black' stroke='white' stroke-width='2' d='M9 11V6h2v3h2V6h2v3h2V6h2v5.5a2.5 2.5 0 01-2.5 2.5H15v4h4v2H9v-2h4v-4H9z'/%3E%3Cpath fill='black' d='M9 11V6h2v3h2V6h2v3h2V6h2v5.5a2.5 2.5 0 01-2.5 2.5H15v4h4v2H9v-2h4v-4H9z'/%3E%3C/g%3E%3C/svg%3E") 12 12, grabbing;
+  cursor: -webkit-grabbing;
+  cursor: -moz-grabbing;
+  cursor: grabbing;
+}
+
+/* Custom node grab cursor */
+.react-flow__node {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath fill='black' stroke='white' stroke-width='2' d='M9 11V6h2v3h2V6h2v3h2V6h2v5.5a2.5 2.5 0 01-2.5 2.5H15v4h4v2H9v-2h4v-4H9z'/%3E%3Cpath fill='black' d='M9 11V6h2v3h2V6h2v3h2V6h2v5.5a2.5 2.5 0 01-2.5 2.5H15v4h4v2H9v-2h4v-4H9z'/%3E%3C/g%3E%3C/svg%3E") 12 12, grab;
+  cursor: -webkit-grab;
+  cursor: -moz-grab;
+  cursor: grab;
+}
+
+.react-flow__node.dragging {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath fill='black' stroke='white' stroke-width='2' d='M9 11V6h2v3h2V6h2v3h2V6h2v5.5a2.5 2.5 0 01-2.5 2.5H15v4h4v2H9v-2h4v-4H9z'/%3E%3Cpath fill='black' d='M9 11V6h2v3h2V6h2v3h2V6h2v5.5a2.5 2.5 0 01-2.5 2.5H15v4h4v2H9v-2h4v-4H9z'/%3E%3C/g%3E%3C/svg%3E") 12 12, grabbing;
+  cursor: -webkit-grabbing;
+  cursor: -moz-grabbing;
+  cursor: grabbing;
+}
+
+/* Custom crosshair cursor with SVG - black color with white border for visibility */
+.react-flow__handle {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath stroke='white' stroke-width='3' d='M12 2v8m0 4v8M2 12h8m4 0h8'/%3E%3Cpath stroke='black' stroke-width='2' d='M12 2v8m0 4v8M2 12h8m4 0h8'/%3E%3Ccircle cx='12' cy='12' r='3' fill='white'/%3E%3Ccircle cx='12' cy='12' r='2' fill='black'/%3E%3C/g%3E%3C/svg%3E") 12 12, crosshair;
+  cursor: crosshair;
+}
+
+.react-flow__handle:hover {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath stroke='white' stroke-width='3' d='M12 2v8m0 4v8M2 12h8m4 0h8'/%3E%3Cpath stroke='black' stroke-width='2' d='M12 2v8m0 4v8M2 12h8m4 0h8'/%3E%3Ccircle cx='12' cy='12' r='3' fill='white'/%3E%3Ccircle cx='12' cy='12' r='2' fill='black'/%3E%3C/g%3E%3C/svg%3E") 12 12, crosshair;
+  cursor: crosshair;
+}
+
+/* Connection line cursor */
+.react-flow__connection {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath stroke='white' stroke-width='3' d='M12 2v8m0 4v8M2 12h8m4 0h8'/%3E%3Cpath stroke='black' stroke-width='2' d='M12 2v8m0 4v8M2 12h8m4 0h8'/%3E%3Ccircle cx='12' cy='12' r='3' fill='white'/%3E%3Ccircle cx='12' cy='12' r='2' fill='black'/%3E%3C/g%3E%3C/svg%3E") 12 12, crosshair;
+  cursor: crosshair;
+}
+
+.react-flow__connection-path {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath stroke='white' stroke-width='3' d='M12 2v8m0 4v8M2 12h8m4 0h8'/%3E%3Cpath stroke='black' stroke-width='2' d='M12 2v8m0 4v8M2 12h8m4 0h8'/%3E%3Ccircle cx='12' cy='12' r='3' fill='white'/%3E%3Ccircle cx='12' cy='12' r='2' fill='black'/%3E%3C/g%3E%3C/svg%3E") 12 12, crosshair;
+  cursor: crosshair;
+}
+
+/* Edge cursor */
+.react-flow__edge {
+  cursor: pointer;
+}
+
+.react-flow__edge-path {
+  cursor: pointer;
+}
+
+/* Selection cursor */
+.react-flow__pane.selection {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath stroke='white' stroke-width='3' d='M12 2v8m0 4v8M2 12h8m4 0h8'/%3E%3Cpath stroke='black' stroke-width='2' d='M12 2v8m0 4v8M2 12h8m4 0h8'/%3E%3Ccircle cx='12' cy='12' r='3' fill='white'/%3E%3Ccircle cx='12' cy='12' r='2' fill='black'/%3E%3C/g%3E%3C/svg%3E") 12 12, crosshair;
+  cursor: crosshair;
+}
+
+/* Ensure proper cursor rendering - force hardware acceleration */
+.react-flow__pane,
+.react-flow__node,
+.react-flow__handle,
+.react-flow__edge {
+  -webkit-transform: translateZ(0);
+  -moz-transform: translateZ(0);
+  transform: translateZ(0);
+  will-change: transform;
+}
+
+/* Selected node highlight - TEAL border */
+.react-flow__node.selected {
+  box-shadow: 0 0 0 4px #319795 !important;
+}
+
+.react-flow__node.selected .chakra-box {
+  border-color: #319795 !important;
+  border-width: 4px !important;
+  box-shadow: 0 4px 12px rgba(49, 151, 149, 0.3) !important;
+}

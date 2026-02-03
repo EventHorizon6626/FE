@@ -85,7 +85,7 @@ export default function Banner({ banner }) {
       </Text>
 
       {/* ==== OLD STATS SECTION ==== */}
-      <Flex w="max-content" mx="auto" mt="10px" mb="20px">
+      {/* <Flex w="max-content" mx="auto" mt="10px" mb="20px">
         <Flex mx="auto" me="60px" align="center" direction="column">
           <Text color={textPrimary} fontSize="2xl" fontWeight="700">
             2
@@ -112,7 +112,7 @@ export default function Banner({ banner }) {
             Review
           </Text>
         </Flex>
-      </Flex>
+      </Flex> */}
 
       {/* ==== NEW: ACCOUNT INFO SECTION ==== */}
       <Box w="90%" mx="auto" mb="25px" p="18px" borderRadius="16px" bg={bgInfo}>

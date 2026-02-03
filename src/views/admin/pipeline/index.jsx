@@ -1,3 +1,4 @@
+/* eslint-disable */
 import {
   Badge,
   Box,
@@ -47,10 +48,13 @@ import ReactFlow, {
   Controls,
   MiniMap,
   Panel,
+  ReactFlowProvider,
   useEdgesState,
   useNodesState,
+  useReactFlow,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
+import '../../../assets/css/ReactFlowCustom.css';
 
 // Built-in agents organized by system
 const BUILTIN_AGENTS = [
@@ -188,7 +192,7 @@ const MODELS = [
 const initialNodes = [];
 const initialEdges = [];
 
-export default function PipelineBuilder() {
+function PipelineBuilderInner() {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const [availableAgents, setAvailableAgents] = useState([...BUILTIN_AGENTS]); // System 1 agents
@@ -226,7 +230,12 @@ export default function PipelineBuilder() {
     maxTokens: 2000,
   });
 
+  // State for instant drag behavior
+  const [draggingAgent, setDraggingAgent] = useState(null);
+  const [tempNodeId, setTempNodeId] = useState(null);
+
   const toast = useToast();
+  const { screenToFlowPosition } = useReactFlow();
 
   // Auto-save functionality
   useEffect(() => {
@@ -325,69 +334,102 @@ export default function PipelineBuilder() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [nodes, setNodes, setEdges, toast]);
 
-  // Drag and drop handlers
-  const onDragStart = (event, agent) => {
-    event.dataTransfer.setData('application/reactflow', JSON.stringify(agent));
-    event.dataTransfer.effectAllowed = 'move';
-  };
-
-  const onDrop = useCallback(
-    (event) => {
-      event.preventDefault();
-      const agent = JSON.parse(event.dataTransfer.getData('application/reactflow'));
-
-      const position = {
-        x: event.clientX - 280,
-        y: event.clientY - 100,
-      };
-
-      const nodeId = `agent-${Date.now()}`;
-      
-      const newNode = {
-        id: nodeId,
-        type: 'default',
-        position,
-        data: {
-          label: (
-            <Box
-              p="15px"
-              bg="white"
-              borderRadius="12px"
-              border="3px solid"
-              borderColor={`${agent.color}.400`}
-              boxShadow="lg"
-              minW="150px"
-            >
-              <HStack spacing="10px" mb="8px">
-                <Icon as={agent.icon} color={`${agent.color}.600`} boxSize="20px" />
-                <Text fontSize="sm" fontWeight="700">
-                  {agent.name}
-                </Text>
-              </HStack>
-              <Badge colorScheme={agent.color} fontSize="xs">
-                {agent.isBuiltin ? 'Built-in' : 'Custom'}
-              </Badge>
-            </Box>
-          ),
-        },
-      };
-
-      setNodes((nds) => nds.concat(newNode));
-      toast({
-        title: 'Agent added',
-        description: `${agent.name} added to pipeline`,
-        status: 'success',
-        duration: 2000,
-        isClosable: true,
-      });
-    },
-    [setNodes, toast]
-  );
-
-  const onDragOver = useCallback((event) => {
+  // Instant drag handlers
+  const handleAgentMouseDown = useCallback((event, agent) => {
     event.preventDefault();
-    event.dataTransfer.dropEffect = 'move';
-  }, []);
+    
+    // Get the cursor position in flow coordinates
+    const position = screenToFlowPosition({
+      x: event.clientX,
+      y: event.clientY,
+    });
+
+    const nodeId = `agent-${Date.now()}`;
+    
+    const newNode = {
+      id: nodeId,
+      type: 'default',
+      position,
+      data: {
+        label: (
+          <Box
+            p="15px"
+            bg="white"
+            borderRadius="12px"
+            border="3px solid"
+            borderColor={`${agent.color}.400`}
+            boxShadow="lg"
+            minW="150px"
+          >
+            <HStack spacing="10px" mb="8px">
+              <Icon as={agent.icon} color={`${agent.color}.600`} boxSize="20px" />
+              <Text fontSize="sm" fontWeight="700">
+                {agent.name}
+              </Text>
+            </HStack>
+            <Badge colorScheme={agent.color} fontSize="xs">
+              {agent.isBuiltin ? 'Built-in' : 'Custom'}
+            </Badge>
+          </Box>
+        ),
+        agent: agent, // Store agent data for reference
+        config: {
+          name: agent.name,
+          description: agent.description || '',
+          model: 'gpt-4',
+          temperature: 0.7,
+          maxTokens: 2000,
+        },
+      },
+    };
+
+    // Add the node immediately
+    setNodes((nds) => nds.concat(newNode));
+    setDraggingAgent(agent);
+    setTempNodeId(nodeId);
+    
+    toast({
+      title: 'Agent added',
+      description: `${agent.name} added to pipeline`,
+      status: 'success',
+      duration: 2000,
+      isClosable: true,
+    });
+  }, [screenToFlowPosition, setNodes, toast]);
+
+  // Handle mouse movement to update node position
+  useEffect(() => {
+    if (!draggingAgent || !tempNodeId) return;
+
+    const handleMouseMove = (event) => {
+      const position = screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
+
+      setNodes((nds) =>
+        nds.map((node) =>
+          node.id === tempNodeId
+            ? { ...node, position }
+            : node
+        )
+      );
+    };
+
+    const handleMouseUp = () => {
+      // Finalize the node placement
+      setDraggingAgent(null);
+      setTempNodeId(null);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [draggingAgent, tempNodeId, screenToFlowPosition, setNodes]);
 
   // Create custom agent
   const handleCreateAgent = () => {
@@ -761,9 +803,9 @@ export default function PipelineBuilder() {
             </Box>
           )}
         </VStack>
-      </Box>
-    );
-  }
+    </Box>
+  );
+}
 
   // Canvas View - Working on a horizon
   return (
@@ -870,8 +912,8 @@ export default function PipelineBuilder() {
                   borderColor="gray.200"
                   cursor="grab"
                   _hover={{ bg: 'blue.50', borderColor: 'blue.400', boxShadow: 'sm' }}
-                  draggable
-                  onDragStart={(e) => onDragStart(e, agent)}
+                  _active={{ cursor: 'grabbing' }}
+                  onMouseDown={(e) => handleAgentMouseDown(e, agent)}
                   w="full"
                 >
                   <HStack spacing="10px">
@@ -977,8 +1019,8 @@ export default function PipelineBuilder() {
                         borderColor="gray.200"
                         cursor="grab"
                         _hover={{ bg: 'purple.50', borderColor: 'purple.400', boxShadow: 'sm' }}
-                        draggable
-                        onDragStart={(e) => onDragStart(e, agent)}
+                        _active={{ cursor: 'grabbing' }}
+                        onMouseDown={(e) => handleAgentMouseDown(e, agent)}
                       >
                         <HStack spacing="10px">
                           <Icon as={agent.icon} color={`${agent.color}.600`} boxSize="20px" />
@@ -1015,8 +1057,6 @@ export default function PipelineBuilder() {
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
-          onDrop={onDrop}
-          onDragOver={onDragOver}
           fitView
         >
           <Controls />
@@ -1083,8 +1123,8 @@ export default function PipelineBuilder() {
               <HStack justify="space-between" mb="8px">
                 <HStack spacing="10px">
                   <Icon as={MdSmartToy} color="teal.600" boxSize="24px" />
-                  <Text fontSize="lg" fontWeight="bold" color="teal.900">
-                    Node Configuration
+                  <Text fontSize="lg" fontWeight="bold" color="teal.900" noOfLines={1}>
+                    {nodeConfig.name || 'Node Configuration'}
                   </Text>
                 </HStack>
                 <IconButton
@@ -1402,3 +1442,13 @@ export default function PipelineBuilder() {
     </Box>
   );
 }
+
+// Wrap the component with ReactFlowProvider
+export default function PipelineBuilder() {
+  return (
+    <ReactFlowProvider>
+      <PipelineBuilderInner />
+    </ReactFlowProvider>
+  );
+}
+
