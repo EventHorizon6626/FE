@@ -1,61 +1,54 @@
-import { useCallback, useState, useEffect } from 'react';
-import ReactFlow, {
-  MiniMap,
-  Controls,
-  Background,
-  useNodesState,
-  useEdgesState,
-  addEdge,
-  Panel,
-} from 'reactflow';
-import 'reactflow/dist/style.css';
 import {
-  Box,
-  VStack,
-  HStack,
-  Text,
-  Button,
-  Icon,
   Badge,
-  Modal,
-  ModalOverlay,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ModalCloseButton,
-  useDisclosure,
-  Input,
+  Box,
+  Button,
+  Divider,
   FormControl,
   FormLabel,
-  useToast,
+  HStack,
+  Icon,
   IconButton,
-  Tooltip,
-  Textarea,
+  Input,
+  Modal,
+  ModalBody,
+  ModalCloseButton,
+  ModalContent,
+  ModalHeader,
+  ModalOverlay,
   Select,
-  Divider,
-  Accordion,
-  AccordionItem,
-  AccordionButton,
-  AccordionPanel,
-  AccordionIcon,
+  Text,
+  Textarea,
+  Tooltip,
+  useDisclosure,
+  useToast,
+  VStack
 } from '@chakra-ui/react';
+import { useCallback, useEffect, useState } from 'react';
 import {
-  MdAdd,
-  MdShowChart,
-  MdArticle,
-  MdSpeed,
   MdAccountBalance,
-  MdTrendingUp,
-  MdWarning,
-  MdSave,
+  MdAdd,
+  MdArticle,
   MdDelete,
-  MdGroups,
-  MdDataset,
-  MdHub,
-  MdSmartToy,
   MdEdit,
+  MdGroups,
   MdHome,
+  MdHub,
+  MdShowChart,
+  MdSmartToy,
+  MdSpeed,
+  MdTrendingUp,
+  MdWarning
 } from 'react-icons/md';
+import ReactFlow, {
+  addEdge,
+  Background,
+  Controls,
+  MiniMap,
+  Panel,
+  useEdgesState,
+  useNodesState,
+} from 'reactflow';
+import 'reactflow/dist/style.css';
 
 // Built-in agents organized by system
 const BUILTIN_AGENTS = [
@@ -270,6 +263,39 @@ export default function PipelineBuilder() {
     [setEdges]
   );
 
+  // Delete selected nodes with keyboard (Delete/Backspace)
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === 'Delete' || event.key === 'Backspace') {
+        // Find selected nodes
+        const selectedNodes = nodes.filter((node) => node.selected);
+        if (selectedNodes.length > 0) {
+          // Prevent deleting fixed nodes (data-pipeline, team nodes)
+          const deletableNodes = selectedNodes.filter(
+            (node) => !['data-pipeline', 'team1', 'team2', 'team3', 'team4'].includes(node.id)
+          );
+          
+          if (deletableNodes.length > 0) {
+            const nodeIds = deletableNodes.map((n) => n.id);
+            setNodes((nds) => nds.filter((node) => !nodeIds.includes(node.id)));
+            setEdges((eds) => eds.filter((edge) => 
+              !nodeIds.includes(edge.source) && !nodeIds.includes(edge.target)
+            ));
+            toast({
+              title: `${deletableNodes.length} node(s) deleted`,
+              status: 'info',
+              duration: 2000,
+              isClosable: true,
+            });
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [nodes, setNodes, setEdges, toast]);
+
   // Drag and drop handlers
   const onDragStart = (event, agent) => {
     event.dataTransfer.setData('application/reactflow', JSON.stringify(agent));
@@ -286,8 +312,10 @@ export default function PipelineBuilder() {
         y: event.clientY - 100,
       };
 
+      const nodeId = `agent-${Date.now()}`;
+      
       const newNode = {
-        id: `agent-${Date.now()}`,
+        id: nodeId,
         type: 'default',
         position,
         data: {
@@ -332,7 +360,7 @@ export default function PipelineBuilder() {
     event.dataTransfer.dropEffect = 'move';
   }, []);
 
-  // Create or update custom agent
+  // Create custom agent
   const handleCreateAgent = () => {
     if (!newAgent.name.trim()) {
       toast({
@@ -964,6 +992,25 @@ export default function PipelineBuilder() {
           <Controls />
           <MiniMap />
           <Background variant="dots" gap={16} size={1} />
+          
+          {/* Bottom hint text */}
+          <Panel position="bottom-center">
+            <Box
+              bg="whiteAlpha.900"
+              backdropFilter="blur(10px)"
+              borderRadius="8px"
+              px="12px"
+              py="6px"
+              border="1px solid"
+              borderColor="whiteAlpha.400"
+              boxShadow="sm"
+            >
+              <Text fontSize="xs" color="gray.600">
+                💡 Select nodes and press <Badge colorScheme="gray" fontSize="2xs">Delete</Badge> or <Badge colorScheme="gray" fontSize="2xs">Backspace</Badge> to remove them
+              </Text>
+            </Box>
+          </Panel>
+
           <Panel position="top-right">
             <Tooltip label="Back to Horizons" placement="left" hasArrow>
               <IconButton
