@@ -59,6 +59,7 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 import '../../../assets/css/ReactFlowCustom.css';
 import { searchSecurities } from 'data/securities';
+import { runAgent, getAgentInputData } from 'lib/agentApi';
 
 // Built-in agents organized by system
 const BUILTIN_AGENTS = [
@@ -196,15 +197,8 @@ const MODELS = [
 const initialNodes = [];
 const initialEdges = [];
 
-// Custom Node Component with Action Toolbar
+// Custom Node Component with Play Button
 function CustomAgentNode({ data, id, selected }) {
-  const handleDelete = (e) => {
-    e.stopPropagation();
-    if (data.onDelete) {
-      data.onDelete(id);
-    }
-  };
-
   const handlePlay = (e) => {
     e.stopPropagation();
     if (data.onPlay) {
@@ -225,63 +219,108 @@ function CustomAgentNode({ data, id, selected }) {
         position={Position.Right}
         style={{ background: '#555', width: '12px', height: '12px' }}
       />
-      
-      <HStack spacing="0" align="stretch">
-        {/* Main Node Content */}
-        <Box
-          p="20px"
-          bg="white"
-          borderRadius="16px 0 0 16px"
-          border={selected ? "3px solid" : "3px solid"}
-          borderColor={selected ? "teal.500" : `${data.agent?.color || 'blue'}.400`}
-          boxShadow={selected ? "0 4px 12px rgba(49, 151, 149, 0.4)" : "lg"}
-          minW="200px"
+
+      {/* Play Button - Top Right Corner */}
+      <Box
+        position="absolute"
+        top="-8px"
+        right="-8px"
+        zIndex="10"
+      >
+        <IconButton
+          icon={<Icon as={MdPlayArrow} />}
+          size="sm"
+          colorScheme="green"
+          variant="solid"
+          borderRadius="full"
+          aria-label="Run agent"
+          onClick={handlePlay}
+          boxShadow="md"
+          _hover={{ transform: 'scale(1.1)', boxShadow: 'lg' }}
           transition="all 0.2s"
-        >
-          <HStack spacing="12px" mb="10px">
-            <Icon as={data.agent?.icon || MdSmartToy} color={`${data.agent?.color || 'blue'}.600`} boxSize="24px" />
-            <Text fontSize="md" fontWeight="700">
-              {data.agent?.name || 'Agent'}
+        />
+      </Box>
+
+      {/* Main Node Content */}
+      <Box
+        p="20px"
+        bg="white"
+        borderRadius="16px"
+        border={selected ? "3px solid" : "3px solid"}
+        borderColor={selected ? "teal.500" : `${data.agent?.color || 'blue'}.400`}
+        boxShadow={selected ? "0 4px 12px rgba(49, 151, 149, 0.4)" : "lg"}
+        minW="200px"
+        transition="all 0.2s"
+      >
+        <HStack spacing="12px">
+          <Icon as={data.agent?.icon || MdSmartToy} color={`${data.agent?.color || 'blue'}.600`} boxSize="24px" />
+          <Text fontSize="md" fontWeight="700">
+            {data.agent?.name || 'Agent'}
+          </Text>
+        </HStack>
+      </Box>
+    </Box>
+  );
+}
+
+// Custom Portfolio Node Component (Data Source)
+function CustomPortfolioNode({ data, id, selected }) {
+  return (
+    <Box position="relative" className="custom-portfolio-node">
+      {/* Only Source Handle - Portfolios output data to agents */}
+      <Handle
+        type="source"
+        position={Position.Right}
+        style={{ background: '#38A169', width: '12px', height: '12px' }}
+      />
+
+      <Box
+        p="16px"
+        bg="white"
+        borderRadius="12px"
+        border={selected ? "3px solid" : "3px dashed"}
+        borderColor={selected ? "green.500" : "green.300"}
+        boxShadow={selected ? "0 4px 12px rgba(56, 161, 105, 0.4)" : "md"}
+        minW="220px"
+        maxW="300px"
+        transition="all 0.2s"
+      >
+        <VStack align="start" spacing="8px">
+          {/* Header */}
+          <HStack spacing="8px">
+            <Icon as={MdShowChart} color="green.600" boxSize="20px" />
+            <Text fontSize="sm" fontWeight="700" color="gray.800">
+              {data.portfolio?.name || 'Portfolio'}
             </Text>
           </HStack>
-          <Badge colorScheme={data.agent?.color || 'blue'} fontSize="sm">
-            {data.agent?.isBuiltin ? 'Built-in' : 'Custom'}
-          </Badge>
-        </Box>
 
-        {/* Action Toolbar - Always visible */}
-        <VStack
-          spacing="0"
-          borderRadius="0 12px 12px 0"
-          overflow="hidden"
-          boxShadow="lg"
-        >
-          <IconButton
-            icon={<Icon as={MdPlayArrow} />}
-            size="md"
-            colorScheme="green"
-            variant="solid"
-            borderRadius="0"
-            aria-label="Run agent"
-            onClick={handlePlay}
-            h="50%"
-            w="40px"
-            minW="40px"
-          />
-          <IconButton
-            icon={<Icon as={MdDelete} />}
-            size="md"
-            colorScheme="red"
-            variant="solid"
-            borderRadius="0"
-            aria-label="Delete agent"
-            onClick={handleDelete}
-            h="50%"
-            w="40px"
-            minW="40px"
-          />
+          {/* Type Badge */}
+          <Badge colorScheme="green" fontSize="xs" variant="subtle">
+            📊 Data Source
+          </Badge>
+
+          {/* Stock List */}
+          {data.portfolio?.stocks && data.portfolio.stocks.length > 0 && (
+            <VStack align="start" spacing="4px" w="full">
+              <Text fontSize="xs" fontWeight="600" color="gray.600">
+                Assets ({data.portfolio.stocks.length}):
+              </Text>
+              <Box
+                maxH="120px"
+                overflowY="auto"
+                w="full"
+                bg="gray.50"
+                p="8px"
+                borderRadius="6px"
+              >
+                <Text fontSize="xs" color="gray.700" lineHeight="1.6">
+                  {data.portfolio.stocks.join(', ')}
+                </Text>
+              </Box>
+            </VStack>
+          )}
         </VStack>
-      </HStack>
+      </Box>
     </Box>
   );
 }
@@ -289,6 +328,7 @@ function CustomAgentNode({ data, id, selected }) {
 // Define custom node types
 const nodeTypes = {
   agentNode: CustomAgentNode,
+  portfolioNode: CustomPortfolioNode,
 };
 
 function PipelineBuilderInner() {
@@ -454,17 +494,65 @@ function PipelineBuilderInner() {
     });
   }, [setNodes, setEdges, toast]);
 
-  const handleNodePlay = useCallback((nodeId) => {
+  const handleNodePlay = useCallback(async (nodeId) => {
     const node = nodes.find((n) => n.id === nodeId);
-    toast({
-      title: 'Running agent',
-      description: `Executing ${node?.data?.agent?.name || 'agent'}...`,
-      status: 'success',
-      duration: 2000,
-      isClosable: true,
-    });
-    // Add your execution logic here
-  }, [nodes, toast]);
+    const agentName = node?.data?.agent?.name || 'agent';
+    const agentType = node?.data?.agent?.type;
+
+    try {
+      // Show loading toast
+      const loadingToast = toast({
+        title: 'Running agent',
+        description: `Executing ${agentName}...`,
+        status: 'info',
+        duration: null,
+        isClosable: false,
+      });
+
+      // Get input data from connected nodes
+      const inputData = getAgentInputData(node, edges, nodes);
+
+      // Run the agent
+      const result = await runAgent(agentType, inputData);
+
+      // Store result in node data
+      setNodes((nds) =>
+        nds.map((n) =>
+          n.id === nodeId
+            ? {
+                ...n,
+                data: {
+                  ...n.data,
+                  output: result,
+                  lastRun: new Date().toISOString(),
+                },
+              }
+            : n
+        )
+      );
+
+      // Close loading toast and show success
+      toast.close(loadingToast);
+      toast({
+        title: 'Agent completed',
+        description: `${agentName} finished successfully`,
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
+
+      console.log(`[${agentName}] Output:`, result);
+    } catch (error) {
+      toast({
+        title: 'Agent failed',
+        description: error.message || `Failed to execute ${agentName}`,
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+      console.error(`[${agentName}] Error:`, error);
+    }
+  }, [nodes, edges, setNodes, toast]);
 
   // Instant drag handlers
   const handleAgentMouseDown = useCallback((event, agent) => {
@@ -509,6 +597,42 @@ function PipelineBuilderInner() {
       isClosable: true,
     });
   }, [screenToFlowPosition, setNodes, toast, handleNodeDelete, handleNodePlay]);
+
+  // Portfolio drag handler - Creates data source nodes
+  const handlePortfolioMouseDown = useCallback((event, portfolio) => {
+    event.preventDefault();
+
+    // Get the cursor position in flow coordinates
+    const position = screenToFlowPosition({
+      x: event.clientX,
+      y: event.clientY,
+    });
+
+    const nodeId = `portfolio-${Date.now()}`;
+
+    const newNode = {
+      id: nodeId,
+      type: 'portfolioNode',
+      position,
+      data: {
+        portfolio: portfolio,
+        onDelete: handleNodeDelete,
+      },
+    };
+
+    // Add the node immediately
+    setNodes((nds) => nds.concat(newNode));
+    setDraggingAgent(portfolio); // Reuse dragging state
+    setTempNodeId(nodeId);
+
+    toast({
+      title: 'Portfolio added',
+      description: `${portfolio.name} data source added`,
+      status: 'success',
+      duration: 2000,
+      isClosable: true,
+    });
+  }, [screenToFlowPosition, setNodes, toast, handleNodeDelete]);
 
   // Handle mouse movement to update node position
   useEffect(() => {
@@ -1032,18 +1156,8 @@ function PipelineBuilderInner() {
                     _active={{ cursor: 'grabbing' }}
                     w="full"
                     onMouseDown={(e) => {
-                      // Create a portfolio agent object for dragging
-                      const portfolioAgent = {
-                        id: portfolio.id,
-                        name: portfolio.name,
-                        type: 'portfolio',
-                        system: 'portfolio',
-                        icon: MdShowChart,
-                        color: 'green',
-                        isBuiltin: false,
-                        stocks: portfolio.stocks,
-                      };
-                      handleAgentMouseDown(e, portfolioAgent);
+                      // Drag portfolio as a data source node
+                      handlePortfolioMouseDown(e, portfolio);
                     }}
                     onContextMenu={(e) => {
                       // Right-click to edit
