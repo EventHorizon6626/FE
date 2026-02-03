@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import ReactFlow, {
   MiniMap,
   Controls,
@@ -32,12 +32,12 @@ import {
   Tooltip,
   Textarea,
   Select,
-  Tabs,
-  TabList,
-  Tab,
-  TabPanels,
-  TabPanel,
   Divider,
+  Accordion,
+  AccordionItem,
+  AccordionButton,
+  AccordionPanel,
+  AccordionIcon,
 } from '@chakra-ui/react';
 import {
   MdAdd,
@@ -53,13 +53,16 @@ import {
   MdDataset,
   MdHub,
   MdSmartToy,
+  MdEdit,
+  MdHome,
 } from 'react-icons/md';
 
-// Built-in agents
+// Built-in agents organized by system
 const BUILTIN_AGENTS = [
+  // System 1: Data Pipeline Agents
   {
     id: 'candlestick',
-    name: 'Candlestick Agent',
+    name: 'Candlestick',
     type: 'data_retriever',
     system: 'data',
     icon: MdShowChart,
@@ -68,7 +71,7 @@ const BUILTIN_AGENTS = [
   },
   {
     id: 'earnings',
-    name: 'Earnings Agent',
+    name: 'Earnings',
     type: 'data_retriever',
     system: 'data',
     icon: MdAccountBalance,
@@ -77,7 +80,7 @@ const BUILTIN_AGENTS = [
   },
   {
     id: 'news',
-    name: 'News Agent',
+    name: 'News',
     type: 'news_agent',
     system: 'data',
     icon: MdArticle,
@@ -86,7 +89,7 @@ const BUILTIN_AGENTS = [
   },
   {
     id: 'technical',
-    name: 'Technical Agent',
+    name: 'Technical',
     type: 'technical_agent',
     system: 'data',
     icon: MdSpeed,
@@ -95,30 +98,77 @@ const BUILTIN_AGENTS = [
   },
   {
     id: 'fundamentals',
-    name: 'Fundamentals Agent',
+    name: 'Fundamentals',
     type: 'financial_metrics',
     system: 'data',
     icon: MdAccountBalance,
     color: 'teal',
     isBuiltin: true,
   },
+];
+
+// System 2: Default Teams with their agents
+const DEFAULT_TEAMS = [
   {
-    id: 'bull_researcher',
-    name: 'Bull Researcher',
-    type: 'strategy_agent',
-    system: 'analyzer',
-    icon: MdTrendingUp,
-    color: 'green',
-    isBuiltin: true,
+    id: 'team1',
+    name: 'Team 1: Analysts',
+    description: 'Multi-perspective analysis team',
+    agents: [
+      // Placeholder - to be implemented
+    ],
   },
   {
-    id: 'bear_researcher',
-    name: 'Bear Researcher',
-    type: 'strategy_agent',
-    system: 'analyzer',
-    icon: MdWarning,
-    color: 'red',
-    isBuiltin: true,
+    id: 'team2',
+    name: 'Team 2: Researchers',
+    description: 'Bull vs Bear debate team',
+    agents: [
+      {
+        id: 'bull_researcher',
+        name: 'Bull Researcher',
+        type: 'researcher',
+        system: 'team',
+        teamId: 'team2',
+        icon: MdTrendingUp,
+        color: 'green',
+        isBuiltin: true,
+      },
+      {
+        id: 'bear_researcher',
+        name: 'Bear Researcher',
+        type: 'researcher',
+        system: 'team',
+        teamId: 'team2',
+        icon: MdWarning,
+        color: 'red',
+        isBuiltin: true,
+      },
+      {
+        id: 'research_manager',
+        name: 'Research Manager',
+        type: 'manager',
+        system: 'team',
+        teamId: 'team2',
+        icon: MdSmartToy,
+        color: 'purple',
+        isBuiltin: true,
+      },
+    ],
+  },
+  {
+    id: 'team3',
+    name: 'Team 3: Risk Management',
+    description: 'Position sizing and risk analysis',
+    agents: [
+      // Placeholder - to be implemented
+    ],
+  },
+  {
+    id: 'team4',
+    name: 'Team 4: Trader',
+    description: 'Final decision and execution',
+    agents: [
+      // Placeholder - to be implemented
+    ],
   },
 ];
 
@@ -140,173 +190,80 @@ const MODELS = [
   { value: 'claude-3-sonnet', label: 'Claude 3 Sonnet' },
 ];
 
-// Initial pipeline structure
-const initialNodes = [
-  // Event Horizon Data Pipeline (unified System 1)
-  {
-    id: 'data-pipeline',
-    type: 'default',
-    position: { x: 250, y: 100 },
-    data: {
-      label: (
-        <Box
-          p="30px"
-          bg="linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
-          borderRadius="16px"
-          boxShadow="xl"
-          minW="350px"
-        >
-          <HStack spacing="12px" mb="8px">
-            <Icon as={MdDataset} color="white" boxSize="28px" />
-            <Text fontSize="lg" fontWeight="bold" color="white">
-              Event Horizon Data Pipeline
-            </Text>
-          </HStack>
-          <Text fontSize="xs" color="whiteAlpha.800" mb="12px">
-            Stage 1 → Stage 2 → Stage 3 (Unified)
-          </Text>
-          <HStack spacing="8px">
-            <Badge colorScheme="purple" bg="whiteAlpha.300" color="white" fontSize="xs">
-              5 Built-in Agents
-            </Badge>
-            <Badge colorScheme="purple" bg="whiteAlpha.300" color="white" fontSize="xs">
-              Drop custom agents here
-            </Badge>
-          </HStack>
-        </Box>
-      ),
-    },
-    draggable: false,
-  },
-  // Analyzer Network (System 2) - Default Teams
-  {
-    id: 'team1',
-    type: 'default',
-    position: { x: 100, y: 350 },
-    data: {
-      label: (
-        <Box
-          p="20px"
-          bg="linear-gradient(135deg, #f093fb 0%, #f5576c 100%)"
-          borderRadius="12px"
-          boxShadow="lg"
-          minW="140px"
-        >
-          <HStack spacing="8px" mb="6px">
-            <Icon as={MdGroups} color="white" boxSize="20px" />
-            <Text fontSize="sm" fontWeight="bold" color="white">
-              Analysts
-            </Text>
-          </HStack>
-          <Badge bg="whiteAlpha.300" color="white" fontSize="2xs">
-            Team 1
-          </Badge>
-        </Box>
-      ),
-    },
-  },
-  {
-    id: 'team2',
-    type: 'default',
-    position: { x: 280, y: 350 },
-    data: {
-      label: (
-        <Box
-          p="20px"
-          bg="linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)"
-          borderRadius="12px"
-          boxShadow="lg"
-          minW="140px"
-        >
-          <HStack spacing="8px" mb="6px">
-            <Icon as={MdGroups} color="white" boxSize="20px" />
-            <Text fontSize="sm" fontWeight="bold" color="white">
-              Researchers
-            </Text>
-          </HStack>
-          <Badge bg="whiteAlpha.300" color="white" fontSize="2xs">
-            Team 2
-          </Badge>
-        </Box>
-      ),
-    },
-  },
-  {
-    id: 'team3',
-    type: 'default',
-    position: { x: 460, y: 350 },
-    data: {
-      label: (
-        <Box
-          p="20px"
-          bg="linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)"
-          borderRadius="12px"
-          boxShadow="lg"
-          minW="140px"
-        >
-          <HStack spacing="8px" mb="6px">
-            <Icon as={MdGroups} color="white" boxSize="20px" />
-            <Text fontSize="sm" fontWeight="bold" color="white">
-              Risk Mgmt
-            </Text>
-          </HStack>
-          <Badge bg="whiteAlpha.300" color="white" fontSize="2xs">
-            Team 3
-          </Badge>
-        </Box>
-      ),
-    },
-  },
-  {
-    id: 'team4',
-    type: 'default',
-    position: { x: 640, y: 350 },
-    data: {
-      label: (
-        <Box
-          p="20px"
-          bg="linear-gradient(135deg, #fa709a 0%, #fee140 100%)"
-          borderRadius="12px"
-          boxShadow="lg"
-          minW="140px"
-        >
-          <HStack spacing="8px" mb="6px">
-            <Icon as={MdGroups} color="white" boxSize="20px" />
-            <Text fontSize="sm" fontWeight="bold" color="white">
-              Trader
-            </Text>
-          </HStack>
-          <Badge bg="whiteAlpha.300" color="white" fontSize="2xs">
-            Team 4
-          </Badge>
-        </Box>
-      ),
-    },
-  },
-];
-
+const initialNodes = [];
 const initialEdges = [];
 
 export default function PipelineBuilder() {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  const [availableAgents, setAvailableAgents] = useState([...BUILTIN_AGENTS]); // System 1 agents
+  const [availableTeams, setAvailableTeams] = useState([...DEFAULT_TEAMS]); // System 2 teams
   const [customAgents, setCustomAgents] = useState([]);
-  const [customTeams, setCustomTeams] = useState([]);
+  const [savedHorizons, setSavedHorizons] = useState([]);
+  const [currentHorizonName, setCurrentHorizonName] = useState('');
+  const [showHomeView, setShowHomeView] = useState(true); // Show home view by default
 
   const { isOpen: isAgentOpen, onOpen: onAgentOpen, onClose: onAgentClose } = useDisclosure();
   const { isOpen: isTeamOpen, onOpen: onTeamOpen, onClose: onTeamClose } = useDisclosure();
+  const { isOpen: isRenameOpen, onOpen: onRenameOpen, onClose: onRenameClose } = useDisclosure();
 
   const [newAgent, setNewAgent] = useState({
     name: '',
     description: '',
     category: 'data_retriever',
     system: 'data',
+    teamId: null,
     model: 'gpt-4',
   });
 
   const [newTeam, setNewTeam] = useState({ name: '', description: '' });
+  const [editingAgent, setEditingAgent] = useState(null); // Track which agent is being edited
+  const [selectedTeamForAgent, setSelectedTeamForAgent] = useState(null); // Track which team to add agent to
+  const [horizonName, setHorizonName] = useState('');
+  const [isEditingHorizonName, setIsEditingHorizonName] = useState(false);
+  const [tempHorizonName, setTempHorizonName] = useState('');
+  const [showDataAgents, setShowDataAgents] = useState(false);
+  const [showTeams, setShowTeams] = useState(false);
 
   const toast = useToast();
+
+  // Auto-save functionality
+  useEffect(() => {
+    // Don't auto-save if canvas is empty and no agents
+    if (nodes.length === 0 && edges.length === 0 && availableAgents.length === BUILTIN_AGENTS.length) return;
+
+    // Auto-save the current state
+    const saveTimeout = setTimeout(() => {
+      const horizonName = currentHorizonName || 'Untitled';
+
+      // Find existing horizon with this name
+      const existingIndex = savedHorizons.findIndex(h => h.name === horizonName);
+
+      const horizon = {
+        id: existingIndex >= 0 ? savedHorizons[existingIndex].id : Date.now(),
+        name: horizonName,
+        nodes,
+        edges,
+        availableAgents, // System 1: Data Pipeline agents
+        availableTeams, // System 2: Team Network
+        customAgents,
+        savedAt: new Date().toISOString(),
+      };
+
+      if (existingIndex >= 0) {
+        // Update existing horizon
+        const updated = [...savedHorizons];
+        updated[existingIndex] = horizon;
+        setSavedHorizons(updated);
+      } else {
+        // Add new horizon
+        setSavedHorizons([...savedHorizons, horizon]);
+        setCurrentHorizonName(horizonName);
+      }
+    }, 1000); // Debounce auto-save by 1 second
+
+    return () => clearTimeout(saveTimeout);
+  }, [nodes, edges, availableAgents, availableTeams, customAgents]);
 
   const onConnect = useCallback(
     (params) => setEdges((eds) => addEdge(params, eds)),
@@ -375,7 +332,7 @@ export default function PipelineBuilder() {
     event.dataTransfer.dropEffect = 'move';
   }, []);
 
-  // Create custom agent
+  // Create or update custom agent
   const handleCreateAgent = () => {
     if (!newAgent.name.trim()) {
       toast({
@@ -387,38 +344,119 @@ export default function PipelineBuilder() {
       return;
     }
 
-    const agent = {
-      id: `custom-${Date.now()}`,
-      name: newAgent.name,
-      description: newAgent.description,
-      type: newAgent.category,
-      system: newAgent.system,
-      icon: MdSmartToy,
-      color: newAgent.system === 'data' ? 'blue' : 'pink',
-      isBuiltin: false,
-      model: newAgent.model,
-    };
+    if (editingAgent) {
+      // Update existing agent
+      const updatedAgent = {
+        ...editingAgent,
+        name: newAgent.name,
+        description: newAgent.description,
+        type: newAgent.category,
+        system: newAgent.system,
+        teamId: newAgent.teamId,
+        model: newAgent.model,
+        color: newAgent.system === 'data' ? 'blue' : 'pink',
+      };
 
-    setCustomAgents([...customAgents, agent]);
+      if (newAgent.system === 'data') {
+        setAvailableAgents(availableAgents.map(a => a.id === editingAgent.id ? updatedAgent : a));
+      } else if (newAgent.system === 'team' && newAgent.teamId) {
+        setAvailableTeams(availableTeams.map(team => {
+          if (team.id === newAgent.teamId) {
+            return {
+              ...team,
+              agents: team.agents.map(a => a.id === editingAgent.id ? updatedAgent : a),
+            };
+          }
+          return team;
+        }));
+      }
+      setCustomAgents(customAgents.map(a => a.id === editingAgent.id ? updatedAgent : a));
+
+      toast({
+        title: 'Agent updated',
+        description: `${updatedAgent.name} has been updated`,
+        status: 'success',
+        duration: 2000,
+        isClosable: true,
+      });
+    } else {
+      // Create new agent
+      const agent = {
+        id: `custom-${Date.now()}`,
+        name: newAgent.name,
+        description: newAgent.description,
+        type: newAgent.category,
+        system: newAgent.system,
+        teamId: newAgent.teamId,
+        icon: MdSmartToy,
+        color: newAgent.system === 'data' ? 'blue' : 'purple',
+        isBuiltin: false,
+        model: newAgent.model,
+      };
+
+      if (newAgent.system === 'data') {
+        // Add to data agents
+        setAvailableAgents([...availableAgents, agent]);
+      } else if (newAgent.system === 'team' && newAgent.teamId) {
+        // Add to specific team
+        setAvailableTeams(availableTeams.map(team => {
+          if (team.id === newAgent.teamId) {
+            return { ...team, agents: [...team.agents, agent] };
+          }
+          return team;
+        }));
+      }
+
+      setCustomAgents([...customAgents, agent]);
+
+      toast({
+        title: 'Agent created',
+        description: `${agent.name} added`,
+        status: 'success',
+        duration: 2000,
+        isClosable: true,
+      });
+    }
+
     setNewAgent({
       name: '',
       description: '',
       category: 'data_retriever',
       system: 'data',
+      teamId: null,
       model: 'gpt-4',
     });
+    setEditingAgent(null);
+    setSelectedTeamForAgent(null);
     onAgentClose();
-
-    toast({
-      title: 'Agent created',
-      description: `${agent.name} added to library`,
-      status: 'success',
-      duration: 2000,
-      isClosable: true,
-    });
   };
 
-  // Create custom team
+  const handleEditAgent = (agent) => {
+    setEditingAgent(agent);
+    setNewAgent({
+      name: agent.name,
+      description: agent.description || '',
+      category: agent.type,
+      system: agent.system,
+      teamId: agent.teamId || null,
+      model: agent.model || 'gpt-4',
+    });
+    onAgentOpen();
+  };
+
+  const handleAddAgentToTeam = (teamId) => {
+    setSelectedTeamForAgent(teamId);
+    setNewAgent({
+      name: '',
+      description: '',
+      category: 'researcher',
+      system: 'team',
+      teamId: teamId,
+      model: 'gpt-4',
+    });
+    onAgentOpen();
+  };
+
   const handleCreateTeam = () => {
     if (!newTeam.name.trim()) {
       toast({
@@ -432,46 +470,27 @@ export default function PipelineBuilder() {
 
     const team = {
       id: `team-${Date.now()}`,
-      type: 'default',
-      position: { x: Math.random() * 400 + 200, y: Math.random() * 100 + 400 },
-      data: {
-        label: (
-          <Box
-            p="20px"
-            bg="linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)"
-            borderRadius="12px"
-            boxShadow="lg"
-            minW="140px"
-          >
-            <HStack spacing="8px" mb="6px">
-              <Icon as={MdGroups} color="gray.700" boxSize="20px" />
-              <Text fontSize="sm" fontWeight="bold" color="gray.800">
-                {newTeam.name}
-              </Text>
-            </HStack>
-            <Badge colorScheme="pink" fontSize="2xs">
-              Custom Horizon
-            </Badge>
-          </Box>
-        ),
-      },
+      name: newTeam.name,
+      description: newTeam.description,
+      agents: [],
     };
 
-    setNodes((nds) => nds.concat(team));
-    setCustomTeams([...customTeams, { name: newTeam.name, description: newTeam.description }]);
+    setAvailableTeams([...availableTeams, team]);
     setNewTeam({ name: '', description: '' });
     onTeamClose();
 
     toast({
-      title: 'Horizon created',
-      description: `${newTeam.name} added to Analyzer Network`,
+      title: 'Team created',
+      description: `${team.name} added`,
       status: 'success',
       duration: 2000,
       isClosable: true,
     });
   };
 
+
   const handleDeleteAgent = (agentId) => {
+    setAvailableAgents(availableAgents.filter(a => a.id !== agentId));
     setCustomAgents(customAgents.filter(a => a.id !== agentId));
     toast({
       title: 'Agent deleted',
@@ -481,199 +500,457 @@ export default function PipelineBuilder() {
     });
   };
 
-  const handleSavePipeline = () => {
-    const pipeline = { nodes, edges, customAgents, customTeams };
-    console.log('Saving horizon:', pipeline);
+  const handleStartEditingName = () => {
+    setTempHorizonName(currentHorizonName || 'Untitled');
+    onRenameOpen();
+  };
+
+  const handleSaveHorizonName = () => {
+    const newName = tempHorizonName.trim();
+    if (!newName) {
+      onRenameClose();
+      return;
+    }
+
+    const oldName = currentHorizonName || 'Untitled';
+    const existingIndex = savedHorizons.findIndex(h => h.name === oldName);
+
+    if (existingIndex >= 0) {
+      const updated = [...savedHorizons];
+      updated[existingIndex] = { ...updated[existingIndex], name: newName };
+      setSavedHorizons(updated);
+    }
+
+    setCurrentHorizonName(newName);
+    onRenameClose();
+
     toast({
-      title: 'Horizon saved',
+      title: 'Renamed',
+      status: 'success',
+      duration: 1500,
+      isClosable: true,
+    });
+  };
+
+  const handleLoadHorizon = (horizon) => {
+    setNodes(horizon.nodes);
+    setEdges(horizon.edges);
+    setAvailableAgents(horizon.availableAgents || [...BUILTIN_AGENTS]);
+    setAvailableTeams(horizon.availableTeams || [...DEFAULT_TEAMS]);
+    setCustomAgents(horizon.customAgents || []);
+    setCurrentHorizonName(horizon.name);
+    setShowHomeView(false); // Exit home view when loading a horizon
+
+    toast({
+      title: 'Horizon loaded',
+      description: `${horizon.name} is now active`,
+      status: 'info',
+      duration: 2000,
+      isClosable: true,
+    });
+  };
+
+  const handleDeleteHorizon = (horizonId) => {
+    setSavedHorizons(savedHorizons.filter(h => h.id !== horizonId));
+    toast({
+      title: 'Horizon deleted',
+      status: 'info',
+      duration: 2000,
+      isClosable: true,
+    });
+  };
+
+  const handleNewHorizon = () => {
+    const newHorizonName = `Untitled ${savedHorizons.length + 1}`;
+
+    // Create and immediately save the new horizon
+    const newHorizon = {
+      id: Date.now(),
+      name: newHorizonName,
+      nodes: [],
+      edges: [],
+      availableAgents: [...BUILTIN_AGENTS],
+      availableTeams: [...DEFAULT_TEAMS],
+      customAgents: [],
+      savedAt: new Date().toISOString(),
+    };
+
+    setSavedHorizons([...savedHorizons, newHorizon]);
+
+    setNodes([]);
+    setEdges([]);
+    setAvailableAgents([...BUILTIN_AGENTS]);
+    setAvailableTeams([...DEFAULT_TEAMS]);
+    setCustomAgents([]);
+    setCurrentHorizonName(newHorizonName);
+    setShowHomeView(false);
+
+    toast({
+      title: 'New horizon created',
+      description: newHorizonName,
       status: 'success',
       duration: 2000,
       isClosable: true,
     });
   };
 
+  // Home View - Show all horizons
+  if (showHomeView) {
+    return (
+      <Box h="100vh" bg="gray.50" p="40px">
+        <VStack spacing="30px" maxW="1200px" mx="auto">
+          {/* Header */}
+          <HStack justify="space-between" w="full">
+            <VStack align="start" spacing="5px">
+              <HStack spacing="12px">
+                <Icon as={MdHub} color="teal.600" boxSize="32px" />
+                <Text fontSize="3xl" fontWeight="bold" color="gray.800">
+                  Horizons
+                </Text>
+              </HStack>
+              <Text fontSize="md" color="gray.600">
+                Select a horizon to work on or create a new one
+              </Text>
+            </VStack>
+            <Button
+              leftIcon={<Icon as={MdAdd} />}
+              colorScheme="teal"
+              size="lg"
+              onClick={handleNewHorizon}
+            >
+              New Horizon
+            </Button>
+          </HStack>
+
+          {/* Horizons Grid */}
+          {savedHorizons.length === 0 ? (
+            <Box
+              w="full"
+              py="80px"
+              textAlign="center"
+              bg="white"
+              borderRadius="16px"
+              border="2px dashed"
+              borderColor="gray.300"
+            >
+              <Icon as={MdHub} boxSize="64px" color="gray.300" mb="20px" />
+              <Text fontSize="xl" fontWeight="600" color="gray.600" mb="10px">
+                No horizons yet
+              </Text>
+              <Text fontSize="md" color="gray.500" mb="20px">
+                Create your first horizon to get started
+              </Text>
+              <Button
+                leftIcon={<Icon as={MdAdd} />}
+                colorScheme="teal"
+                size="lg"
+                onClick={handleNewHorizon}
+              >
+                Create First Horizon
+              </Button>
+            </Box>
+          ) : (
+            <Box
+              display="grid"
+              gridTemplateColumns="repeat(auto-fill, minmax(300px, 1fr))"
+              gap="20px"
+              w="full"
+            >
+              {savedHorizons.map((horizon) => (
+                <Box
+                  key={horizon.id}
+                  p="20px"
+                  bg="white"
+                  borderRadius="12px"
+                  border="2px solid"
+                  borderColor="gray.200"
+                  cursor="pointer"
+                  _hover={{ borderColor: 'teal.400', boxShadow: 'lg', transform: 'translateY(-2px)' }}
+                  transition="all 0.2s"
+                  onClick={() => handleLoadHorizon(horizon)}
+                >
+                  <HStack justify="space-between" mb="12px">
+                    <HStack spacing="10px">
+                      <Icon as={MdHub} color="teal.600" boxSize="24px" />
+                      <Text fontSize="lg" fontWeight="bold" color="gray.800" noOfLines={1}>
+                        {horizon.name}
+                      </Text>
+                    </HStack>
+                    <IconButton
+                      icon={<Icon as={MdDelete} />}
+                      size="sm"
+                      variant="ghost"
+                      colorScheme="red"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteHorizon(horizon.id);
+                      }}
+                    />
+                  </HStack>
+                  <Text fontSize="sm" color="gray.600" mb="12px">
+                    Last modified: {new Date(horizon.savedAt).toLocaleDateString()}
+                  </Text>
+                  <HStack spacing="8px">
+                    <Badge colorScheme="blue" fontSize="xs">
+                      {horizon.nodes?.length || 0} nodes
+                    </Badge>
+                    <Badge colorScheme="purple" fontSize="xs">
+                      {horizon.availableAgents?.length || 0} agents
+                    </Badge>
+                  </HStack>
+                </Box>
+              ))}
+            </Box>
+          )}
+        </VStack>
+      </Box>
+    );
+  }
+
+  // Canvas View - Working on a horizon
   return (
     <Box h="100vh" position="relative" bg="gray.50">
-      {/* Left Sidebar - Agent Library */}
-      <Box
+      {/* Floating Sidebar Sections */}
+      <VStack
         position="absolute"
-        left="0"
-        top="0"
-        h="100%"
-        w="280px"
-        bg="white"
-        borderRight="2px solid"
-        borderColor="gray.200"
+        left="20px"
+        top="20px"
+        spacing="12px"
         zIndex="10"
-        overflowY="auto"
+        align="start"
       >
-        <VStack spacing="0" align="stretch" h="full">
-          {/* Header */}
-          <Box p="20px" borderBottom="2px solid" borderColor="gray.200" bg="teal.50">
-            <HStack spacing="10px" mb="8px">
-              <Icon as={MdHub} color="teal.600" boxSize="24px" />
-              <Text fontSize="lg" fontWeight="bold" color="teal.900">
-                Horizon
-              </Text>
-            </HStack>
-            <Text fontSize="xs" color="teal.700">
-              Build your multi-agent network
-            </Text>
-          </Box>
+        {/* 1. Horizon Name - Adaptive Rectangle */}
+        <HStack
+          bg="whiteAlpha.900"
+          backdropFilter="blur(10px)"
+          borderRadius="12px"
+          px="12px"
+          py="8px"
+          spacing="8px"
+          border="1px solid"
+          borderColor="whiteAlpha.400"
+          boxShadow="md"
+          cursor="pointer"
+          onClick={handleStartEditingName}
+          _hover={{ borderColor: 'teal.400', boxShadow: 'lg' }}
+          transition="all 0.2s"
+        >
+          <Icon as={MdHub} color="teal.600" boxSize="20px" />
+          <Text fontSize="sm" fontWeight="600" color="gray.800" noOfLines={1}>
+            {currentHorizonName || 'Untitled'}
+          </Text>
+          <Icon as={MdEdit} color="gray.500" boxSize="14px" />
+        </HStack>
 
-          {/* Tabs for agents */}
-          <Tabs size="sm" variant="enclosed" colorScheme="teal">
-            <TabList px="10px" pt="10px">
-              <Tab fontSize="xs">Built-in</Tab>
-              <Tab fontSize="xs">Custom</Tab>
-            </TabList>
+        {/* 2. Data Agents - with Dropdown */}
+        <Box
+          position="relative"
+          onMouseEnter={() => setShowDataAgents(true)}
+          onMouseLeave={() => setShowDataAgents(false)}
+        >
+          <HStack
+            bg="whiteAlpha.900"
+            backdropFilter="blur(10px)"
+            borderRadius="12px"
+            px="12px"
+            py="8px"
+            spacing="8px"
+            border="1px solid"
+            borderColor="whiteAlpha.400"
+            boxShadow="md"
+            cursor="pointer"
+            _hover={{ borderColor: 'blue.400', boxShadow: 'lg' }}
+            transition="all 0.2s"
+          >
+            <Tooltip label="Data Agents" placement="right" hasArrow>
+              <Icon as={MdSmartToy} color="blue.600" boxSize="24px" />
+            </Tooltip>
+            <Tooltip label="Add data agent" placement="right" hasArrow>
+              <IconButton
+                icon={<Icon as={MdAdd} />}
+                size="xs"
+                variant="ghost"
+                colorScheme="blue"
+                aria-label="Add data agent"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setNewAgent({ name: '', description: '', category: 'data_retriever', system: 'data', teamId: null, model: 'gpt-4' });
+                  onAgentOpen();
+                }}
+              />
+            </Tooltip>
+          </HStack>
 
-            <TabPanels>
-              {/* Built-in Agents */}
-              <TabPanel p="15px">
-                <VStack spacing="12px" align="stretch">
-                  <HStack justify="space-between" align="center">
-                    <Text fontSize="xs" fontWeight="600" color="gray.500" textTransform="uppercase">
-                      Data Agents
+          {/* Data Agents Dropdown - Positioned to the right */}
+          {showDataAgents && (
+            <Box
+              position="absolute"
+              top="0"
+              left="100%"
+              pl="8px"
+            >
+              <VStack
+                bg="whiteAlpha.900"
+                backdropFilter="blur(10px)"
+                borderRadius="12px"
+                border="1px solid"
+                borderColor="whiteAlpha.400"
+                boxShadow="lg"
+                p="8px"
+                spacing="6px"
+                minW="200px"
+                maxH="400px"
+                overflowY="auto"
+              >
+              {availableAgents.map((agent) => (
+                <Box
+                  key={agent.id}
+                  p="10px"
+                  bg="white"
+                  borderRadius="8px"
+                  border="1px solid"
+                  borderColor="gray.200"
+                  cursor="grab"
+                  _hover={{ bg: 'blue.50', borderColor: 'blue.400', boxShadow: 'sm' }}
+                  draggable
+                  onDragStart={(e) => onDragStart(e, agent)}
+                  w="full"
+                >
+                  <HStack spacing="10px">
+                    <Icon as={agent.icon} color={`${agent.color}.600`} boxSize="20px" />
+                    <Text fontSize="sm" fontWeight="600" flex="1">
+                      {agent.name}
                     </Text>
-                    <IconButton
-                      icon={<Icon as={MdAdd} />}
-                      size="xs"
-                      colorScheme="teal"
-                      variant="ghost"
-                      aria-label="Add data agent"
-                      onClick={() => {
-                        setNewAgent({ ...newAgent, system: 'data', category: 'data_retriever' });
-                        onAgentOpen();
-                      }}
-                    />
+                    {agent.isBuiltin && (
+                      <Badge colorScheme="blue" fontSize="xs">
+                        Built-in
+                      </Badge>
+                    )}
                   </HStack>
-                  {BUILTIN_AGENTS.filter((a) => a.system === 'data').map((agent) => (
-                    <Box
-                      key={agent.id}
-                      p="12px"
-                      bg="gray.50"
-                      borderRadius="8px"
-                      border="2px solid"
-                      borderColor="gray.200"
-                      cursor="grab"
-                      _hover={{ bg: 'gray.100', borderColor: 'teal.400', boxShadow: 'md' }}
-                      draggable
-                      onDragStart={(e) => onDragStart(e, agent)}
-                    >
-                      <HStack spacing="10px" justify="space-between">
-                        <Text fontSize="xs" fontWeight="600">
-                          {agent.name}
-                        </Text>
-                        <Icon as={agent.icon} color={`${agent.color}.600`} boxSize="20px" />
-                      </HStack>
-                    </Box>
-                  ))}
+                </Box>
+              ))}
+              </VStack>
+            </Box>
+          )}
+        </Box>
 
-                  <Divider />
+        {/* 3. Teams - with Dropdown */}
+        <Box
+          position="relative"
+          onMouseEnter={() => setShowTeams(true)}
+          onMouseLeave={() => setShowTeams(false)}
+        >
+          <HStack
+            bg="whiteAlpha.900"
+            backdropFilter="blur(10px)"
+            borderRadius="12px"
+            px="12px"
+            py="8px"
+            spacing="8px"
+            border="1px solid"
+            borderColor="whiteAlpha.400"
+            boxShadow="md"
+            cursor="pointer"
+            _hover={{ borderColor: 'purple.400', boxShadow: 'lg' }}
+            transition="all 0.2s"
+          >
+            <Tooltip label="Teams" placement="right" hasArrow>
+              <Icon as={MdGroups} color="purple.600" boxSize="24px" />
+            </Tooltip>
+            <Tooltip label="Add team" placement="right" hasArrow>
+              <IconButton
+                icon={<Icon as={MdAdd} />}
+                size="xs"
+                variant="ghost"
+                colorScheme="purple"
+                aria-label="Add team"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onTeamOpen();
+                }}
+              />
+            </Tooltip>
+          </HStack>
 
-                  <HStack justify="space-between" align="center">
-                    <Text fontSize="xs" fontWeight="600" color="gray.500" textTransform="uppercase">
-                      Analyzer Agents
+          {/* Teams Dropdown - Positioned to the right */}
+          {showTeams && (
+            <Box
+              position="absolute"
+              top="0"
+              left="100%"
+              pl="8px"
+            >
+              <VStack
+                bg="whiteAlpha.900"
+                backdropFilter="blur(10px)"
+                borderRadius="12px"
+                border="1px solid"
+                borderColor="whiteAlpha.400"
+                boxShadow="lg"
+                p="8px"
+                spacing="8px"
+                minW="250px"
+                maxH="400px"
+                overflowY="auto"
+              >
+              {availableTeams.map((team) => (
+                <VStack key={team.id} align="stretch" spacing="6px" w="full">
+                  <HStack justify="space-between" px="8px">
+                    <Text fontSize="xs" fontWeight="700" color="purple.700">
+                      {team.name}
                     </Text>
                     <IconButton
                       icon={<Icon as={MdAdd} />}
                       size="xs"
+                      variant="ghost"
                       colorScheme="purple"
-                      variant="ghost"
-                      aria-label="Add analyzer agent"
-                      onClick={() => {
-                        setNewAgent({ ...newAgent, system: 'analyzer', category: 'strategy_agent' });
-                        onAgentOpen();
-                      }}
+                      aria-label="Add agent to team"
+                      onClick={() => handleAddAgentToTeam(team.id)}
                     />
                   </HStack>
-                  {BUILTIN_AGENTS.filter((a) => a.system === 'analyzer').map((agent) => (
-                    <Box
-                      key={agent.id}
-                      p="12px"
-                      bg="gray.50"
-                      borderRadius="8px"
-                      border="2px solid"
-                      borderColor="gray.200"
-                      cursor="grab"
-                      _hover={{ bg: 'gray.100', borderColor: 'teal.400', boxShadow: 'md' }}
-                      draggable
-                      onDragStart={(e) => onDragStart(e, agent)}
-                    >
-                      <HStack spacing="10px" justify="space-between">
-                        <Text fontSize="xs" fontWeight="600">
-                          {agent.name}
-                        </Text>
-                        <Icon as={agent.icon} color={`${agent.color}.600`} boxSize="20px" />
-                      </HStack>
-                    </Box>
-                  ))}
-                </VStack>
-              </TabPanel>
-
-              {/* Custom Agents */}
-              <TabPanel p="15px">
-                <VStack spacing="10px" align="stretch">
-                  {customAgents.length === 0 ? (
-                    <Box p="20px" textAlign="center">
-                      <Text fontSize="xs" color="gray.500">
-                        No custom agents yet
-                      </Text>
-                    </Box>
-                  ) : (
-                    customAgents.map((agent) => (
+                  {team.agents.length > 0 ? (
+                    team.agents.map((agent) => (
                       <Box
                         key={agent.id}
-                        p="12px"
-                        bg="gray.50"
+                        p="10px"
+                        bg="white"
                         borderRadius="8px"
-                        border="2px solid"
+                        border="1px solid"
                         borderColor="gray.200"
                         cursor="grab"
+                        _hover={{ bg: 'purple.50', borderColor: 'purple.400', boxShadow: 'sm' }}
                         draggable
                         onDragStart={(e) => onDragStart(e, agent)}
                       >
-                        <HStack justify="space-between">
-                          <Text fontSize="xs" fontWeight="600">
+                        <HStack spacing="10px">
+                          <Icon as={agent.icon} color={`${agent.color}.600`} boxSize="20px" />
+                          <Text fontSize="sm" fontWeight="600" flex="1">
                             {agent.name}
                           </Text>
-                          <HStack spacing="8px">
-                            <Icon as={agent.icon} color={`${agent.color}.600`} boxSize="18px" />
-                            <IconButton
-                              icon={<Icon as={MdDelete} />}
-                              size="xs"
-                              variant="ghost"
-                              colorScheme="red"
-                              onClick={() => handleDeleteAgent(agent.id)}
-                            />
-                          </HStack>
+                          {agent.isBuiltin && (
+                            <Badge colorScheme="purple" fontSize="xs">
+                              Built-in
+                            </Badge>
+                          )}
                         </HStack>
                       </Box>
                     ))
+                  ) : (
+                    <Text fontSize="xs" color="gray.500" px="8px" py="4px">
+                      No agents yet
+                    </Text>
                   )}
+                  <Divider />
                 </VStack>
-              </TabPanel>
-            </TabPanels>
-          </Tabs>
-
-          {/* Action Buttons */}
-          <Box mt="auto" p="15px" borderTop="2px solid" borderColor="gray.200">
-            <Button
-              leftIcon={<Icon as={MdGroups} />}
-              size="sm"
-              colorScheme="purple"
-              w="full"
-              onClick={onTeamOpen}
-            >
-              Create New Horizon
-            </Button>
-          </Box>
-        </VStack>
-      </Box>
+              ))}
+              </VStack>
+            </Box>
+          )}
+        </Box>
+      </VStack>
 
       {/* Main Canvas */}
-      <Box ml="280px" h="100%">
+      <Box h="100%">
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -684,61 +961,41 @@ export default function PipelineBuilder() {
           onDragOver={onDragOver}
           fitView
         >
-          <Panel position="top-left">
-            <VStack align="start" spacing="10px">
-              <Box bg="white" p="15px" borderRadius="12px" boxShadow="md" border="1px solid" borderColor="gray.200">
-                <Text fontSize="md" fontWeight="bold" color="gray.800" mb="5px">
-                  Event Horizon
-                </Text>
-                <Text fontSize="xs" color="gray.600">
-                  Drop agents → Connect nodes → Save
-                </Text>
-              </Box>
-
-              <Box bg="purple.50" p="12px" borderRadius="8px" border="1px solid" borderColor="purple.200">
-                <Text fontSize="xs" fontWeight="600" color="purple.800" mb="4px">
-                  📊 Data Pipeline (Fixed)
-                </Text>
-                <Text fontSize="2xs" color="purple.700">
-                  Stage 1→2→3 unified. Add custom agents to Stage 1.
-                </Text>
-              </Box>
-
-              <Box bg="pink.50" p="12px" borderRadius="8px" border="1px solid" borderColor="pink.200">
-                <Text fontSize="xs" fontWeight="600" color="pink.800" mb="4px">
-                  🧠 Analyzer Network (Flexible)
-                </Text>
-                <Text fontSize="2xs" color="pink.700">
-                  4 default teams + create unlimited custom teams.
-                </Text>
-              </Box>
-            </VStack>
-          </Panel>
-
+          <Controls />
+          <MiniMap />
+          <Background variant="dots" gap={16} size={1} />
           <Panel position="top-right">
-            <Tooltip label="Save Horizon">
+            <Tooltip label="Back to Horizons" placement="left" hasArrow>
               <IconButton
-                icon={<Icon as={MdSave} />}
+                icon={<Icon as={MdHome} />}
+                size="md"
                 colorScheme="teal"
-                onClick={handleSavePipeline}
-                size="lg"
+                variant="solid"
+                aria-label="Back to horizons"
+                onClick={() => setShowHomeView(true)}
                 boxShadow="lg"
               />
             </Tooltip>
           </Panel>
-
-          <Controls />
-          <MiniMap />
-          <Background variant="dots" gap={16} size={1} />
         </ReactFlow>
       </Box>
 
-      {/* Create Agent Modal */}
-      <Modal isOpen={isAgentOpen} onClose={onAgentClose} isCentered size="lg">
+      {/* Create/Edit Agent Modal */}
+      <Modal isOpen={isAgentOpen} onClose={() => {
+        onAgentClose();
+        setEditingAgent(null);
+        setNewAgent({
+          name: '',
+          description: '',
+          category: 'data_retriever',
+          system: 'data',
+          model: 'gpt-4',
+        });
+      }} isCentered size="lg">
         <ModalOverlay bg="blackAlpha.600" backdropFilter="blur(4px)" />
         <ModalContent borderRadius="20px">
           <ModalCloseButton />
-          <ModalHeader>Create Custom Agent</ModalHeader>
+          <ModalHeader>{editingAgent ? 'Edit Agent' : 'Create Custom Agent'}</ModalHeader>
 
           <ModalBody pb="20px">
             <VStack spacing="20px" align="stretch">
@@ -761,31 +1018,11 @@ export default function PipelineBuilder() {
                   placeholder="What does this agent do?"
                   value={newAgent.description}
                   onChange={(e) => setNewAgent({ ...newAgent, description: e.target.value })}
-                  rows={3}
+                  rows={2}
                 />
               </FormControl>
 
-              <FormControl isRequired>
-                <FormLabel fontSize="sm" fontWeight="600">
-                  System
-                </FormLabel>
-                <Select
-                  value={newAgent.system}
-                  onChange={(e) => {
-                    const system = e.target.value;
-                    setNewAgent({
-                      ...newAgent,
-                      system,
-                      category: system === 'data' ? 'data_retriever' : 'strategy_agent'
-                    });
-                  }}
-                >
-                  <option value="data">Event Horizon Data Pipeline</option>
-                  <option value="analyzer">Analyzer Network</option>
-                </Select>
-              </FormControl>
-
-              <FormControl isRequired>
+              <FormControl>
                 <FormLabel fontSize="sm" fontWeight="600">
                   Category
                 </FormLabel>
@@ -818,30 +1055,31 @@ export default function PipelineBuilder() {
               </FormControl>
 
               <Button colorScheme="teal" onClick={handleCreateAgent} size="lg" w="full">
-                Create Agent
+                {editingAgent ? 'Update Agent' : 'Create Agent'}
               </Button>
             </VStack>
           </ModalBody>
         </ModalContent>
       </Modal>
 
-      {/* Create Horizon Modal */}
-      <Modal isOpen={isTeamOpen} onClose={onTeamClose} isCentered size="lg">
+      {/* Create Team Modal */}
+      <Modal isOpen={isTeamOpen} onClose={onTeamClose} isCentered size="md">
         <ModalOverlay bg="blackAlpha.600" backdropFilter="blur(4px)" />
         <ModalContent borderRadius="20px">
           <ModalCloseButton />
-          <ModalHeader>Create New Horizon</ModalHeader>
+          <ModalHeader>Create Team</ModalHeader>
 
           <ModalBody pb="20px">
-            <VStack spacing="20px" align="stretch">
+            <VStack spacing="15px" align="stretch">
               <FormControl isRequired>
                 <FormLabel fontSize="sm" fontWeight="600">
-                  Horizon Name
+                  Team Name
                 </FormLabel>
                 <Input
-                  placeholder="e.g., Momentum Traders"
+                  placeholder="e.g., Risk Analysts"
                   value={newTeam.name}
                   onChange={(e) => setNewTeam({ ...newTeam, name: e.target.value })}
+                  autoFocus
                 />
               </FormControl>
 
@@ -850,27 +1088,47 @@ export default function PipelineBuilder() {
                   Description
                 </FormLabel>
                 <Textarea
-                  placeholder="What does this horizon do?"
+                  placeholder="What does this team do?"
                   value={newTeam.description}
                   onChange={(e) => setNewTeam({ ...newTeam, description: e.target.value })}
-                  rows={3}
+                  rows={2}
                 />
               </FormControl>
 
-              <Button colorScheme="purple" onClick={handleCreateTeam} size="lg" w="full">
-                Create Horizon
+              <Button colorScheme="purple" onClick={handleCreateTeam} size="md" w="full">
+                Create Team
               </Button>
-
-              <Box p="15px" bg="blue.50" borderRadius="8px" border="1px solid" borderColor="blue.200">
-                <Text fontSize="xs" color="blue.800">
-                  <strong>Tip:</strong> After creating a horizon, drag agents onto it and
-                  connect horizons with lines to build your custom analyzer network.
-                </Text>
-              </Box>
             </VStack>
           </ModalBody>
         </ModalContent>
       </Modal>
+
+      {/* Rename Horizon Modal */}
+      <Modal isOpen={isRenameOpen} onClose={onRenameClose} isCentered size="sm">
+        <ModalOverlay bg="blackAlpha.600" backdropFilter="blur(4px)" />
+        <ModalContent borderRadius="16px">
+          <ModalCloseButton />
+          <ModalHeader>Rename Horizon</ModalHeader>
+          <ModalBody pb="20px">
+            <VStack spacing="15px">
+              <Input
+                value={tempHorizonName}
+                onChange={(e) => setTempHorizonName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSaveHorizonName();
+                }}
+                placeholder="Horizon name"
+                autoFocus
+                onFocus={(e) => e.target.select()}
+              />
+              <Button colorScheme="teal" onClick={handleSaveHorizonName} w="full">
+                Save
+              </Button>
+            </VStack>
+          </ModalBody>
+        </ModalContent>
+      </Modal>
+
     </Box>
   );
 }
