@@ -114,15 +114,16 @@ export default function PipelineList() {
       setSavedHorizons(savedHorizons.filter(h => h.id !== horizonId));
 
       toast({
-        title: 'Horizon deleted',
+        title: 'Horizon disabled',
+        description: 'The horizon has been marked as inactive',
         status: 'info',
         duration: 2000,
         isClosable: true,
       });
     } catch (error) {
-      console.error('Failed to delete horizon:', error);
+      console.error('Failed to disable horizon:', error);
       toast({
-        title: 'Failed to delete horizon',
+        title: 'Failed to disable horizon',
         description: error.message,
         status: 'error',
         duration: 5000,
@@ -226,6 +227,7 @@ export default function PipelineList() {
                     variant="ghost"
                     colorScheme="red"
                     onClick={(e) => handleDeleteHorizon(e, horizon.id)}
+                    aria-label="Disable horizon"
                   />
                 </HStack>
                 <Text fontSize="sm" color="gray.600" mb="12px">

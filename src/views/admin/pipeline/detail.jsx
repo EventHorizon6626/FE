@@ -646,18 +646,32 @@ function PipelineBuilderInner() {
     }
   }, [onPortfolioOpen]);
 
-  const handleNodeDelete = useCallback((nodeId) => {
-    setNodes((nds) => nds.filter((node) => node.id !== nodeId));
-    setEdges((eds) => eds.filter((edge) => 
-      edge.source !== nodeId && edge.target !== nodeId
-    ));
-    toast({
-      title: 'Node deleted',
-      status: 'info',
-      duration: 2000,
-      isClosable: true,
-    });
-    
+  const handleNodeDelete = useCallback(async (nodeId) => {
+    try {
+      await request.delete(`/nodes/${nodeId}`);
+      
+      setNodes((nds) => nds.filter((node) => node.id !== nodeId));
+      setEdges((eds) => eds.filter((edge) => 
+        edge.source !== nodeId && edge.target !== nodeId
+      ));
+      
+      toast({
+        title: 'Node disabled',
+        description: 'The node has been marked as inactive',
+        status: 'info',
+        duration: 2000,
+        isClosable: true,
+      });
+    } catch (error) {
+      console.error('Failed to disable node:', error);
+      toast({
+        title: 'Failed to disable node',
+        description: error.message,
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+    }
   }, [setNodes, setEdges, toast]);
 
   const { getNodes, getEdges } = useReactFlow();
@@ -1048,31 +1062,47 @@ function PipelineBuilderInner() {
     });
   };
 
-  const handleSaveHorizonName = () => {
+  const handleSaveHorizonName = async () => {
     const newName = tempHorizonName.trim();
     if (!newName) {
-      onRenameClose();
+      toast({
+        title: 'Name required',
+        description: 'Horizon name cannot be empty',
+        status: 'warning',
+        duration: 3000,
+        isClosable: true,
+      });
       return;
     }
 
-    const oldName = currentHorizonName || 'Untitled';
-    const existingIndex = savedHorizons.findIndex(h => h.name === oldName);
+    try {
+      const result = await request.put(`/horizons/${id}`, {
+        name: newName,
+      });
 
-    if (existingIndex >= 0) {
-      const updated = [...savedHorizons];
-      updated[existingIndex] = { ...updated[existingIndex], name: newName };
-      setSavedHorizons(updated);
+      if (result.success && result.data) {
+        setCurrentHorizonName(newName);
+        
+        toast({
+          title: 'Horizon renamed',
+          description: `Renamed to "${newName}"`,
+          status: 'success',
+          duration: 2000,
+          isClosable: true,
+        });
+
+        onRenameClose();
+      }
+    } catch (error) {
+      console.error('Failed to rename horizon:', error);
+      toast({
+        title: 'Failed to rename horizon',
+        description: error.message,
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
     }
-
-    setCurrentHorizonName(newName);
-    onRenameClose();
-
-    toast({
-      title: 'Renamed',
-      status: 'success',
-      duration: 1500,
-      isClosable: true,
-    });
   };
 
   // Load horizon data from backend on mount
