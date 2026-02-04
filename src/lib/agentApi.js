@@ -1,65 +1,65 @@
-import aiApi from './aiApi';
+import { request } from './api';
 
 export const runCandlestickAgent = async (stocks) => {
-  const response = await aiApi.post('/agents/candlestick', {
+  const response = await request.post('/ai/agents/candlestick', {
     stocks,
     timeframe: '1d',
     period: '30d',
   });
-  return response.data;
+  return response;
 };
 
 export const runEarningsAgent = async (stocks) => {
-  const response = await aiApi.post('/agents/earnings', {
+  const response = await request.post('/ai/agents/earnings', {
     stocks,
   });
-  return response.data;
+  return response;
 };
 
 export const runNewsAgent = async (stocks) => {
-  const response = await aiApi.post('/agents/news', {
+  const response = await request.post('/ai/agents/news', {
     stocks,
     days: 7,
   });
-  return response.data;
+  return response;
 };
 
 export const runTechnicalAgent = async (stocks) => {
-  const response = await aiApi.post('/agents/technical', {
+  const response = await request.post('/ai/agents/technical', {
     stocks,
     indicators: ['RSI', 'MACD', 'SMA', 'EMA', 'BB'],
   });
-  return response.data;
+  return response;
 };
 
 export const runFundamentalsAgent = async (stocks) => {
-  const response = await aiApi.post('/agents/fundamentals', {
+  const response = await request.post('/ai/agents/fundamentals', {
     stocks,
     metrics: ['PE', 'PB', 'EPS', 'DIVIDEND_YIELD', 'MARKET_CAP'],
   });
-  return response.data;
+  return response;
 };
 
 export const runBullResearcherAgent = async (data) => {
-  const response = await aiApi.post('/agents/bull-researcher', {
+  const response = await request.post('/ai/agents/bull-researcher', {
     data,
   });
-  return response.data;
+  return response;
 };
 
 export const runBearResearcherAgent = async (data) => {
-  const response = await aiApi.post('/agents/bear-researcher', {
+  const response = await request.post('/ai/agents/bear-researcher', {
     data,
   });
-  return response.data;
+  return response;
 };
 
 export const runResearchManagerAgent = async (bullThesis, bearThesis) => {
-  const response = await aiApi.post('/agents/research-manager', {
+  const response = await request.post('/ai/agents/research-manager', {
     bull_thesis: bullThesis,
     bear_thesis: bearThesis,
   });
-  return response.data;
+  return response;
 };
 
 export const runAgent = async (agentType, inputData) => {
