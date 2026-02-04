@@ -601,6 +601,16 @@ function PipelineBuilderInner() {
 
   useEffect(() => {
     const handleKeyDown = (event) => {
+      const target = event.target;
+      const isInputField = target.tagName === 'INPUT' || 
+                          target.tagName === 'TEXTAREA' || 
+                          target.isContentEditable ||
+                          target.closest('[contenteditable="true"]');
+      
+      if (isInputField) {
+        return;
+      }
+
       if (event.key === 'Delete' || event.key === 'Backspace') {
         const selectedNodes = nodes.filter((node) => node.selected);
         if (selectedNodes.length > 0) {
