@@ -1117,11 +1117,16 @@ function PipelineBuilderInner() {
           console.log('[PipelineDetail] Horizon ID:', horizon.id, 'URL ID:', id);
           setNodes(horizon.nodes || []);
           setEdges(horizon.edges || []);
-          setAvailableAgents(horizon.agents || horizon.availableAgents || [...BUILTIN_AGENTS]);
-          setAvailableTeams(horizon.teams || horizon.availableTeams || [...DEFAULT_TEAMS]);
+          
+          const loadedAgents = horizon.agents || horizon.availableAgents;
+          setAvailableAgents(loadedAgents && loadedAgents.length > 0 ? loadedAgents : [...BUILTIN_AGENTS]);
+          
+          const loadedTeams = horizon.teams || horizon.availableTeams;
+          setAvailableTeams(loadedTeams && loadedTeams.length > 0 ? loadedTeams : [...DEFAULT_TEAMS]);
+          
           setCustomAgents(horizon.customAgents || []);
           setCurrentHorizonName(horizon.name);
-          setCurrentHorizonId(horizon.id); // Backend returns 'id' not '_id'
+          setCurrentHorizonId(horizon.id);
           setPortfolios(horizon.portfolios || []);
         }
       } catch (error) {
