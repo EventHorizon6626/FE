@@ -1,4 +1,3 @@
-// src/routes.js
 import { Icon } from '@chakra-ui/react';
 import {
   MdPerson,
@@ -6,18 +5,13 @@ import {
   MdLock,
 } from 'react-icons/md';
 
-// Admin Imports
 import LandingPage from 'views/admin/landing';
-// import PortfolioAnalyzer from 'views/admin/portfolio/PortfolioAnalyzer'; // Removed - now in Horizon page
-import PipelineBuilder from 'views/admin/pipeline';
+import PipelineList from 'views/admin/pipeline';
+import PipelineDetail from 'views/admin/pipeline/detail';
 import Profile from 'views/admin/profile';
-// import RTL from 'views/admin/rtl';
-
-// Auth Imports
 import SignInCentered from 'views/auth/signIn';
 
 const routes = [
-  // ----- PUBLIC HOME PAGE -----
   {
     name: 'Home',
     layout: '/',
@@ -25,17 +19,24 @@ const routes = [
     icon: <Icon as={MdHome} width="20px" height="20px" color="inherit" />,
     component: <LandingPage />,
     requiresAuth: true,
-    hideInSidebar: true, // Don't show in sidebar navigation
+    hideInSidebar: true,
   },
-  // ----- PROTECTED (requiresAuth: true) -----
-  // Portfolio removed - now integrated in Horizon page
   {
     name: 'Horizon',
     layout: '/',
     path: '/pipeline',
     icon: <Icon as={MdHome} width="20px" height="20px" color="inherit" />,
-    component: <PipelineBuilder />,
+    component: <PipelineList />,
     requiresAuth: true,
+  },
+  {
+    name: 'Horizon Detail',
+    layout: '/',
+    path: '/pipeline/:id',
+    icon: <Icon as={MdHome} width="20px" height="20px" color="inherit" />,
+    component: <PipelineDetail />,
+    requiresAuth: true,
+    hideInSidebar: true,
   },
   {
     name: 'Profile',
@@ -45,8 +46,6 @@ const routes = [
     component: <Profile />,
     requiresAuth: true,
   },
-
-  // ----- GUEST ONLY -----
   {
     name: 'Sign In',
     layout: '/auth',
@@ -55,16 +54,6 @@ const routes = [
     component: <SignInCentered />,
     guestOnly: true,
   },
-
-  // ----- PUBLIC (example) -----
-  // {
-  //   name: 'RTL Admin',
-  //   layout: '/rtl',
-  //   path: '/rtl-default',
-  //   icon: <Icon as={MdHome} width="20px" height="20px" color="inherit" />,
-  //   component: <RTL />,
-  //   // public: true
-  // },
 ];
 
 export default routes;
