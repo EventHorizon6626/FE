@@ -62,7 +62,7 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import '../../../assets/css/ReactFlowCustom.css';
-import { searchSecurities } from 'data/securities';
+import { searchSecurities, SECURITIES } from 'data/securities';
 import { runAgent, getAgentInputData } from 'lib/agentApi';
 import { request } from 'lib/api';
 
@@ -283,6 +283,12 @@ function CustomPortfolioNode({ data, id, selected }) {
               {data.portfolio?.name || 'Portfolio'}
             </Text>
           </HStack>
+
+          {data.portfolio?.description && (
+            <Text fontSize="xs" color="gray.600" noOfLines={2}>
+              {data.portfolio.description}
+            </Text>
+          )}
 
           {data.portfolio?.stocks && data.portfolio.stocks.length > 0 && (
             <VStack align="start" spacing="4px" w="full">
@@ -525,6 +531,10 @@ function PipelineBuilderInner() {
   const [selectedStocks, setSelectedStocks] = useState([]);
   const [editingPortfolio, setEditingPortfolio] = useState(null);
   const [editingPortfolioNodeId, setEditingPortfolioNodeId] = useState(null);
+  const [portfolioConfig, setPortfolioConfig] = useState({
+    name: '',
+    description: '',
+  });
 
   const [selectedNode, setSelectedNode] = useState(null);
   const [nodeConfig, setNodeConfig] = useState({
@@ -540,6 +550,10 @@ function PipelineBuilderInner() {
   useEffect(() => {
     if (editingPortfolio) {
       setSelectedStocks(editingPortfolio.stocks || []);
+      setPortfolioConfig({
+        name: editingPortfolio.name || '',
+        description: editingPortfolio.description || '',
+      });
     }
   }, [editingPortfolio]);
   const [tempNodeId, setTempNodeId] = useState(null);
@@ -594,6 +608,13 @@ function PipelineBuilderInner() {
         temperature: selected.data?.config?.temperature || 0.7,
         maxTokens: selected.data?.config?.maxTokens || 2000,
       });
+    } else if (selected && selected.type === 'portfolioNode') {
+      setSelectedNode(selected);
+      setPortfolioConfig({
+        name: selected.data?.portfolio?.name || '',
+        description: selected.data?.portfolio?.description || '',
+      });
+      setSelectedStocks(selected.data?.portfolio?.stocks || []);
     } else {
       setSelectedNode(null);
     }
@@ -640,11 +661,7 @@ function PipelineBuilderInner() {
   }, [nodes, setNodes, setEdges, toast]);
 
   const handleNodeDoubleClick = useCallback((event, node) => {
-    if (node.type === 'portfolioNode') {
-      setEditingPortfolio(node.data.portfolio);
-      setEditingPortfolioNodeId(node.id);
-      onPortfolioOpen();
-    } else if (node.type === 'agentNode') {
+    if (node.type === 'agentNode') {
       setSelectedNode(node);
       setNodeConfig({
         name: node.data?.agent?.name || '',
@@ -654,7 +671,7 @@ function PipelineBuilderInner() {
         maxTokens: node.data?.config?.maxTokens || 2000,
       });
     }
-  }, [onPortfolioOpen]);
+  }, []);
 
   const handleNodeDelete = useCallback(async (nodeId) => {
     try {
@@ -1558,7 +1575,7 @@ function PipelineBuilderInner() {
       </Box>
 
       {/* Right Side Configuration Panel */}
-      {selectedNode && (
+      {selectedNode && selectedNode.type === 'agentNode' && (
         <Box
           position="absolute"
           right="0"
@@ -1750,6 +1767,266 @@ function PipelineBuilderInner() {
         </Box>
       )}
 
+      {/* Portfolio Configuration Panel - Simple version without stock list */}
+      {selectedNode && selectedNode.type === 'portfolioNode' && (
+        <Box
+          position="absolute"
+          right="0"
+          top="0"
+          h="100vh"
+          w="33.33%"
+          bg="white"
+          borderLeft="2px solid"
+          borderColor="gray.200"
+          overflowY="auto"
+          zIndex="20"
+          boxShadow="xl"
+        >
+          <VStack spacing="0" align="stretch" h="full">
+            {/* Header */}
+            <Box
+              p="20px"
+              borderBottom="2px solid"
+              borderColor="gray.200"
+              bg="green.50"
+            >
+              <HStack justify="space-between" mb="8px">
+                <HStack spacing="10px">
+                  <Icon as={MdShowChart} color="green.600" boxSize="24px" />
+                  <Text fontSize="lg" fontWeight="bold" color="green.900" noOfLines={1}>
+                    {portfolioConfig.name || 'Portfolio Configuration'}
+                  </Text>
+                </HStack>
+                <IconButton
+                  icon={<Icon as={MdClose} />}
+                  size="sm"
+                  variant="ghost"
+                  colorScheme="gray"
+                  aria-label="Close panel"
+                  onClick={() => {
+                    setNodes((nds) =>
+                      nds.map((n) => ({ ...n, selected: false }))
+                    );
+                  }}
+                />
+              </HStack>
+              <Text fontSize="xs" color="green.700">
+                Configure settings for this portfolio
+              </Text>
+            </Box>
+
+            {/* Configuration Form */}
+            <Box flex="1" p="20px">
+              <VStack spacing="20px" align="stretch">
+                {/* Node ID */}
+                <Box>
+                  <Text fontSize="xs" color="gray.500" mb="4px">
+                    Node ID
+                  </Text>
+                  <Badge colorScheme="gray" fontSize="xs">
+                    {selectedNode.id}
+                  </Badge>
+                </Box>
+
+                {/* Portfolio Name */}
+                <FormControl isRequired>
+                  <FormLabel fontSize="sm" fontWeight="600">
+                    Portfolio Name
+                  </FormLabel>
+                  <Input
+                    placeholder="Enter portfolio name"
+                    value={portfolioConfig.name}
+                    onChange={(e) =>
+                      setPortfolioConfig({ ...portfolioConfig, name: e.target.value })
+                    }
+                    size="sm"
+                  />
+                </FormControl>
+
+                {/* Description */}
+                <FormControl>
+                  <FormLabel fontSize="sm" fontWeight="600">
+                    Description
+                  </FormLabel>
+                  <Textarea
+                    placeholder="Describe this portfolio..."
+                    value={portfolioConfig.description}
+                    onChange={(e) =>
+                      setPortfolioConfig({
+                        ...portfolioConfig,
+                        description: e.target.value,
+                      })
+                    }
+                    size="sm"
+                    rows={3}
+                  />
+                </FormControl>
+
+                <Divider />
+
+                {/* Stocks Management */}
+                <FormControl>
+                  <FormLabel fontSize="sm" fontWeight="600">
+                    Search Stocks / Assets
+                  </FormLabel>
+                  <Input
+                    placeholder="Search by ticker or name (e.g., AAPL, Apple)..."
+                    value={portfolioSearch}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setPortfolioSearch(value);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && portfolioSearch.trim()) {
+                        const ticker = portfolioSearch.trim().toUpperCase();
+                        if (!selectedStocks.includes(ticker)) {
+                          setSelectedStocks([...selectedStocks, ticker]);
+                          setPortfolioSearch('');
+                        }
+                      }
+                    }}
+                    size="sm"
+                  />
+                </FormControl>
+
+                {/* Suggestions - Badge style like Selected Stocks */}
+                <VStack spacing="8px" align="stretch">
+                  <Text fontSize="xs" fontWeight="600" color="gray.500">
+                    {portfolioSearch.length > 0 ? 'Search Results' : 'Popular Stocks'}
+                  </Text>
+                  <Box
+                    maxH="150px"
+                    overflowY="auto"
+                  >
+                    <Box display="flex" flexWrap="wrap" gap="4px" rowGap="4px">
+                      {(portfolioSearch.length > 0 
+                        ? searchSecurities(portfolioSearch) 
+                        : SECURITIES.slice(0, 20)
+                      ).map((security) => (
+                        <Box
+                          key={security.symbol}
+                          px="10px"
+                          py="6px"
+                          bg="white"
+                          border="1px solid"
+                          borderColor="gray.300"
+                          borderRadius="6px"
+                          fontSize="xs"
+                          fontWeight="600"
+                          cursor="pointer"
+                          _hover={{ 
+                            bg: 'green.50', 
+                            borderColor: 'green.400',
+                            transform: 'translateY(-1px)',
+                            boxShadow: 'sm'
+                          }}
+                          transition="all 0.2s"
+                          onClick={() => {
+                            if (!selectedStocks.includes(security.symbol)) {
+                              setSelectedStocks([...selectedStocks, security.symbol]);
+                            }
+                            setPortfolioSearch('');
+                          }}
+                        >
+                          {security.symbol}
+                        </Box>
+                      ))}
+                    </Box>
+                  </Box>
+                </VStack>
+
+                {/* Selected Stocks */}
+                {selectedStocks.length > 0 && (
+                  <VStack spacing="8px" align="stretch">
+                    <HStack justify="space-between">
+                      <Text fontSize="xs" fontWeight="600" color="gray.500">
+                        Selected Stocks ({selectedStocks.length})
+                      </Text>
+                      <Button
+                        size="xs"
+                        variant="ghost"
+                        colorScheme="red"
+                        onClick={() => setSelectedStocks([])}
+                      >
+                        Clear All
+                      </Button>
+                    </HStack>
+                    <HStack spacing="6px" flexWrap="wrap">
+                      {selectedStocks.map((stock) => (
+                        <Badge
+                          key={stock}
+                          colorScheme="green"
+                          fontSize="xs"
+                          px="10px"
+                          py="8px"
+                          borderRadius="4px"
+                          cursor="pointer"
+                          onClick={() => setSelectedStocks(selectedStocks.filter(s => s !== stock))}
+                        >
+                          {stock} ×
+                        </Badge>
+                      ))}
+                    </HStack>
+                  </VStack>
+                )}
+              </VStack>
+            </Box>
+
+            {/* Footer with Save Button */}
+            <Box
+              p="20px"
+              borderTop="2px solid"
+              borderColor="gray.200"
+              bg="gray.50"
+            >
+              <Button
+                leftIcon={<Icon as={MdSave} />}
+                colorScheme="green"
+                size="md"
+                w="full"
+                isDisabled={!portfolioConfig.name.trim() || selectedStocks.length === 0}
+                onClick={() => {
+                  setNodes((nds) =>
+                    nds.map((node) => {
+                      if (node.id === selectedNode.id) {
+                        return {
+                          ...node,
+                          data: {
+                            ...node.data,
+                            portfolio: {
+                              ...node.data.portfolio,
+                              name: portfolioConfig.name.trim(),
+                              description: portfolioConfig.description.trim(),
+                              stocks: [...selectedStocks],
+                            },
+                          },
+                        };
+                      }
+                      return node;
+                    })
+                  );
+
+                  toast({
+                    title: 'Portfolio configuration saved',
+                    description: `${portfolioConfig.name.trim()} with ${selectedStocks.length} stocks`,
+                    status: 'success',
+                    duration: 2000,
+                    isClosable: true,
+                  });
+
+                  setNodes((nds) =>
+                    nds.map((n) => ({ ...n, selected: false }))
+                  );
+                }}
+                fontWeight="600"
+              >
+                Save Configuration
+              </Button>
+            </Box>
+          </VStack>
+        </Box>
+      )}
+
       {/* Create/Edit Agent Modal */}
       <Modal isOpen={isAgentOpen} onClose={() => {
         onAgentClose();
@@ -1906,6 +2183,7 @@ function PipelineBuilderInner() {
         setSelectedStocks([]);
         setPortfolioSearch('');
         setSearchSuggestions([]);
+        setPortfolioConfig({ name: '', description: '' });
       }} isCentered size="md">
         <ModalOverlay bg="blackAlpha.300" />
         <ModalContent borderRadius="20px">
@@ -1913,6 +2191,33 @@ function PipelineBuilderInner() {
           <ModalHeader>{editingPortfolio ? 'Edit Portfolio' : 'Build Portfolio'}</ModalHeader>
           <ModalBody pb="20px">
             <VStack spacing="20px" align="stretch">
+              <FormControl>
+                <FormLabel fontSize="sm" fontWeight="600">
+                  Portfolio Name
+                </FormLabel>
+                <Input
+                  placeholder="Enter portfolio name..."
+                  value={portfolioConfig.name}
+                  onChange={(e) => setPortfolioConfig({ ...portfolioConfig, name: e.target.value })}
+                  size="md"
+                />
+              </FormControl>
+
+              <FormControl>
+                <FormLabel fontSize="sm" fontWeight="600">
+                  Description (Optional)
+                </FormLabel>
+                <Textarea
+                  placeholder="Describe this portfolio..."
+                  value={portfolioConfig.description}
+                  onChange={(e) => setPortfolioConfig({ ...portfolioConfig, description: e.target.value })}
+                  size="md"
+                  rows={2}
+                />
+              </FormControl>
+
+              <Divider />
+
               <FormControl>
                 <FormLabel fontSize="sm" fontWeight="600">
                   Search Stocks / Assets
@@ -2044,18 +2349,21 @@ function PipelineBuilderInner() {
                 colorScheme="green"
                 size="md"
                 w="full"
-                isDisabled={selectedStocks.length === 0}
+                isDisabled={selectedStocks.length === 0 || !portfolioConfig.name.trim()}
                 onClick={() => {
                   if (editingPortfolio) {
-                    // Update existing portfolio
                     const updatedPortfolios = portfolios.map(p =>
                       p.id === editingPortfolio.id
-                        ? { ...p, stocks: [...selectedStocks] }
+                        ? { 
+                            ...p, 
+                            name: portfolioConfig.name.trim(),
+                            description: portfolioConfig.description.trim(),
+                            stocks: [...selectedStocks] 
+                          }
                         : p
                     );
                     setPortfolios(updatedPortfolios);
 
-                    // Update portfolio node on canvas if editing from double-click
                     if (editingPortfolioNodeId) {
                       setNodes((nds) =>
                         nds.map((n) =>
@@ -2066,6 +2374,8 @@ function PipelineBuilderInner() {
                                   ...n.data,
                                   portfolio: {
                                     ...n.data.portfolio,
+                                    name: portfolioConfig.name.trim(),
+                                    description: portfolioConfig.description.trim(),
                                     stocks: [...selectedStocks],
                                   },
                                 },
@@ -2078,24 +2388,23 @@ function PipelineBuilderInner() {
 
                     toast({
                       title: 'Portfolio Updated',
-                      description: `${editingPortfolio.name} now has ${selectedStocks.length} stocks`,
+                      description: `${portfolioConfig.name.trim()} now has ${selectedStocks.length} stocks`,
                       status: 'success',
                       duration: 2000,
                       isClosable: true,
                     });
                   } else {
-                    // Create new portfolio
-                    const portfolioName = `Portfolio ${portfolios.length + 1}`;
                     const newPortfolio = {
                       id: Date.now(),
-                      name: portfolioName,
+                      name: portfolioConfig.name.trim() || `Portfolio ${portfolios.length + 1}`,
+                      description: portfolioConfig.description.trim(),
                       stocks: [...selectedStocks],
                       createdAt: new Date().toISOString(),
                     };
                     setPortfolios([...portfolios, newPortfolio]);
                     toast({
                       title: 'Portfolio Created',
-                      description: `${portfolioName} with ${selectedStocks.length} stocks`,
+                      description: `${newPortfolio.name} with ${selectedStocks.length} stocks`,
                       status: 'success',
                       duration: 2000,
                       isClosable: true,
@@ -2103,6 +2412,7 @@ function PipelineBuilderInner() {
                   }
                   setSelectedStocks([]);
                   setPortfolioSearch('');
+                  setPortfolioConfig({ name: '', description: '' });
                   setEditingPortfolio(null);
                   onPortfolioClose();
                 }}
