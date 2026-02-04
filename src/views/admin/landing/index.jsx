@@ -120,11 +120,6 @@ export default function LandingPage() {
             </Box>
 
             <SidebarItem
-              icon={MdTrendingUp}
-              label="Portfolio"
-              onClick={() => navigate('/portfolio')}
-            />
-            <SidebarItem
               icon={MdAccountTree}
               label="Horizon"
               onClick={() => navigate('/pipeline')}

@@ -8,6 +8,11 @@ export default function ProtectedRoute({ children, requiresAuth }) {
   const { user, loading } = useAuth();
   const loc = useLocation();
 
+  // TEMPORARY: Bypass auth for local development testing
+  if (process.env.NODE_ENV === 'development') {
+    return children;
+  }
+
   if (loading) {
     return (
       <div style={{ padding: 24, display: 'flex', justifyContent: 'center' }}>

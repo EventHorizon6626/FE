@@ -109,6 +109,70 @@ export const SECURITIES = [
   { symbol: 'VTV', name: 'Vanguard Value ETF', type: 'Style ETF', category: 'ETFs' },
   { symbol: 'IVV', name: 'iShares Core S&P 500 ETF', type: 'Index ETF', category: 'ETFs' },
   { symbol: 'VOO', name: 'Vanguard S&P 500 ETF', type: 'Index ETF', category: 'ETFs' },
+
+  // Additional Popular Tech
+  { symbol: 'SHOP', name: 'Shopify Inc.', type: 'Stock', category: 'Technology' },
+  { symbol: 'SQ', name: 'Block Inc. (Square)', type: 'Stock', category: 'Technology' },
+  { symbol: 'PYPL', name: 'PayPal Holdings Inc.', type: 'Stock', category: 'Technology' },
+  { symbol: 'UBER', name: 'Uber Technologies Inc.', type: 'Stock', category: 'Technology' },
+  { symbol: 'LYFT', name: 'Lyft Inc.', type: 'Stock', category: 'Technology' },
+  { symbol: 'SNAP', name: 'Snap Inc.', type: 'Stock', category: 'Technology' },
+  { symbol: 'SPOT', name: 'Spotify Technology S.A.', type: 'Stock', category: 'Technology' },
+  { symbol: 'PINS', name: 'Pinterest Inc.', type: 'Stock', category: 'Technology' },
+  { symbol: 'TWLO', name: 'Twilio Inc.', type: 'Stock', category: 'Technology' },
+  { symbol: 'SNOW', name: 'Snowflake Inc.', type: 'Stock', category: 'Technology' },
+  { symbol: 'DDOG', name: 'Datadog Inc.', type: 'Stock', category: 'Technology' },
+  { symbol: 'PLTR', name: 'Palantir Technologies Inc.', type: 'Stock', category: 'Technology' },
+  { symbol: 'CRWD', name: 'CrowdStrike Holdings Inc.', type: 'Stock', category: 'Technology' },
+  { symbol: 'ZM', name: 'Zoom Video Communications', type: 'Stock', category: 'Technology' },
+  { symbol: 'DOCU', name: 'DocuSign Inc.', type: 'Stock', category: 'Technology' },
+
+  // Communications & Media
+  { symbol: 'DIS', name: 'Walt Disney Company', type: 'Stock', category: 'Communications' },
+  { symbol: 'CMCSA', name: 'Comcast Corporation', type: 'Stock', category: 'Communications' },
+  { symbol: 'T', name: 'AT&T Inc.', type: 'Stock', category: 'Communications' },
+  { symbol: 'VZ', name: 'Verizon Communications Inc.', type: 'Stock', category: 'Communications' },
+  { symbol: 'NFLX', name: 'Netflix Inc.', type: 'Stock', category: 'Communications' },
+
+  // Industrials
+  { symbol: 'BA', name: 'Boeing Company', type: 'Stock', category: 'Industrials' },
+  { symbol: 'CAT', name: 'Caterpillar Inc.', type: 'Stock', category: 'Industrials' },
+  { symbol: 'GE', name: 'General Electric Company', type: 'Stock', category: 'Industrials' },
+  { symbol: 'MMM', name: '3M Company', type: 'Stock', category: 'Industrials' },
+  { symbol: 'UPS', name: 'United Parcel Service Inc.', type: 'Stock', category: 'Industrials' },
+  { symbol: 'FDX', name: 'FedEx Corporation', type: 'Stock', category: 'Industrials' },
+  { symbol: 'LMT', name: 'Lockheed Martin Corporation', type: 'Stock', category: 'Industrials' },
+  { symbol: 'RTX', name: 'Raytheon Technologies Corp.', type: 'Stock', category: 'Industrials' },
+
+  // Electric Vehicles
+  { symbol: 'F', name: 'Ford Motor Company', type: 'Stock', category: 'Automotive' },
+  { symbol: 'GM', name: 'General Motors Company', type: 'Stock', category: 'Automotive' },
+  { symbol: 'RIVN', name: 'Rivian Automotive Inc.', type: 'Stock', category: 'Automotive' },
+  { symbol: 'LCID', name: 'Lucid Group Inc.', type: 'Stock', category: 'Automotive' },
+  { symbol: 'NIO', name: 'NIO Inc.', type: 'Stock', category: 'Automotive' },
+
+  // Biotech & Pharma
+  { symbol: 'MRNA', name: 'Moderna Inc.', type: 'Stock', category: 'Healthcare' },
+  { symbol: 'BNTX', name: 'BioNTech SE', type: 'Stock', category: 'Healthcare' },
+  { symbol: 'GILD', name: 'Gilead Sciences Inc.', type: 'Stock', category: 'Healthcare' },
+  { symbol: 'REGN', name: 'Regeneron Pharmaceuticals', type: 'Stock', category: 'Healthcare' },
+  { symbol: 'VRTX', name: 'Vertex Pharmaceuticals Inc.', type: 'Stock', category: 'Healthcare' },
+
+  // Real Estate
+  { symbol: 'AMT', name: 'American Tower Corporation', type: 'Stock', category: 'Real Estate' },
+  { symbol: 'PLD', name: 'Prologis Inc.', type: 'Stock', category: 'Real Estate' },
+  { symbol: 'SPG', name: 'Simon Property Group Inc.', type: 'Stock', category: 'Real Estate' },
+
+  // Dividend ETFs
+  { symbol: 'VYM', name: 'Vanguard High Dividend Yield ETF', type: 'Dividend ETF', category: 'ETFs' },
+  { symbol: 'SCHD', name: 'Schwab U.S. Dividend Equity ETF', type: 'Dividend ETF', category: 'ETFs' },
+  { symbol: 'DVY', name: 'iShares Select Dividend ETF', type: 'Dividend ETF', category: 'ETFs' },
+
+  // Leveraged/Inverse ETFs (Advanced)
+  { symbol: 'TQQQ', name: 'ProShares UltraPro QQQ (3x)', type: 'Leveraged ETF', category: 'ETFs' },
+  { symbol: 'SQQQ', name: 'ProShares UltraPro Short QQQ (-3x)', type: 'Inverse ETF', category: 'ETFs' },
+  { symbol: 'UPRO', name: 'ProShares UltraPro S&P500 (3x)', type: 'Leveraged ETF', category: 'ETFs' },
+  { symbol: 'SPXU', name: 'ProShares UltraPro Short S&P500 (-3x)', type: 'Inverse ETF', category: 'ETFs' },
 ];
 
 // Helper function to search securities

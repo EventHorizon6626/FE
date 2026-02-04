@@ -55,6 +55,9 @@ import ReactFlow, {
   useEdgesState,
   useNodesState,
   useReactFlow,
+  BaseEdge,
+  EdgeLabelRenderer,
+  getBezierPath,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import '../../../assets/css/ReactFlowCustom.css';
@@ -294,11 +297,6 @@ function CustomPortfolioNode({ data, id, selected }) {
             </Text>
           </HStack>
 
-          {/* Type Badge */}
-          <Badge colorScheme="green" fontSize="xs" variant="subtle">
-            📊 Data Source
-          </Badge>
-
           {/* Stock List */}
           {data.portfolio?.stocks && data.portfolio.stocks.length > 0 && (
             <VStack align="start" spacing="4px" w="full">
@@ -325,10 +323,189 @@ function CustomPortfolioNode({ data, id, selected }) {
   );
 }
 
-// Define custom node types
+// Custom Edge with Inspect Button
+function CustomEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, data }) {
+  const [edgePath, labelX, labelY] = getBezierPath({
+    sourceX,
+    sourceY,
+    sourcePosition,
+    targetX,
+    targetY,
+    targetPosition,
+  });
+
+  const [showOutput, setShowOutput] = useState(false);
+
+  const handleInspect = (e) => {
+    e.stopPropagation();
+    setShowOutput(!showOutput);
+  };
+
+  return (
+    <>
+      <BaseEdge path={edgePath} />
+      <EdgeLabelRenderer>
+        <div
+          style={{
+            position: 'absolute',
+            transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
+            pointerEvents: 'all',
+          }}
+        >
+          <IconButton
+            icon={<Icon as={MdArticle} />}
+            size="xs"
+            colorScheme="teal"
+            variant="solid"
+            borderRadius="full"
+            aria-label="Inspect data"
+            onClick={handleInspect}
+            boxShadow="md"
+            _hover={{ transform: 'scale(1.2)' }}
+          />
+          {showOutput && data?.output && (
+            <Box
+              position="absolute"
+              top="30px"
+              left="50%"
+              transform="translateX(-50%)"
+              bg="white"
+              border="2px solid"
+              borderColor="teal.400"
+              borderRadius="8px"
+              p="12px"
+              minW="300px"
+              maxW="500px"
+              maxH="400px"
+              overflowY="auto"
+              boxShadow="lg"
+              zIndex="1000"
+            >
+              <HStack justify="space-between" mb="8px">
+                <Text fontSize="xs" fontWeight="700" color="teal.600">
+                  Data Flow
+                </Text>
+                <IconButton
+                  icon={<Icon as={MdClose} />}
+                  size="xs"
+                  variant="ghost"
+                  onClick={handleInspect}
+                  aria-label="Close"
+                />
+              </HStack>
+              <Box
+                fontSize="xs"
+                fontFamily="monospace"
+                bg="gray.50"
+                p="8px"
+                borderRadius="4px"
+                userSelect="text"
+                cursor="text"
+              >
+                <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', userSelect: 'text' }}>
+                  {JSON.stringify(data.output, null, 2)}
+                </pre>
+              </Box>
+            </Box>
+          )}
+        </div>
+      </EdgeLabelRenderer>
+    </>
+  );
+}
+
+// Custom Output Node Component
+function CustomOutputNode({ data, id, selected }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  return (
+    <Box position="relative" className="custom-output-node">
+      {/* Only Target Handle - Receives data from agents */}
+      <Handle
+        type="target"
+        position={Position.Left}
+        style={{ background: '#38B2AC', width: '12px', height: '12px' }}
+      />
+
+      <Box
+        p="16px"
+        bg="white"
+        borderRadius="12px"
+        border={selected ? "3px solid" : "2px solid"}
+        borderColor={selected ? "teal.500" : "teal.300"}
+        boxShadow={selected ? "0 4px 12px rgba(56, 178, 172, 0.4)" : "md"}
+        minW="280px"
+        maxW="400px"
+        transition="all 0.2s"
+      >
+        <VStack align="start" spacing="12px">
+          {/* Header */}
+          <HStack justify="space-between" w="full">
+            <HStack spacing="8px">
+              <Icon as={MdArticle} color="teal.600" boxSize="20px" />
+              <Text fontSize="sm" fontWeight="700" color="gray.800">
+                {data.agentName} Output
+              </Text>
+            </HStack>
+            <IconButton
+              icon={<Icon as={isExpanded ? MdClose : MdWarning} />}
+              size="xs"
+              variant="ghost"
+              onClick={() => setIsExpanded(!isExpanded)}
+              aria-label={isExpanded ? "Collapse" : "Expand"}
+            />
+          </HStack>
+
+          {/* Type Badge */}
+          <Badge colorScheme="teal" fontSize="xs">
+            📤 Result
+          </Badge>
+
+          {/* Summary */}
+          <VStack align="start" spacing="4px" w="full">
+            <Text fontSize="xs" color="gray.600">
+              Status: <Text as="span" color="green.600" fontWeight="600">{data.result?.status || 'success'}</Text>
+            </Text>
+            <Text fontSize="xs" color="gray.600">
+              Symbols: {data.result?.total_symbols || 0}
+            </Text>
+            <Text fontSize="xs" color="gray.500">
+              {new Date(data.timestamp).toLocaleString()}
+            </Text>
+          </VStack>
+
+          {/* Expanded Details */}
+          {isExpanded && (
+            <Box
+              maxH="300px"
+              overflowY="auto"
+              bg="gray.50"
+              p="12px"
+              borderRadius="8px"
+              w="full"
+              fontSize="xs"
+              fontFamily="monospace"
+            >
+              <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                {JSON.stringify(data.result, null, 2)}
+              </pre>
+            </Box>
+          )}
+        </VStack>
+      </Box>
+    </Box>
+  );
+}
+
+// Define custom node and edge types
 const nodeTypes = {
   agentNode: CustomAgentNode,
   portfolioNode: CustomPortfolioNode,
+  outputNode: CustomOutputNode,
+};
+
+const edgeTypes = {
+  custom: CustomEdge,
 };
 
 function PipelineBuilderInner() {
@@ -366,7 +543,8 @@ function PipelineBuilderInner() {
   const [portfolios, setPortfolios] = useState([]);
   const [selectedStocks, setSelectedStocks] = useState([]);
   const [editingPortfolio, setEditingPortfolio] = useState(null);
-  
+  const [editingPortfolioNodeId, setEditingPortfolioNodeId] = useState(null);
+
   const [selectedNode, setSelectedNode] = useState(null);
   const [nodeConfig, setNodeConfig] = useState({
     name: '',
@@ -378,6 +556,13 @@ function PipelineBuilderInner() {
 
   // State for instant drag behavior
   const [draggingAgent, setDraggingAgent] = useState(null);
+
+  // Load stocks when editing a portfolio
+  useEffect(() => {
+    if (editingPortfolio) {
+      setSelectedStocks(editingPortfolio.stocks || []);
+    }
+  }, [editingPortfolio]);
   const [tempNodeId, setTempNodeId] = useState(null);
 
   const toast = useToast();
@@ -425,7 +610,19 @@ function PipelineBuilderInner() {
   }, [nodes, edges, availableAgents, availableTeams, customAgents, currentHorizonName]);
 
   const onConnect = useCallback(
-    (params) => setEdges((eds) => addEdge(params, eds)),
+    (params) => {
+      console.log('[onConnect] Connection params:', params);
+      setEdges((eds) => {
+        const newEdge = {
+          ...params,
+          type: 'custom',
+          data: { output: null }, // Will be populated when agent runs
+        };
+        const newEdges = addEdge(newEdge, eds);
+        console.log('[onConnect] Updated edges:', newEdges);
+        return newEdges;
+      });
+    },
     [setEdges]
   );
 
@@ -482,6 +679,25 @@ function PipelineBuilderInner() {
   }, [nodes, setNodes, setEdges, toast]);
 
   // Handler for node actions
+  const handleNodeDoubleClick = useCallback((event, node) => {
+    if (node.type === 'portfolioNode') {
+      // Edit portfolio - open portfolio modal with existing data
+      setEditingPortfolio(node.data.portfolio);
+      setEditingPortfolioNodeId(node.id);
+      onPortfolioOpen();
+    } else if (node.type === 'agentNode') {
+      // Edit agent configuration
+      setSelectedNode(node);
+      setNodeConfig({
+        name: node.data?.agent?.name || '',
+        description: node.data?.agent?.description || '',
+        model: node.data?.config?.model || 'gpt-4',
+        temperature: node.data?.config?.temperature || 0.7,
+        maxTokens: node.data?.config?.maxTokens || 2000,
+      });
+    }
+  }, [onPortfolioOpen]);
+
   const handleNodeDelete = useCallback((nodeId) => {
     setNodes((nds) => nds.filter((node) => node.id !== nodeId));
     setEdges((eds) => eds.filter((edge) => 
@@ -495,15 +711,22 @@ function PipelineBuilderInner() {
     });
   }, [setNodes, setEdges, toast]);
 
+  // Use ReactFlow hook to get fresh state
+  const { getNodes, getEdges } = useReactFlow();
+
   const handleNodePlay = useCallback(async (nodeId) => {
-    const node = nodes.find((n) => n.id === nodeId);
+    // Get fresh state from ReactFlow instead of closure
+    const currentNodes = getNodes();
+    const currentEdges = getEdges();
+
+    const node = currentNodes.find((n) => n.id === nodeId);
     const agentName = node?.data?.agent?.name || 'agent';
     const agentType = node?.data?.agent?.type;
 
     console.log('[handleNodePlay] Starting execution for node:', nodeId);
-    console.log('[handleNodePlay] Total nodes:', nodes.length);
-    console.log('[handleNodePlay] Total edges:', edges.length);
-    console.log('[handleNodePlay] Edges:', edges);
+    console.log('[handleNodePlay] Total nodes:', currentNodes.length);
+    console.log('[handleNodePlay] Total edges:', currentEdges.length);
+    console.log('[handleNodePlay] Edges:', currentEdges);
 
     try {
       // Show loading toast
@@ -515,8 +738,8 @@ function PipelineBuilderInner() {
         isClosable: false,
       });
 
-      // Get input data from connected nodes
-      const inputData = getAgentInputData(node, edges, nodes);
+      // Get input data from connected nodes using fresh state
+      const inputData = getAgentInputData(node, currentEdges, currentNodes);
 
       // Run the agent
       const result = await runAgent(agentType, inputData);
@@ -537,6 +760,19 @@ function PipelineBuilderInner() {
         )
       );
 
+      // Update outgoing edges with the output data
+      setEdges((eds) =>
+        eds.map((edge) =>
+          edge.source === nodeId
+            ? {
+                ...edge,
+                data: { ...edge.data, output: result },
+                animated: true,
+              }
+            : edge
+        )
+      );
+
       // Close loading toast and show success
       toast.close(loadingToast);
       toast({
@@ -548,6 +784,40 @@ function PipelineBuilderInner() {
       });
 
       console.log(`[${agentName}] Output:`, result);
+
+      // Auto-create output node if no downstream connections
+      const hasOutgoingEdge = currentEdges.some(edge => edge.source === nodeId);
+      if (!hasOutgoingEdge) {
+        const outputNodeId = `output-${Date.now()}`;
+        const agentNodePosition = currentNodes.find(n => n.id === nodeId)?.position || { x: 0, y: 0 };
+
+        const outputNode = {
+          id: outputNodeId,
+          type: 'outputNode',
+          position: {
+            x: agentNodePosition.x + 350,
+            y: agentNodePosition.y,
+          },
+          data: {
+            result: result,
+            agentName: agentName,
+            timestamp: new Date().toISOString(),
+            onDelete: handleNodeDelete,
+          },
+        };
+
+        const outputEdge = {
+          id: `edge-${nodeId}-${outputNodeId}`,
+          source: nodeId,
+          target: outputNodeId,
+          type: 'custom',
+          data: { output: result },
+          animated: true,
+        };
+
+        setNodes((nds) => [...nds, outputNode]);
+        setEdges((eds) => [...eds, outputEdge]);
+      }
     } catch (error) {
       toast({
         title: 'Agent failed',
@@ -558,7 +828,7 @@ function PipelineBuilderInner() {
       });
       console.error(`[${agentName}] Error:`, error);
     }
-  }, [nodes, edges, setNodes, toast]);
+  }, [getNodes, getEdges, setNodes, toast]);
 
   // Instant drag handlers
   const handleAgentMouseDown = useCallback((event, agent) => {
@@ -1409,7 +1679,9 @@ function PipelineBuilderInner() {
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
+          onNodeDoubleClick={handleNodeDoubleClick}
           nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
           defaultViewport={{ x: 0, y: 0, zoom: 0.9 }}
           minZoom={0.1}
           maxZoom={2}
@@ -1931,6 +2203,28 @@ function PipelineBuilderInner() {
                         : p
                     );
                     setPortfolios(updatedPortfolios);
+
+                    // Update portfolio node on canvas if editing from double-click
+                    if (editingPortfolioNodeId) {
+                      setNodes((nds) =>
+                        nds.map((n) =>
+                          n.id === editingPortfolioNodeId
+                            ? {
+                                ...n,
+                                data: {
+                                  ...n.data,
+                                  portfolio: {
+                                    ...n.data.portfolio,
+                                    stocks: [...selectedStocks],
+                                  },
+                                },
+                              }
+                            : n
+                        )
+                      );
+                      setEditingPortfolioNodeId(null);
+                    }
+
                     toast({
                       title: 'Portfolio Updated',
                       description: `${editingPortfolio.name} now has ${selectedStocks.length} stocks`,
