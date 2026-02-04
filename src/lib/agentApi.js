@@ -1,7 +1,7 @@
 import { request } from './api';
 
 export const runCandlestickAgent = async (stocks) => {
-  const response = await request.post('/ai/agents/candlestick', {
+  const response = await request.post('/api/ai/agents/candlestick', {
     stocks,
     timeframe: '1d',
     period: '30d',
@@ -10,14 +10,14 @@ export const runCandlestickAgent = async (stocks) => {
 };
 
 export const runEarningsAgent = async (stocks) => {
-  const response = await request.post('/ai/agents/earnings', {
+  const response = await request.post('/api/ai/agents/earnings', {
     stocks,
   });
   return response;
 };
 
 export const runNewsAgent = async (stocks) => {
-  const response = await request.post('/ai/agents/news', {
+  const response = await request.post('/api/ai/agents/news', {
     stocks,
     days: 7,
   });
@@ -25,7 +25,7 @@ export const runNewsAgent = async (stocks) => {
 };
 
 export const runTechnicalAgent = async (stocks) => {
-  const response = await request.post('/ai/agents/technical', {
+  const response = await request.post('/api/ai/agents/technical', {
     stocks,
     indicators: ['RSI', 'MACD', 'SMA', 'EMA', 'BB'],
   });
@@ -33,7 +33,7 @@ export const runTechnicalAgent = async (stocks) => {
 };
 
 export const runFundamentalsAgent = async (stocks) => {
-  const response = await request.post('/ai/agents/fundamentals', {
+  const response = await request.post('/api/ai/agents/fundamentals', {
     stocks,
     metrics: ['PE', 'PB', 'EPS', 'DIVIDEND_YIELD', 'MARKET_CAP'],
   });
@@ -41,21 +41,21 @@ export const runFundamentalsAgent = async (stocks) => {
 };
 
 export const runBullResearcherAgent = async (data) => {
-  const response = await request.post('/ai/agents/bull-researcher', {
+  const response = await request.post('/api/ai/agents/bull-researcher', {
     data,
   });
   return response;
 };
 
 export const runBearResearcherAgent = async (data) => {
-  const response = await request.post('/ai/agents/bear-researcher', {
+  const response = await request.post('/api/ai/agents/bear-researcher', {
     data,
   });
   return response;
 };
 
 export const runResearchManagerAgent = async (bullThesis, bearThesis) => {
-  const response = await request.post('/ai/agents/research-manager', {
+  const response = await request.post('/api/ai/agents/research-manager', {
     bull_thesis: bullThesis,
     bear_thesis: bearThesis,
   });
