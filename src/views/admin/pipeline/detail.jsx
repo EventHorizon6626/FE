@@ -476,6 +476,7 @@ function PipelineBuilderInner() {
     system: 'data',
     teamId: null,
     model: 'gpt-4',
+    systemPrompt: '',
   });
 
   const [newTeam, setNewTeam] = useState({ name: '', description: '' });
@@ -972,6 +973,7 @@ function PipelineBuilderInner() {
         system: newAgent.system,
         teamId: newAgent.teamId,
         model: newAgent.model,
+        systemPrompt: newAgent.systemPrompt.trim(),
         icon: 'MdSmartToy',
         color: newAgent.system === 'data' ? 'blue' : 'purple',
         isBuiltin: false,
@@ -1051,6 +1053,7 @@ function PipelineBuilderInner() {
         system: 'data',
         teamId: null,
         model: 'gpt-4',
+        systemPrompt: '',
       });
       setEditingAgent(null);
       onAgentClose();
@@ -1671,6 +1674,7 @@ function PipelineBuilderInner() {
                               system: agent.system,
                               teamId: agent.teamId,
                               model: agent.model,
+                              systemPrompt: agent.systemPrompt || '',
                             });
                             onAgentOpen();
                           }}
@@ -1843,6 +1847,7 @@ function PipelineBuilderInner() {
                                     system: agent.system,
                                     teamId: agent.teamId,
                                     model: agent.model,
+                                    systemPrompt: agent.systemPrompt || '',
                                   });
                                   onAgentOpen();
                                 }}
@@ -2396,6 +2401,7 @@ function PipelineBuilderInner() {
           category: 'data_retriever',
           system: 'data',
           model: 'gpt-4',
+          systemPrompt: '',
         });
       }} isCentered size="lg">
         <ModalOverlay bg="blackAlpha.600" backdropFilter="blur(4px)" />
@@ -2442,6 +2448,19 @@ function PipelineBuilderInner() {
                     </option>
                   ))}
                 </Select>
+              </FormControl>
+
+              <FormControl>
+                <FormLabel fontSize="sm" fontWeight="600">
+                  System Prompt
+                </FormLabel>
+                <Textarea
+                  placeholder="Define the agent's behavior and instructions..."
+                  value={newAgent.systemPrompt}
+                  onChange={(e) => setNewAgent({ ...newAgent, systemPrompt: e.target.value })}
+                  rows={4}
+                  fontSize="sm"
+                />
               </FormControl>
 
               <Button colorScheme="teal" onClick={handleCreateAgent} size="lg" w="full">
