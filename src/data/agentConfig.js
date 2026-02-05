@@ -155,21 +155,21 @@ export const LLM_BACKENDS = {
 };
 
 // ===== DEFAULT LLM CONFIGURATION (TradingAgents Style) =====
-// Default to Ollama (FREE local inference) - can be overridden via .env
+// Default to Google Gemini (FREE tier available)
 export const DEFAULT_LLM_CONFIG = {
-  provider: 'ollama', // FREE - runs locally, no API key needed
-  deepThinkModel: 'llama3.3:70b',
-  quickThinkModel: 'llama3.1:8b',
+  provider: 'google', // FREE tier available
+  deepThinkModel: 'gemini-1.5-pro',
+  quickThinkModel: 'gemini-2.0-flash',
   maxDebateRounds: 1,
   maxRiskDiscussionRounds: 1,
 };
 
 // Provider pricing info (for cost estimation)
 export const PROVIDER_INFO = {
+  google: { free: true, requiresApiKey: true, note: 'FREE tier available', pricing: 'Free tier / ~$0.075-1.25/1M tokens' },
   ollama: { free: true, requiresApiKey: false, note: 'Runs locally on your GPU' },
   openai: { free: false, requiresApiKey: true, pricing: '~$2.50-15/1M tokens' },
   anthropic: { free: false, requiresApiKey: true, pricing: '~$3-15/1M tokens' },
-  google: { free: false, requiresApiKey: true, pricing: '~$0.075-1.25/1M tokens' },
   xai: { free: false, requiresApiKey: true, pricing: '~$2-10/1M tokens' },
   openrouter: { free: false, requiresApiKey: true, pricing: 'Varies by model' },
 };

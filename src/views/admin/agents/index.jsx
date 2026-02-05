@@ -238,12 +238,12 @@ const SYSTEM2_TEAMS = [
 ];
 
 // LLM Providers (TradingAgents compatible)
-// Note: Only Ollama is FREE (runs locally). All others require API keys + payment.
+// Google Gemini has FREE tier, Ollama is FREE (runs locally)
 const LLM_PROVIDERS = [
+  { value: 'google', label: 'Google Gemini (FREE tier)', icon: '💎', free: true },
   { value: 'ollama', label: 'Ollama (Local - FREE)', icon: '🦙', free: true },
   { value: 'openai', label: 'OpenAI', icon: '✨', free: false },
   { value: 'anthropic', label: 'Anthropic (Claude)', icon: '🤖', free: false },
-  { value: 'google', label: 'Google (Gemini)', icon: '💎', free: false },
   { value: 'xai', label: 'xAI (Grok)', icon: '🚀', free: false },
   { value: 'openrouter', label: 'OpenRouter', icon: '🔀', free: false },
 ];
@@ -312,16 +312,16 @@ export default function AgentsPage() {
   const toast = useToast();
 
   // New agent form state (TradingAgents dual-LLM config)
-  // Default to Ollama (FREE local inference) - users can switch to paid APIs
+  // Default to Google Gemini (FREE tier available)
   const [newAgent, setNewAgent] = useState({
     name: '',
     description: '',
     category: 'data_retriever',
     system: 'System 1',
     stage: 'stage1',
-    provider: 'ollama',
-    deepThinkModel: 'llama3.3:70b',
-    quickThinkModel: 'llama3.1:8b',
+    provider: 'google',
+    deepThinkModel: 'gemini-1.5-pro',
+    quickThinkModel: 'gemini-2.0-flash',
     status: 'inactive',
   });
 
@@ -377,9 +377,9 @@ export default function AgentsPage() {
       category: 'data_retriever',
       system: 'System 1',
       stage: 'stage1',
-      provider: 'ollama',
-      deepThinkModel: 'llama3.3:70b',
-      quickThinkModel: 'llama3.1:8b',
+      provider: 'google',
+      deepThinkModel: 'gemini-1.5-pro',
+      quickThinkModel: 'gemini-2.0-flash',
       status: 'inactive',
     });
     onClose();
