@@ -3,6 +3,7 @@ import {
   Badge,
   Box,
   Button,
+  Collapse,
   Divider,
   FormControl,
   FormLabel,
@@ -18,9 +19,12 @@ import {
   ModalBody,
   ModalCloseButton,
   ModalContent,
+  ModalFooter,
   ModalHeader,
   ModalOverlay,
   Select,
+  Spinner,
+  Switch,
   Text,
   Textarea,
   Tooltip,
@@ -42,7 +46,9 @@ import {
   MdHome,
   MdHub,
   MdMoreVert,
+  MdLightbulb,
   MdPlayArrow,
+  MdPsychology,
   MdSave,
   MdShowChart,
   MdSmartToy,
@@ -208,6 +214,8 @@ const initialEdges = [];
 // This component now uses useMutation hook for better loading state management
 /*
 function CustomAgentNode({ data, id, selected }) {
+  const [showThinking, setShowThinking] = useState(false);
+
   const handlePlay = (e) => {
     e.stopPropagation();
     if (data.onPlay) {
@@ -216,6 +224,10 @@ function CustomAgentNode({ data, id, selected }) {
   };
 
   const isLoading = data.isLoading || false;
+  const isRunning = data.isRunning;
+  const thinkingSteps = data.thinkingSteps || [];
+  const output = data.output;
+  const isPaused = data.status === 'paused';
 
   return (
     <Box position="relative" className="custom-agent-node">
@@ -248,7 +260,7 @@ function CustomAgentNode({ data, id, selected }) {
           _hover={{ transform: 'scale(1.1)', boxShadow: 'lg' }}
           transition="all 0.2s"
           isLoading={isLoading}
-          isDisabled={isLoading}
+          isDisabled={isLoading || isRunning}
         />
       </Box>
 
@@ -257,9 +269,10 @@ function CustomAgentNode({ data, id, selected }) {
         bg="white"
         borderRadius="16px"
         border={selected ? "3px solid" : "3px solid"}
-        borderColor={selected ? "teal.500" : `${data.agent?.color || 'blue'}.400`}
+        borderColor={isPaused ? "orange.500" : selected ? "teal.500" : `${data.agent?.color || 'blue'}.400`}
         boxShadow={selected ? "0 4px 12px rgba(49, 151, 149, 0.4)" : "lg"}
         minW="200px"
+        maxW="300px"
         transition="all 0.2s"
       >
         <HStack spacing="12px">
@@ -268,6 +281,89 @@ function CustomAgentNode({ data, id, selected }) {
             {data.agent?.name || 'Agent'}
           </Text>
         </HStack>
+
+        {/* Thinking indicator while running */}
+        {isRunning && thinkingSteps.length > 0 && (
+          <Box mt="12px" p="10px" bg="purple.50" borderRadius="8px">
+            <HStack spacing="8px">
+              <Spinner size="xs" color="purple.500" />
+              <Text fontSize="xs" color="purple.700" fontWeight="600">
+                Thinking... (Step {thinkingSteps.length})
+              </Text>
+            </HStack>
+            <Text fontSize="xs" color="purple.600" mt="6px" noOfLines={2}>
+              {thinkingSteps[thinkingSteps.length - 1]?.thought}
+            </Text>
+          </Box>
+        )}
+
+        {/* Paused indicator */}
+        {isPaused && (
+          <Box mt="12px" p="10px" bg="orange.50" borderRadius="8px" border="1px solid" borderColor="orange.200">
+            <HStack spacing="8px">
+              <Icon as={MdWarning} color="orange.500" boxSize="16px" />
+              <Text fontSize="xs" color="orange.700" fontWeight="600">
+                Paused
+              </Text>
+            </HStack>
+            <Text fontSize="xs" color="orange.600" mt="4px">
+              {data.pauseReason || 'Needs custom data agent'}
+            </Text>
+          </Box>
+        )}
+
+        {/* Completed thinking summary */}
+        {output?.thinking_steps && output.thinking_steps.length > 0 && !isRunning && (
+          <Box mt="12px">
+            <Button
+              size="xs"
+              variant="ghost"
+              colorScheme="purple"
+              leftIcon={<Icon as={MdPsychology} />}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowThinking(!showThinking);
+              }}
+            >
+              {showThinking ? 'Hide' : 'Show'} Thinking ({output.iterations_used || output.thinking_steps.length} steps)
+            </Button>
+            <Collapse in={showThinking}>
+              <VStack align="stretch" spacing="6px" mt="8px">
+                {output.thinking_steps.map((step, i) => (
+                  <Box key={i} p="8px" bg="gray.50" borderRadius="6px" fontSize="xs">
+                    <HStack spacing="6px" mb="4px">
+                      <Badge colorScheme="purple" size="sm">Step {step.iteration}</Badge>
+                      <Badge
+                        colorScheme={
+                          step.action === 'call_tool' ? 'blue' :
+                          step.action === 'generate_response' ? 'green' :
+                          step.action === 'need_custom_data_agent' ? 'orange' : 'gray'
+                        }
+                        size="sm"
+                      >
+                        {step.action}
+                      </Badge>
+                      {step.tool && (
+                        <Badge colorScheme="teal" size="sm">{step.tool}</Badge>
+                      )}
+                    </HStack>
+                    <Text color="gray.700" noOfLines={3}>{step.thought}</Text>
+                  </Box>
+                ))}
+              </VStack>
+            </Collapse>
+          </Box>
+        )}
+
+        {/* Tools used indicator */}
+        {output?.tools_used && output.tools_used.length > 0 && !showThinking && (
+          <HStack mt="8px" spacing="4px" flexWrap="wrap">
+            <Icon as={MdLightbulb} color="teal.500" boxSize="12px" />
+            {output.tools_used.map((tool, i) => (
+              <Badge key={i} colorScheme="teal" fontSize="xs" size="sm">{tool}</Badge>
+            ))}
+          </HStack>
+        )}
       </Box>
     </Box>
   );
@@ -527,6 +623,15 @@ function PipelineBuilderInner() {
   const { isOpen: isTeamOpen, onOpen: onTeamOpen, onClose: onTeamClose } = useDisclosure();
   const { isOpen: isRenameOpen, onOpen: onRenameOpen, onClose: onRenameClose } = useDisclosure();
   const { isOpen: isPortfolioOpen, onOpen: onPortfolioOpen, onClose: onPortfolioClose } = useDisclosure();
+  const { isOpen: isDataAgentOpen, onOpen: onDataAgentOpen, onClose: onDataAgentClose } = useDisclosure();
+
+  // State for data agent suggestion modal (when thinking agent pauses)
+  const [dataAgentModal, setDataAgentModal] = useState({
+    nodeId: null,
+    suggestedAgent: null,
+    thinkingSteps: [],
+    resumeContext: null,
+  });
 
   const [newAgent, setNewAgent] = useState({
     name: '',
@@ -723,12 +828,186 @@ function PipelineBuilderInner() {
 
   const { getNodes, getEdges } = useReactFlow();
 
-  // handleNodePlay is no longer needed - logic moved to CustomAgentNode component with useMutation hook
-  /*
   const handleNodePlay = useCallback(async (nodeId) => {
-    ...
-  }, [getNodes, getEdges, setNodes, toast]);
-  */
+    const currentNodes = getNodes();
+    const currentEdges = getEdges();
+
+    const node = currentNodes.find((n) => n.id === nodeId);
+    const agentName = node?.data?.agent?.name || 'agent';
+    const agentType = node?.data?.agent?.type;
+    const agentConfig = node?.data?.agent;
+
+    console.log('[handleNodePlay] Starting execution for node:', nodeId);
+    console.log('[handleNodePlay] Total nodes:', currentNodes.length);
+    console.log('[handleNodePlay] Total edges:', currentEdges.length);
+    console.log('[handleNodePlay] Edges:', currentEdges);
+
+    try {
+      // Mark node as running
+      setNodes((nds) =>
+        nds.map((n) =>
+          n.id === nodeId
+            ? { ...n, data: { ...n.data, isRunning: true, thinkingSteps: [], status: null } }
+            : n
+        )
+      );
+
+      const loadingToast = toast({
+        title: 'Running agent',
+        description: `Executing ${agentName}...`,
+        status: 'info',
+        duration: null,
+        isClosable: false,
+      });
+
+      const inputData = getAgentInputData(node, currentEdges, currentNodes);
+
+      // Build custom agent config if this is a custom thinking agent
+      let customAgentConfig = null;
+      if (agentConfig && !agentConfig.isBuiltin && agentConfig.systemPrompt) {
+        customAgentConfig = {
+          systemPrompt: agentConfig.systemPrompt,
+          enableThinking: agentConfig.enableThinking !== false, // Default to true
+          maxIterations: agentConfig.maxIterations || 5,
+        };
+      }
+
+      const result = await runAgent(agentType, inputData, customAgentConfig);
+
+      // Check if result is a paused thinking agent response
+      if (result?.status === 'paused' && result?.reason === 'need_data_agent') {
+        // Pause execution - show modal requiring user to create data agent
+        setDataAgentModal({
+          nodeId: nodeId,
+          suggestedAgent: result.suggested_data_agent,
+          thinkingSteps: result.thinking_steps,
+          resumeContext: result.resume_context,
+        });
+        onDataAgentOpen();
+
+        // Update node to show paused state
+        setNodes((nds) =>
+          nds.map((n) =>
+            n.id === nodeId
+              ? {
+                  ...n,
+                  data: {
+                    ...n.data,
+                    isRunning: false,
+                    status: 'paused',
+                    pauseReason: result.message,
+                    thinkingSteps: result.thinking_steps,
+                  },
+                }
+              : n
+          )
+        );
+
+        toast.close(loadingToast);
+        toast({
+          title: 'Agent paused',
+          description: result.message,
+          status: 'warning',
+          duration: 5000,
+          isClosable: true,
+        });
+        return;
+      }
+
+      // Normal completion
+      setNodes((nds) =>
+        nds.map((n) =>
+          n.id === nodeId
+            ? {
+                ...n,
+                data: {
+                  ...n.data,
+                  output: result,
+                  isRunning: false,
+                  status: 'completed',
+                  thinkingSteps: result?.thinking_steps || [],
+                  lastRun: new Date().toISOString(),
+                },
+              }
+            : n
+        )
+      );
+
+      setEdges((eds) =>
+        eds.map((edge) =>
+          edge.source === nodeId
+            ? {
+                ...edge,
+                data: { ...edge.data, output: result },
+                animated: true,
+              }
+            : edge
+        )
+      );
+
+      toast.close(loadingToast);
+      toast({
+        title: 'Agent completed',
+        description: `${agentName} finished successfully${result?.iterations_used ? ` (${result.iterations_used} thinking steps)` : ''}`,
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
+
+      console.log(`[${agentName}] Output:`, result);
+
+      const hasOutgoingEdge = currentEdges.some(edge => edge.source === nodeId);
+      if (!hasOutgoingEdge) {
+        const outputNodeId = `output-${Date.now()}`;
+        const agentNodePosition = currentNodes.find(n => n.id === nodeId)?.position || { x: 0, y: 0 };
+
+        const outputNode = {
+          id: outputNodeId,
+          type: 'outputNode',
+          position: {
+            x: agentNodePosition.x + 350,
+            y: agentNodePosition.y,
+          },
+          data: {
+            result: result,
+            agentName: agentName,
+            timestamp: new Date().toISOString(),
+            onDelete: handleNodeDelete,
+          },
+        };
+
+        const outputEdge = {
+          id: `edge-${nodeId}-${outputNodeId}`,
+          source: nodeId,
+          target: outputNodeId,
+          type: 'custom',
+          data: { output: result },
+          animated: true,
+        };
+
+        setNodes((nds) => [...nds, outputNode]);
+        setEdges((eds) => [...eds, outputEdge]);
+      }
+    } catch (error) {
+      // Clear running state on error
+      setNodes((nds) =>
+        nds.map((n) =>
+          n.id === nodeId
+            ? { ...n, data: { ...n.data, isRunning: false, status: 'error' } }
+            : n
+        )
+      );
+
+      toast({
+        title: 'Agent failed',
+        description: error.message || `Failed to execute ${agentName}`,
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+      console.error(`[${agentName}] Error:`, error);
+    }
+  }, [getNodes, getEdges, setNodes, setEdges, toast, onDataAgentOpen, handleNodeDelete]);
 
   const handleAgentMouseDown = useCallback(async (event, agent) => {
     event.preventDefault();
@@ -2701,6 +2980,158 @@ function PipelineBuilderInner() {
               </Button>
             </VStack>
           </ModalBody>
+        </ModalContent>
+      </Modal>
+
+      {/* Custom Data Agent Needed Modal */}
+      <Modal
+        isOpen={isDataAgentOpen}
+        onClose={() => {}}
+        closeOnOverlayClick={false}
+        isCentered
+        size="lg"
+      >
+        <ModalOverlay bg="blackAlpha.600" backdropFilter="blur(4px)" />
+        <ModalContent borderRadius="20px">
+          <ModalHeader>
+            <HStack spacing="10px">
+              <Icon as={MdPsychology} color="orange.500" boxSize="28px" />
+              <Text>Custom Data Agent Needed</Text>
+            </HStack>
+          </ModalHeader>
+          <ModalBody>
+            <VStack spacing="16px" align="stretch">
+              <Text color="gray.700">
+                The analysis agent needs data that built-in agents don't provide:
+              </Text>
+
+              <Box
+                p="16px"
+                bg="orange.50"
+                borderRadius="12px"
+                border="1px solid"
+                borderColor="orange.200"
+              >
+                <HStack mb="8px" spacing="8px">
+                  <Badge colorScheme="orange" fontSize="sm">Missing Data</Badge>
+                  <Text fontWeight="700" color="gray.800">
+                    {dataAgentModal.suggestedAgent?.data_type}
+                  </Text>
+                </HStack>
+                <Text fontSize="sm" color="gray.700">
+                  {dataAgentModal.suggestedAgent?.description}
+                </Text>
+              </Box>
+
+              <Divider />
+
+              <Text fontWeight="600" color="gray.800">Suggested Data Agent:</Text>
+              <Box p="14px" bg="purple.50" borderRadius="12px" border="1px solid" borderColor="purple.200">
+                <HStack spacing="10px" mb="8px">
+                  <Icon as={MdSmartToy} color="purple.600" boxSize="20px" />
+                  <Text fontWeight="700" color="purple.800">
+                    {dataAgentModal.suggestedAgent?.name}
+                  </Text>
+                </HStack>
+                <Text fontSize="xs" color="gray.600">
+                  A system prompt will be auto-generated to fetch this data type.
+                </Text>
+              </Box>
+
+              {/* Show thinking steps so far */}
+              {dataAgentModal.thinkingSteps?.length > 0 && (
+                <>
+                  <Divider />
+                  <Text fontWeight="600" color="gray.800" fontSize="sm">
+                    Thinking Progress ({dataAgentModal.thinkingSteps.length} steps):
+                  </Text>
+                  <VStack align="stretch" spacing="6px" maxH="150px" overflowY="auto">
+                    {dataAgentModal.thinkingSteps.map((step, i) => (
+                      <Box key={i} p="8px" bg="gray.50" borderRadius="6px" fontSize="xs">
+                        <HStack spacing="4px" mb="4px">
+                          <Badge colorScheme="purple" size="sm">Step {step.iteration}</Badge>
+                          <Badge
+                            colorScheme={step.action === 'call_tool' ? 'blue' : 'orange'}
+                            size="sm"
+                          >
+                            {step.action}
+                          </Badge>
+                          {step.tool && <Badge colorScheme="teal" size="sm">{step.tool}</Badge>}
+                        </HStack>
+                        <Text color="gray.600" noOfLines={2}>{step.thought}</Text>
+                      </Box>
+                    ))}
+                  </VStack>
+                </>
+              )}
+
+              <Text fontSize="xs" color="gray.500" mt="8px">
+                After creating this agent, add it to your canvas and re-run the analysis.
+              </Text>
+            </VStack>
+          </ModalBody>
+          <ModalFooter>
+            <HStack spacing="12px">
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  // Cancel - clear paused state
+                  if (dataAgentModal.nodeId) {
+                    setNodes((nds) =>
+                      nds.map((n) =>
+                        n.id === dataAgentModal.nodeId
+                          ? { ...n, data: { ...n.data, status: 'cancelled', pauseReason: null } }
+                          : n
+                      )
+                    );
+                  }
+                  setDataAgentModal({ nodeId: null, suggestedAgent: null, thinkingSteps: [], resumeContext: null });
+                  onDataAgentClose();
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                colorScheme="purple"
+                leftIcon={<Icon as={MdAdd} />}
+                onClick={() => {
+                  // Navigate to agents page or open agent creation with pre-filled data
+                  // For now, we'll add the agent to availableAgents directly
+                  const suggestedAgent = dataAgentModal.suggestedAgent;
+                  if (suggestedAgent) {
+                    const newDataAgent = {
+                      id: `custom-data-${Date.now()}`,
+                      name: suggestedAgent.name,
+                      description: suggestedAgent.description,
+                      type: 'data_retriever',
+                      system: 'data',
+                      icon: MdSmartToy,
+                      color: 'purple',
+                      isBuiltin: false,
+                      systemPrompt: suggestedAgent.suggested_system_prompt,
+                      enableThinking: false, // Data agents don't need thinking
+                    };
+
+                    setAvailableAgents([...availableAgents, newDataAgent]);
+                    setCustomAgents([...customAgents, newDataAgent]);
+
+                    toast({
+                      title: 'Data Agent Created',
+                      description: `${newDataAgent.name} has been added. Drag it to the canvas and connect it to your analysis agent.`,
+                      status: 'success',
+                      duration: 5000,
+                      isClosable: true,
+                    });
+                  }
+
+                  setDataAgentModal({ nodeId: null, suggestedAgent: null, thinkingSteps: [], resumeContext: null });
+                  onDataAgentClose();
+                }}
+              >
+                Create Data Agent
+              </Button>
+            </HStack>
+          </ModalFooter>
         </ModalContent>
       </Modal>
 

@@ -29,8 +29,18 @@ import {
   Switch,
   SimpleGrid,
   Flex,
+  Spinner,
+  Collapse,
+  IconButton,
 } from '@chakra-ui/react';
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import {
+  createAgent,
+  getAgents,
+  updateAgent,
+  deleteAgent,
+  generateAgentPrompt,
+} from 'lib/agentApi';
 import {
   MdAdd,
   MdSearch,
@@ -52,6 +62,12 @@ import {
   MdSwapHoriz,
   MdBalance,
   MdAssessment,
+  MdAutoAwesome,
+  MdEdit,
+  MdExpandMore,
+  MdExpandLess,
+  MdRefresh,
+  MdPsychology,
 } from 'react-icons/md';
 import Card from 'components/card/Card.js';
 
@@ -229,116 +245,155 @@ const BUILTIN_SYSTEM2_AGENTS = [
 ];
 
 const AGENT_CATEGORIES = [
-  { value: 'data_retriever', label: '📊 Data Retriever', system: 'System 1' },
-  { value: 'news_agent', label: '📰 News Agent', system: 'System 1' },
-  { value: 'technical_agent', label: '📈 Technical Agent', system: 'System 1' },
-  { value: 'financial_metrics', label: '💰 Financial Metrics', system: 'System 1' },
-  { value: 'api_connector', label: '🔗 API Connector', system: 'System 1' },
-  { value: 'strategy_agent', label: '🎯 Strategy Agent', system: 'System 2' },
-  { value: 'risk_manager', label: '⚖️ Risk Manager', system: 'System 2' },
-  { value: 'custom_analyzer', label: '🤖 Custom Analyzer', system: 'System 2' },
+  { value: 'data_retriever', label: 'Data Retriever', system: 'System 1' },
+  { value: 'news_agent', label: 'News Agent', system: 'System 1' },
+  { value: 'technical_agent', label: 'Technical Agent', system: 'System 1' },
+  { value: 'financial_metrics', label: 'Financial Metrics', system: 'System 1' },
+  { value: 'api_connector', label: 'API Connector', system: 'System 1' },
+  { value: 'strategy_agent', label: 'Strategy Agent', system: 'System 2' },
+  { value: 'risk_manager', label: 'Risk Manager', system: 'System 2' },
+  { value: 'custom_analyzer', label: 'Custom Analyzer', system: 'System 2' },
 ];
 
 const SYSTEM1_STAGES = [
-  { value: 'stage1', label: 'Stage 1 - Data Retrieval' },
-  { value: 'stage2', label: 'Stage 2 - Normalization' },
-  { value: 'stage3', label: 'Stage 3 - LLM Features' },
+  { value: 'Stage 1', label: 'Stage 1 - Data Retrieval' },
+  { value: 'Stage 2', label: 'Stage 2 - Normalization' },
+  { value: 'Stage 3', label: 'Stage 3 - LLM Features' },
 ];
 
 const SYSTEM2_TEAMS = [
-  { value: 'team1', label: 'Team 1 - Market Analysis' },
-  { value: 'team2', label: 'Team 2 - Bull/Bear Debate' },
-  { value: 'team3', label: 'Team 3 - Portfolio Optimization' },
-  { value: 'team4', label: 'Team 4 - Risk Assessment' },
+  { value: 'Team 1', label: 'Team 1 - Market Analysis', description: 'Analyst role: analyze market data and provide insights' },
+  { value: 'Team 2', label: 'Team 2 - Bull/Bear Debate', description: 'Researcher role: build investment cases and debate' },
+  { value: 'Team 3', label: 'Team 3 - Portfolio', description: 'Manager role: portfolio allocation and position sizing' },
+  { value: 'Team 4', label: 'Team 4 - Risk', description: 'Risk/Execution role: evaluate risk and execute trades' },
 ];
 
-// LLM Providers (TradingAgents compatible)
-// Google Gemini has FREE tier, Ollama is FREE (runs locally)
-const LLM_PROVIDERS = [
-  { value: 'google', label: 'Google Gemini (FREE tier)', icon: '💎', free: true },
-  { value: 'ollama', label: 'Ollama (Local - FREE)', icon: '🦙', free: true },
-  { value: 'openai', label: 'OpenAI', icon: '✨', free: false },
-  { value: 'anthropic', label: 'Anthropic (Claude)', icon: '🤖', free: false },
-  { value: 'xai', label: 'xAI (Grok)', icon: '🚀', free: false },
-  { value: 'openrouter', label: 'OpenRouter', icon: '🔀', free: false },
-];
-
-// Deep Think Models by provider
-const DEEP_THINK_MODELS = {
-  openai: [
-    { value: 'gpt-4o', label: 'GPT-4o' },
-    { value: 'gpt-4-turbo', label: 'GPT-4 Turbo' },
-    { value: 'o1', label: 'O1' },
-  ],
-  anthropic: [
-    { value: 'claude-opus-4-5', label: 'Claude Opus 4.5' },
-    { value: 'claude-sonnet-4-5', label: 'Claude Sonnet 4.5' },
-    { value: 'claude-3-5-sonnet', label: 'Claude 3.5 Sonnet' },
-  ],
-  google: [
-    { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
-  ],
-  xai: [
-    { value: 'grok-2', label: 'Grok 2' },
-  ],
-  openrouter: [
-    { value: 'openai/gpt-4o', label: 'GPT-4o' },
-    { value: 'anthropic/claude-3.5-sonnet', label: 'Claude 3.5 Sonnet' },
-  ],
-  ollama: [
-    { value: 'llama3.3:70b', label: 'Llama 3.3 70B' },
-    { value: 'mixtral:8x7b', label: 'Mixtral 8x7B' },
-    { value: 'deepseek-r1:70b', label: 'DeepSeek R1 70B' },
-  ],
-};
-
-// Quick Think Models by provider
-const QUICK_THINK_MODELS = {
-  openai: [
-    { value: 'gpt-4o-mini', label: 'GPT-4o Mini' },
-    { value: 'o1-mini', label: 'O1 Mini' },
-    { value: 'o3-mini', label: 'O3 Mini' },
-  ],
-  anthropic: [
-    { value: 'claude-3-5-haiku', label: 'Claude 3.5 Haiku' },
-  ],
-  google: [
-    { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
-    { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash' },
-  ],
-  xai: [
-    { value: 'grok-2-mini', label: 'Grok 2 Mini' },
-  ],
-  openrouter: [
-    { value: 'openai/gpt-4o-mini', label: 'GPT-4o Mini' },
-  ],
-  ollama: [
-    { value: 'llama3.1:8b', label: 'Llama 3.1 8B' },
-    { value: 'mistral:7b', label: 'Mistral 7B' },
-    { value: 'deepseek-r1:14b', label: 'DeepSeek R1 14B' },
-  ],
-};
 
 export default function AgentsPage() {
   const [customAgents, setCustomAgents] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [showSystemPrompt, setShowSystemPrompt] = useState(false);
+  const [editingAgent, setEditingAgent] = useState(null);
   const { isOpen, onOpen, onClose } = useDisclosure();
   const toast = useToast();
 
-  // New agent form state (TradingAgents dual-LLM config)
-  // Default to Google Gemini (FREE tier available)
+  // New agent form state - simplified without LLM config
   const [newAgent, setNewAgent] = useState({
     name: '',
     description: '',
-    category: 'data_retriever',
-    system: 'System 1',
-    stage: 'stage1',
-    provider: 'google',
-    deepThinkModel: 'gemini-1.5-pro',
-    quickThinkModel: 'gemini-2.0-flash',
-    status: 'inactive',
+    category: 'strategy_agent',
+    system: 'System 2',
+    stage: 'Team 1',
+    systemPrompt: '',
+    enableThinking: true,
+    maxIterations: 5,
+    status: 'active',
   });
+
+  // Fetch custom agents on mount
+  useEffect(() => {
+    fetchCustomAgents();
+  }, []);
+
+  const fetchCustomAgents = async () => {
+    try {
+      setIsLoading(true);
+      const response = await getAgents();
+      if (response.success) {
+        const agents = response.data.map((agent) => ({
+          ...agent,
+          icon: MdSmartToy,
+          isBuiltin: false,
+        }));
+        setCustomAgents(agents);
+      }
+    } catch (error) {
+      console.error('Error fetching agents:', error);
+      toast({
+        title: 'Error loading agents',
+        description: error.message,
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Generate system prompt when name or description changes
+  const handleGeneratePrompt = useCallback(async () => {
+    if (!newAgent.name.trim() || !newAgent.description.trim()) {
+      toast({
+        title: 'Missing information',
+        description: 'Please enter both name and description first.',
+        status: 'warning',
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    try {
+      setIsGenerating(true);
+      const response = await generateAgentPrompt(
+        newAgent.name,
+        newAgent.description,
+        newAgent.stage,
+        newAgent.category
+      );
+
+      if (response.success && response.data?.systemPrompt) {
+        setNewAgent((prev) => ({
+          ...prev,
+          systemPrompt: response.data.systemPrompt,
+        }));
+        setShowSystemPrompt(true);
+        toast({
+          title: 'System prompt generated',
+          description: 'You can review and edit the prompt below.',
+          status: 'success',
+          duration: 3000,
+          isClosable: true,
+        });
+      }
+    } catch (error) {
+      console.error('Error generating prompt:', error);
+      toast({
+        title: 'Generation failed',
+        description: error.message,
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [newAgent.name, newAgent.description, newAgent.stage, newAgent.category, toast]);
+
+  const resetForm = () => {
+    setNewAgent({
+      name: '',
+      description: '',
+      category: 'strategy_agent',
+      system: 'System 2',
+      stage: 'Team 1',
+      systemPrompt: '',
+      enableThinking: true,
+      maxIterations: 5,
+      status: 'active',
+    });
+    setShowSystemPrompt(false);
+    setEditingAgent(null);
+  };
+
+  const handleCloseModal = () => {
+    resetForm();
+    onClose();
+  };
 
   // Colors
   const textColor = '#1F2937';
@@ -349,7 +404,7 @@ export default function AgentsPage() {
 
   const allAgents = [...BUILTIN_SYSTEM1_AGENTS, ...BUILTIN_SYSTEM2_AGENTS, ...customAgents];
 
-  const handleCreateAgent = () => {
+  const handleCreateAgent = async () => {
     if (!newAgent.name.trim()) {
       toast({
         title: 'Name required',
@@ -361,71 +416,181 @@ export default function AgentsPage() {
       return;
     }
 
-    const categoryInfo = AGENT_CATEGORIES.find((c) => c.value === newAgent.category);
-    const providerInfo = LLM_PROVIDERS.find((p) => p.value === newAgent.provider);
-    const agent = {
-      id: Date.now().toString(),
-      name: newAgent.name,
-      description: newAgent.description,
-      category: categoryInfo?.label || 'Custom',
-      system: newAgent.system,
-      stage: newAgent.system === 'System 1'
-        ? SYSTEM1_STAGES.find(s => s.value === newAgent.stage)?.label
-        : SYSTEM2_TEAMS.find(t => t.value === newAgent.stage)?.label,
-      icon: MdSmartToy,
-      status: newAgent.status,
-      // TradingAgents dual-LLM configuration
-      llm: {
-        provider: newAgent.provider,
-        providerName: providerInfo?.label,
-        deepThinkModel: newAgent.deepThinkModel,
-        quickThinkModel: newAgent.quickThinkModel,
-      },
-      isBuiltin: false,
-      created: 'Just now',
-    };
+    // Generate prompt if not already generated
+    let systemPrompt = newAgent.systemPrompt;
+    if (!systemPrompt.trim()) {
+      if (!newAgent.description.trim()) {
+        toast({
+          title: 'Description required',
+          description: 'Please enter a description to generate the system prompt.',
+          status: 'warning',
+          duration: 3000,
+          isClosable: true,
+        });
+        return;
+      }
 
-    setCustomAgents([agent, ...customAgents]);
+      try {
+        setIsGenerating(true);
+        const response = await generateAgentPrompt(
+          newAgent.name,
+          newAgent.description,
+          newAgent.stage,
+          newAgent.category
+        );
+        if (response.success && response.data?.systemPrompt) {
+          systemPrompt = response.data.systemPrompt;
+        } else {
+          throw new Error('Failed to generate system prompt');
+        }
+      } catch (error) {
+        toast({
+          title: 'Generation failed',
+          description: error.message,
+          status: 'error',
+          duration: 3000,
+          isClosable: true,
+        });
+        setIsGenerating(false);
+        return;
+      } finally {
+        setIsGenerating(false);
+      }
+    }
+
+    try {
+      setIsLoading(true);
+
+      if (editingAgent) {
+        // Update existing agent
+        const response = await updateAgent(editingAgent.id, {
+          name: newAgent.name.trim(),
+          description: newAgent.description,
+          type: 'custom_agent',
+          category: newAgent.category,
+          system: newAgent.system,
+          stage: newAgent.stage,
+          systemPrompt: systemPrompt,
+          enableThinking: newAgent.enableThinking,
+          maxIterations: newAgent.maxIterations,
+          status: newAgent.status,
+        });
+
+        if (response.success) {
+          await fetchCustomAgents();
+          handleCloseModal();
+          toast({
+            title: 'Agent updated',
+            description: `${newAgent.name} has been updated.`,
+            status: 'success',
+            duration: 3000,
+            isClosable: true,
+          });
+        }
+      } else {
+        // Create new agent
+        const response = await createAgent({
+          name: newAgent.name.trim(),
+          description: newAgent.description,
+          type: 'custom_agent',
+          category: newAgent.category,
+          system: newAgent.system,
+          stage: newAgent.stage,
+          systemPrompt: systemPrompt,
+          enableThinking: newAgent.enableThinking,
+          maxIterations: newAgent.maxIterations,
+        });
+
+        if (response.success) {
+          await fetchCustomAgents();
+          handleCloseModal();
+          toast({
+            title: 'Agent created',
+            description: `${newAgent.name} is ready to use in your pipeline.`,
+            status: 'success',
+            duration: 3000,
+            isClosable: true,
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error saving agent:', error);
+      toast({
+        title: 'Error saving agent',
+        description: error.message,
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleToggleAgent = async (id) => {
+    const agent = customAgents.find((a) => a.id === id);
+    if (!agent) return;
+
+    const newStatus = agent.status === 'active' ? 'inactive' : 'active';
+
+    try {
+      const response = await updateAgent(id, { status: newStatus });
+      if (response.success) {
+        setCustomAgents(
+          customAgents.map((a) =>
+            a.id === id ? { ...a, status: newStatus } : a
+          )
+        );
+      }
+    } catch (error) {
+      toast({
+        title: 'Error updating agent',
+        description: error.message,
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+    }
+  };
+
+  const handleDeleteAgent = async (id) => {
+    try {
+      const response = await deleteAgent(id);
+      if (response.success) {
+        setCustomAgents(customAgents.filter((a) => a.id !== id));
+        toast({
+          title: 'Agent deleted',
+          status: 'info',
+          duration: 2000,
+          isClosable: true,
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Error deleting agent',
+        description: error.message,
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+    }
+  };
+
+  const handleEditAgent = (agent) => {
+    setEditingAgent(agent);
     setNewAgent({
-      name: '',
-      description: '',
-      category: 'data_retriever',
-      system: 'System 1',
-      stage: 'stage1',
-      provider: 'google',
-      deepThinkModel: 'gemini-1.5-pro',
-      quickThinkModel: 'gemini-2.0-flash',
-      status: 'inactive',
+      name: agent.name,
+      description: agent.description || '',
+      category: agent.category || 'strategy_agent',
+      system: agent.system || 'System 2',
+      stage: agent.stage || 'Team 1',
+      systemPrompt: agent.systemPrompt || '',
+      enableThinking: agent.enableThinking !== false,
+      maxIterations: agent.maxIterations || 5,
+      status: agent.status || 'active',
     });
-    onClose();
-
-    toast({
-      title: 'Agent created',
-      description: `${agent.name} is ready. Enable it to add to your pipeline.`,
-      status: 'success',
-      duration: 3000,
-      isClosable: true,
-    });
-  };
-
-  const handleToggleAgent = (id) => {
-    setCustomAgents(
-      customAgents.map((agent) =>
-        agent.id === id
-          ? { ...agent, status: agent.status === 'active' ? 'inactive' : 'active' }
-          : agent
-      )
-    );
-  };
-
-  const handleDeleteAgent = (id) => {
-    setCustomAgents(customAgents.filter((a) => a.id !== id));
-    toast({
-      title: 'Agent deleted',
-      status: 'info',
-      duration: 2000,
-      isClosable: true,
-    });
+    setShowSystemPrompt(!!agent.systemPrompt);
+    onOpen();
   };
 
   const filteredAgents = (system) => {
@@ -502,15 +667,17 @@ export default function AgentsPage() {
                 size="xs"
                 variant="ghost"
                 color={textColorSecondary}
-                onClick={() => {}}
+                onClick={() => handleEditAgent(agent)}
+                title="Edit agent"
               >
-                <Icon as={MdSettings} />
+                <Icon as={MdEdit} />
               </Button>
               <Button
                 size="xs"
                 variant="ghost"
                 color="red.500"
                 onClick={() => handleDeleteAgent(agent.id)}
+                title="Delete agent"
               >
                 <Icon as={MdDelete} />
               </Button>
@@ -853,19 +1020,22 @@ export default function AgentsPage() {
       </Box>
 
       {/* Create Agent Modal */}
-      <Modal isOpen={isOpen} onClose={onClose} size="lg">
+      <Modal isOpen={isOpen} onClose={handleCloseModal} size="xl">
         <ModalOverlay />
         <ModalContent>
-          <ModalHeader>Create Custom Agent</ModalHeader>
+          <ModalHeader>
+            {editingAgent ? 'Edit Custom Agent' : 'Create Custom Agent'}
+          </ModalHeader>
           <ModalCloseButton />
           <ModalBody pb="20px">
-            <VStack spacing="20px" align="stretch">
+            <VStack spacing="16px" align="stretch">
+              {/* Name */}
               <FormControl isRequired>
                 <FormLabel fontSize="sm" fontWeight="600">
-                  Agent Name
+                  Name
                 </FormLabel>
                 <Input
-                  placeholder="e.g., Custom P/E Calculator"
+                  placeholder="e.g., Dividend Hunter"
                   value={newAgent.name}
                   onChange={(e) =>
                     setNewAgent({ ...newAgent, name: e.target.value })
@@ -874,12 +1044,13 @@ export default function AgentsPage() {
                 />
               </FormControl>
 
-              <FormControl>
+              {/* Description */}
+              <FormControl isRequired>
                 <FormLabel fontSize="sm" fontWeight="600">
                   Description
                 </FormLabel>
                 <Textarea
-                  placeholder="What does this agent do?"
+                  placeholder="Describe what this agent does, e.g., 'An agent that finds high-yield dividend stocks with sustainable payout ratios'"
                   value={newAgent.description}
                   onChange={(e) =>
                     setNewAgent({ ...newAgent, description: e.target.value })
@@ -887,174 +1058,217 @@ export default function AgentsPage() {
                   size="md"
                   rows={3}
                 />
+                <Text fontSize="xs" color="gray.500" mt="4px">
+                  This description will be used to generate the system prompt
+                </Text>
               </FormControl>
 
-              <FormControl isRequired>
-                <FormLabel fontSize="sm" fontWeight="600">
-                  System
-                </FormLabel>
-                <Select
-                  value={newAgent.system}
-                  onChange={(e) =>
-                    setNewAgent({
-                      ...newAgent,
-                      system: e.target.value,
-                      stage: e.target.value === 'System 1' ? 'stage1' : 'team1'
-                    })
-                  }
-                  size="md"
-                >
-                  <option value="System 1">System 1 - Data Pipeline</option>
-                  <option value="System 2">System 2 - Decision Making</option>
-                </Select>
-              </FormControl>
-
-              <FormControl isRequired>
-                <FormLabel fontSize="sm" fontWeight="600">
-                  Category
-                </FormLabel>
-                <Select
-                  value={newAgent.category}
-                  onChange={(e) =>
-                    setNewAgent({ ...newAgent, category: e.target.value })
-                  }
-                  size="md"
-                >
-                  {AGENT_CATEGORIES.filter(c => c.system === newAgent.system).map((cat) => (
-                    <option key={cat.value} value={cat.value}>
-                      {cat.label}
-                    </option>
-                  ))}
-                </Select>
-              </FormControl>
-
-              <FormControl isRequired>
-                <FormLabel fontSize="sm" fontWeight="600">
-                  {newAgent.system === 'System 1' ? 'Pipeline Stage' : 'Team'}
-                </FormLabel>
-                <Select
-                  value={newAgent.stage}
-                  onChange={(e) =>
-                    setNewAgent({ ...newAgent, stage: e.target.value })
-                  }
-                  size="md"
-                >
-                  {newAgent.system === 'System 1'
-                    ? SYSTEM1_STAGES.map((stage) => (
-                        <option key={stage.value} value={stage.value}>
-                          {stage.label}
-                        </option>
-                      ))
-                    : SYSTEM2_TEAMS.map((team) => (
-                        <option key={team.value} value={team.value}>
-                          {team.label}
-                        </option>
-                      ))
-                  }
-                </Select>
-              </FormControl>
-
-              <FormControl isRequired>
-                <FormLabel fontSize="sm" fontWeight="600">
-                  LLM Provider
-                </FormLabel>
-                <Select
-                  value={newAgent.provider}
-                  onChange={(e) => {
-                    const provider = e.target.value;
-                    const deepModels = DEEP_THINK_MODELS[provider] || [];
-                    const quickModels = QUICK_THINK_MODELS[provider] || [];
-                    setNewAgent({
-                      ...newAgent,
-                      provider,
-                      deepThinkModel: deepModels[0]?.value || '',
-                      quickThinkModel: quickModels[0]?.value || '',
-                    });
-                  }}
-                  size="md"
-                >
-                  {LLM_PROVIDERS.map((provider) => (
-                    <option key={provider.value} value={provider.value}>
-                      {provider.icon} {provider.label}
-                    </option>
-                  ))}
-                </Select>
-              </FormControl>
-
+              {/* Category and Team in a row */}
               <SimpleGrid columns={2} spacing="15px">
                 <FormControl isRequired>
                   <FormLabel fontSize="sm" fontWeight="600">
-                    Deep Think Model
+                    Category
                   </FormLabel>
                   <Select
-                    value={newAgent.deepThinkModel}
+                    value={newAgent.category}
                     onChange={(e) =>
-                      setNewAgent({ ...newAgent, deepThinkModel: e.target.value })
+                      setNewAgent({ ...newAgent, category: e.target.value })
                     }
                     size="md"
                   >
-                    {(DEEP_THINK_MODELS[newAgent.provider] || []).map((model) => (
-                      <option key={model.value} value={model.value}>
-                        {model.label}
-                      </option>
-                    ))}
+                    {AGENT_CATEGORIES.filter((c) => c.system === newAgent.system).map(
+                      (cat) => (
+                        <option key={cat.value} value={cat.value}>
+                          {cat.label}
+                        </option>
+                      )
+                    )}
                   </Select>
-                  <Text fontSize="xs" color="gray.500" mt="4px">
-                    For complex reasoning & synthesis
-                  </Text>
                 </FormControl>
 
                 <FormControl isRequired>
                   <FormLabel fontSize="sm" fontWeight="600">
-                    Quick Think Model
+                    Team
                   </FormLabel>
                   <Select
-                    value={newAgent.quickThinkModel}
+                    value={newAgent.stage}
                     onChange={(e) =>
-                      setNewAgent({ ...newAgent, quickThinkModel: e.target.value })
+                      setNewAgent({ ...newAgent, stage: e.target.value })
                     }
                     size="md"
                   >
-                    {(QUICK_THINK_MODELS[newAgent.provider] || []).map((model) => (
-                      <option key={model.value} value={model.value}>
-                        {model.label}
-                      </option>
-                    ))}
+                    {newAgent.system === 'System 1'
+                      ? SYSTEM1_STAGES.map((stage) => (
+                          <option key={stage.value} value={stage.value}>
+                            {stage.label}
+                          </option>
+                        ))
+                      : SYSTEM2_TEAMS.map((team) => (
+                          <option key={team.value} value={team.value}>
+                            {team.label}
+                          </option>
+                        ))}
                   </Select>
-                  <Text fontSize="xs" color="gray.500" mt="4px">
-                    For rapid tasks & data processing
-                  </Text>
+                  {newAgent.system === 'System 2' && (
+                    <Text fontSize="xs" color="gray.500" mt="4px">
+                      {SYSTEM2_TEAMS.find((t) => t.value === newAgent.stage)?.description}
+                    </Text>
+                  )}
                 </FormControl>
               </SimpleGrid>
 
-              <FormControl display="flex" alignItems="center">
-                <FormLabel fontSize="sm" fontWeight="600" mb="0">
-                  Activate Immediately
-                </FormLabel>
-                <Switch
-                  colorScheme="teal"
-                  isChecked={newAgent.status === 'active'}
-                  onChange={(e) =>
-                    setNewAgent({
-                      ...newAgent,
-                      status: e.target.checked ? 'active' : 'inactive',
-                    })
-                  }
-                />
-              </FormControl>
+              {/* Thinking Mode Section */}
+              <Box
+                border="1px solid"
+                borderColor={borderColor}
+                borderRadius="8px"
+                p="16px"
+                bg="purple.50"
+              >
+                <HStack justify="space-between" mb="12px">
+                  <HStack spacing="8px">
+                    <Icon as={MdPsychology} color="purple.600" boxSize="20px" />
+                    <VStack align="start" spacing="0">
+                      <Text fontSize="sm" fontWeight="600" color={textColor}>
+                        Enable Iterative Thinking
+                      </Text>
+                      <Text fontSize="xs" color="gray.500">
+                        Agent will reason about what data it needs and can request tools
+                      </Text>
+                    </VStack>
+                  </HStack>
+                  <Switch
+                    colorScheme="purple"
+                    isChecked={newAgent.enableThinking}
+                    onChange={(e) =>
+                      setNewAgent({ ...newAgent, enableThinking: e.target.checked })
+                    }
+                    size="md"
+                  />
+                </HStack>
 
-              <HStack justify="flex-end" spacing="10px" pt="10px">
-                <Button variant="ghost" onClick={onClose}>
-                  Cancel
-                </Button>
+                {newAgent.enableThinking && (
+                  <FormControl>
+                    <FormLabel fontSize="sm" fontWeight="600">
+                      Max Iterations
+                    </FormLabel>
+                    <Select
+                      value={newAgent.maxIterations}
+                      onChange={(e) =>
+                        setNewAgent({ ...newAgent, maxIterations: parseInt(e.target.value) })
+                      }
+                      size="sm"
+                      bg="white"
+                    >
+                      <option value={3}>3 (Fast)</option>
+                      <option value={5}>5 (Balanced)</option>
+                      <option value={10}>10 (Thorough)</option>
+                    </Select>
+                    <Text fontSize="xs" color="gray.500" mt="4px">
+                      Higher iterations allow more data gathering but take longer
+                    </Text>
+                  </FormControl>
+                )}
+              </Box>
+
+              {/* System Prompt Section */}
+              <Box
+                border="1px solid"
+                borderColor={borderColor}
+                borderRadius="8px"
+                p="16px"
+                bg="gray.50"
+              >
+                <HStack justify="space-between" mb={showSystemPrompt ? '12px' : '0'}>
+                  <HStack spacing="8px">
+                    <Icon as={MdAutoAwesome} color="purple.500" />
+                    <Text fontSize="sm" fontWeight="600" color={textColor}>
+                      System Prompt
+                    </Text>
+                    {newAgent.systemPrompt && (
+                      <Badge colorScheme="green" fontSize="xs">
+                        Generated
+                      </Badge>
+                    )}
+                  </HStack>
+                  <HStack spacing="8px">
+                    <Button
+                      size="sm"
+                      leftIcon={isGenerating ? <Spinner size="xs" /> : <Icon as={MdRefresh} />}
+                      onClick={handleGeneratePrompt}
+                      isLoading={isGenerating}
+                      loadingText="Generating..."
+                      variant="outline"
+                      colorScheme="purple"
+                      isDisabled={!newAgent.name.trim() || !newAgent.description.trim()}
+                    >
+                      {newAgent.systemPrompt ? 'Regenerate' : 'Generate'}
+                    </Button>
+                    {newAgent.systemPrompt && (
+                      <IconButton
+                        size="sm"
+                        icon={<Icon as={showSystemPrompt ? MdExpandLess : MdExpandMore} />}
+                        onClick={() => setShowSystemPrompt(!showSystemPrompt)}
+                        variant="ghost"
+                        aria-label="Toggle system prompt"
+                      />
+                    )}
+                  </HStack>
+                </HStack>
+
+                <Collapse in={showSystemPrompt} animateOpacity>
+                  <FormControl>
+                    <Textarea
+                      value={newAgent.systemPrompt}
+                      onChange={(e) =>
+                        setNewAgent({ ...newAgent, systemPrompt: e.target.value })
+                      }
+                      placeholder="System prompt will be generated based on name, description, and team..."
+                      size="md"
+                      rows={8}
+                      fontFamily="mono"
+                      fontSize="xs"
+                      bg="white"
+                    />
+                    <Text fontSize="xs" color="gray.500" mt="4px">
+                      You can edit the generated prompt to customize the agent's behavior
+                    </Text>
+                  </FormControl>
+                </Collapse>
+
+                {!showSystemPrompt && !newAgent.systemPrompt && (
+                  <Text fontSize="xs" color="gray.500">
+                    Click "Generate" to create a system prompt based on your name and description
+                  </Text>
+                )}
+              </Box>
+
+              {/* Action Buttons */}
+              <HStack justify="space-between" pt="10px">
                 <Button
-                  bg={brandColor}
-                  color="white"
-                  onClick={handleCreateAgent}
-                  _hover={{ bg: 'teal.700' }}
+                  variant="outline"
+                  leftIcon={<Icon as={MdAutoAwesome} />}
+                  onClick={handleGeneratePrompt}
+                  isLoading={isGenerating}
+                  isDisabled={!newAgent.name.trim() || !newAgent.description.trim()}
                 >
-                  Create Agent
+                  Save Config
                 </Button>
+                <HStack spacing="10px">
+                  <Button variant="ghost" onClick={handleCloseModal}>
+                    Cancel
+                  </Button>
+                  <Button
+                    bg={brandColor}
+                    color="white"
+                    onClick={handleCreateAgent}
+                    _hover={{ bg: 'teal.700' }}
+                    isLoading={isLoading}
+                    loadingText={editingAgent ? 'Updating...' : 'Creating...'}
+                  >
+                    {editingAgent ? 'Update Agent' : 'Create Agent'}
+                  </Button>
+                </HStack>
               </HStack>
             </VStack>
           </ModalBody>
