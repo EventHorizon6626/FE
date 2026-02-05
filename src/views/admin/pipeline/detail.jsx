@@ -1910,20 +1910,35 @@ function PipelineBuilderInner() {
         </ReactFlow>
       </Box>
 
-      {/* Right Side Configuration Panel */}
+      {/* Floating Agent Configuration Panel */}
       {selectedNode && selectedNode.type === 'agentNode' && (
+        <>
         <Box
           position="absolute"
-          right="0"
           top="0"
-          h="100vh"
-          w="33.33%"
+          left="0"
+          w="100%"
+          h="100%"
+          bg="blackAlpha.400"
+          zIndex="19"
+          onClick={() => {
+            setNodes((nds) =>
+              nds.map((n) => ({ ...n, selected: false }))
+            );
+          }}
+        />
+        <Box
+          position="absolute"
+          top="50%"
+          left="50%"
+          transform="translate(-50%, -50%)"
+          w="500px"
+          maxH="80vh"
           bg="white"
-          borderLeft="2px solid"
-          borderColor="gray.200"
+          borderRadius="20px"
           overflowY="auto"
           zIndex="20"
-          boxShadow="xl"
+          boxShadow="2xl"
         >
           <VStack spacing="0" align="stretch" h="full">
             {/* Header */}
@@ -1932,13 +1947,23 @@ function PipelineBuilderInner() {
               borderBottom="2px solid"
               borderColor="gray.200"
               bg="teal.50"
+              borderTopRadius="20px"
             >
-              <HStack justify="space-between" mb="8px">
-                <HStack spacing="10px">
+              <HStack justify="space-between">
+                <HStack spacing="10px" flex="1">
                   <Icon as={MdSmartToy} color="teal.600" boxSize="24px" />
-                  <Text fontSize="lg" fontWeight="bold" color="teal.900" noOfLines={1}>
-                    {nodeConfig.name || 'Node Configuration'}
-                  </Text>
+                  <Input
+                    value={nodeConfig.name}
+                    onChange={(e) =>
+                      setNodeConfig({ ...nodeConfig, name: e.target.value })
+                    }
+                    placeholder="Node Configuration"
+                    fontSize="lg"
+                    fontWeight="bold"
+                    color="teal.900"
+                    variant="unstyled"
+                    _placeholder={{ color: 'teal.400' }}
+                  />
                 </HStack>
                 <IconButton
                   icon={<Icon as={MdClose} />}
@@ -1953,39 +1978,11 @@ function PipelineBuilderInner() {
                   }}
                 />
               </HStack>
-              <Text fontSize="xs" color="teal.700">
-                Configure settings for this agent
-              </Text>
             </Box>
 
             {/* Configuration Form */}
             <Box flex="1" p="20px">
               <VStack spacing="20px" align="stretch">
-                {/* Node ID */}
-                <Box>
-                  <Text fontSize="xs" color="gray.500" mb="4px">
-                    Node ID
-                  </Text>
-                  <Badge colorScheme="gray" fontSize="xs">
-                    {selectedNode.id}
-                  </Badge>
-                </Box>
-
-                {/* Name */}
-                <FormControl>
-                  <FormLabel fontSize="sm" fontWeight="600">
-                    Agent Name
-                  </FormLabel>
-                  <Input
-                    placeholder="Enter agent name"
-                    value={nodeConfig.name}
-                    onChange={(e) =>
-                      setNodeConfig({ ...nodeConfig, name: e.target.value })
-                    }
-                    size="sm"
-                  />
-                </FormControl>
-
                 {/* Description */}
                 <FormControl>
                   <FormLabel fontSize="sm" fontWeight="600">
@@ -2066,6 +2063,7 @@ function PipelineBuilderInner() {
               borderTop="2px solid"
               borderColor="gray.200"
               bg="gray.50"
+              borderBottomRadius="20px"
             >
               <Button
                 leftIcon={<Icon as={MdSave} />}
@@ -2080,22 +2078,38 @@ function PipelineBuilderInner() {
             </Box>
           </VStack>
         </Box>
+        </>
       )}
 
-      {/* Portfolio Configuration Panel - Simple version without stock list */}
+      {/* Floating Portfolio Configuration Panel */}
       {selectedNode && selectedNode.type === 'portfolioNode' && (
+        <>
         <Box
           position="absolute"
-          right="0"
           top="0"
-          h="100vh"
-          w="33.33%"
+          left="0"
+          w="100%"
+          h="100%"
+          bg="blackAlpha.400"
+          zIndex="19"
+          onClick={() => {
+            setNodes((nds) =>
+              nds.map((n) => ({ ...n, selected: false }))
+            );
+          }}
+        />
+        <Box
+          position="absolute"
+          top="50%"
+          left="50%"
+          transform="translate(-50%, -50%)"
+          w="500px"
+          maxH="80vh"
           bg="white"
-          borderLeft="2px solid"
-          borderColor="gray.200"
+          borderRadius="20px"
           overflowY="auto"
           zIndex="20"
-          boxShadow="xl"
+          boxShadow="2xl"
         >
           <VStack spacing="0" align="stretch" h="full">
             {/* Header */}
@@ -2104,13 +2118,23 @@ function PipelineBuilderInner() {
               borderBottom="2px solid"
               borderColor="gray.200"
               bg="green.50"
+              borderTopRadius="20px"
             >
-              <HStack justify="space-between" mb="8px">
-                <HStack spacing="10px">
+              <HStack justify="space-between">
+                <HStack spacing="10px" flex="1">
                   <Icon as={MdShowChart} color="green.600" boxSize="24px" />
-                  <Text fontSize="lg" fontWeight="bold" color="green.900" noOfLines={1}>
-                    {portfolioConfig.name || 'Portfolio Configuration'}
-                  </Text>
+                  <Input
+                    value={portfolioConfig.name}
+                    onChange={(e) =>
+                      setPortfolioConfig({ ...portfolioConfig, name: e.target.value })
+                    }
+                    placeholder="Portfolio Configuration"
+                    fontSize="lg"
+                    fontWeight="bold"
+                    color="green.900"
+                    variant="unstyled"
+                    _placeholder={{ color: 'green.400' }}
+                  />
                 </HStack>
                 <IconButton
                   icon={<Icon as={MdClose} />}
@@ -2125,39 +2149,11 @@ function PipelineBuilderInner() {
                   }}
                 />
               </HStack>
-              <Text fontSize="xs" color="green.700">
-                Configure settings for this portfolio
-              </Text>
             </Box>
 
             {/* Configuration Form */}
             <Box flex="1" p="20px">
               <VStack spacing="20px" align="stretch">
-                {/* Node ID */}
-                <Box>
-                  <Text fontSize="xs" color="gray.500" mb="4px">
-                    Node ID
-                  </Text>
-                  <Badge colorScheme="gray" fontSize="xs">
-                    {selectedNode.id}
-                  </Badge>
-                </Box>
-
-                {/* Portfolio Name */}
-                <FormControl isRequired>
-                  <FormLabel fontSize="sm" fontWeight="600">
-                    Portfolio Name
-                  </FormLabel>
-                  <Input
-                    placeholder="Enter portfolio name"
-                    value={portfolioConfig.name}
-                    onChange={(e) =>
-                      setPortfolioConfig({ ...portfolioConfig, name: e.target.value })
-                    }
-                    size="sm"
-                  />
-                </FormControl>
-
                 {/* Description */}
                 <FormControl>
                   <FormLabel fontSize="sm" fontWeight="600">
@@ -2293,6 +2289,7 @@ function PipelineBuilderInner() {
               borderTop="2px solid"
               borderColor="gray.200"
               bg="gray.50"
+              borderBottomRadius="20px"
             >
               <Button
                 leftIcon={<Icon as={MdSave} />}
@@ -2379,6 +2376,7 @@ function PipelineBuilderInner() {
             </Box>
           </VStack>
         </Box>
+        </>
       )}
 
       {/* Create/Edit Agent Modal */}
