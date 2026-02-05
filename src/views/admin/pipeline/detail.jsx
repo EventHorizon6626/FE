@@ -200,13 +200,6 @@ const AGENT_CATEGORIES = [
   { value: 'custom_analyzer', label: '🤖 Custom Analyzer', system: 'analyzer' },
 ];
 
-const MODELS = [
-  { value: 'gpt-4', label: 'GPT-4' },
-  { value: 'gpt-4-turbo', label: 'GPT-4 Turbo' },
-  { value: 'claude-3-opus', label: 'Claude 3 Opus' },
-  { value: 'claude-3-sonnet', label: 'Claude 3 Sonnet' },
-];
-
 const initialNodes = [];
 const initialEdges = [];
 
@@ -2017,27 +2010,6 @@ function PipelineBuilderInner() {
                   />
                 </FormControl>
 
-                {/* AI Model */}
-                <FormControl>
-                  <FormLabel fontSize="sm" fontWeight="600">
-                    AI Model
-                  </FormLabel>
-                  <Select
-                    value={nodeConfig.model}
-                    onChange={(e) =>
-                      setNodeConfig({ ...nodeConfig, model: e.target.value })
-                    }
-                    size="sm"
-                  >
-                    <option value="gpt-4">GPT-4</option>
-                    <option value="gpt-4-turbo">GPT-4 Turbo</option>
-                    <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
-                    <option value="claude-3-opus">Claude 3 Opus</option>
-                    <option value="claude-3-sonnet">Claude 3 Sonnet</option>
-                    <option value="claude-3-haiku">Claude 3 Haiku</option>
-                  </Select>
-                </FormControl>
-
                 {/* Temperature */}
                 <FormControl>
                   <FormLabel fontSize="sm" fontWeight="600">
@@ -2467,22 +2439,6 @@ function PipelineBuilderInner() {
                   {AGENT_CATEGORIES.filter(c => c.system === newAgent.system).map((cat) => (
                     <option key={cat.value} value={cat.value}>
                       {cat.label}
-                    </option>
-                  ))}
-                </Select>
-              </FormControl>
-
-              <FormControl isRequired>
-                <FormLabel fontSize="sm" fontWeight="600">
-                  Model
-                </FormLabel>
-                <Select
-                  value={newAgent.model}
-                  onChange={(e) => setNewAgent({ ...newAgent, model: e.target.value })}
-                >
-                  {MODELS.map((model) => (
-                    <option key={model.value} value={model.value}>
-                      {model.label}
                     </option>
                   ))}
                 </Select>
