@@ -955,12 +955,12 @@ function PipelineBuilderInner() {
     try {
       const agentData = {
         name: newAgent.name.trim(),
-        description: newAgent.description.trim(),
+        description: (newAgent.description || '').trim(),
         type: newAgent.category,
         system: newAgent.system,
         teamId: newAgent.teamId,
         model: newAgent.model,
-        systemPrompt: newAgent.systemPrompt.trim(),
+        systemPrompt: (newAgent.systemPrompt || '').trim(),
         icon: 'MdSmartToy',
         color: newAgent.system === 'data' ? 'blue' : 'purple',
         isBuiltin: false,
