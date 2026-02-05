@@ -1,5 +1,55 @@
 import { request } from './api';
 
+// ===== Custom Agent CRUD Operations =====
+
+export const createAgent = async (agentData) => {
+  const response = await request.post('/agents', agentData);
+  return response;
+};
+
+export const getAgents = async () => {
+  const response = await request.get('/agents');
+  return response;
+};
+
+export const getAgent = async (id) => {
+  const response = await request.get(`/agents/${id}`);
+  return response;
+};
+
+export const updateAgent = async (id, agentData) => {
+  const response = await request.put(`/agents/${id}`, agentData);
+  return response;
+};
+
+export const deleteAgent = async (id) => {
+  const response = await request.delete(`/agents/${id}`);
+  return response;
+};
+
+export const generateAgentPrompt = async (name, description, team, category) => {
+  const response = await request.post('/agents/generate-prompt', {
+    name,
+    description,
+    team,
+    category,
+  });
+  return response;
+};
+
+// ===== Custom Agent Execution =====
+
+export const runCustomAgentApi = async (stocks, systemPrompt, userPrompt = null) => {
+  const response = await request.post('/ai/agents/custom', {
+    stocks,
+    system_prompt: systemPrompt,
+    user_prompt: userPrompt,
+  });
+  return response;
+};
+
+// ===== Built-in Agent Execution =====
+
 export const runCandlestickAgent = async (stocks) => {
   const response = await request.post('/ai/agents/candlestick', {
     stocks,
@@ -100,10 +150,44 @@ export const runTraderAgent = async (stocks, data) => {
   return response;
 };
 
-export const runAgent = async (agentType, inputData) => {
+// ===== Thinking Agent (ReAct-style iterative reasoning) =====
+
+export const runThinkingAgent = async (stocks, systemPrompt, inputData = null, maxIterations = 5) => {
+  const response = await request.post('/ai/agents/think', {
+    stocks,
+    system_prompt: systemPrompt,
+    input_data: inputData,
+    max_iterations: maxIterations,
+    available_tools: ['candlestick', 'earnings', 'news', 'technical', 'fundamentals'],
+  });
+  return response;
+};
+
+export const runAgent = async (agentType, inputData, customAgentConfig = null) => {
   const { stocks, data } = inputData;
 
+  // Handle custom agents with optional thinking mode
+  if (customAgentConfig && customAgentConfig.systemPrompt) {
+    // Check if thinking mode is enabled
+    if (customAgentConfig.enableThinking) {
+      return await runThinkingAgent(
+        stocks,
+        customAgentConfig.systemPrompt,
+        data,
+        customAgentConfig.maxIterations || 5
+      );
+    }
+    return await runCustomAgentApi(stocks, customAgentConfig.systemPrompt, customAgentConfig.userPrompt);
+  }
+
   switch (agentType) {
+    // ===== Custom Agent =====
+    case 'custom_agent':
+      if (data?.systemPrompt) {
+        return await runCustomAgentApi(stocks, data.systemPrompt, data.userPrompt);
+      }
+      throw new Error('Custom agent requires a system prompt');
+
     // ===== System 1: Data Pipeline Agents =====
     case 'candlestick':
     case 'data_retriever':
