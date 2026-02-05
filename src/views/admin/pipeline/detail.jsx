@@ -2309,7 +2309,7 @@ function PipelineBuilderInner() {
                     const existingPortfolio = selectedNode.data.portfolio;
                     let savedPortfolio;
 
-                    if (existingPortfolio && existingPortfolio.id && existingPortfolio.id.match(/^[0-9a-fA-F]{24}$/)) {
+                    if (existingPortfolio && existingPortfolio.id && String(existingPortfolio.id).match(/^[0-9a-fA-F]{24}$/)) {
                       // Update existing portfolio in DB
                       const response = await portfolioApi.update(existingPortfolio.id, portfolioData);
                       if (response.success) {
