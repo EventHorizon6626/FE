@@ -559,28 +559,8 @@ function PipelineBuilderInner() {
     [setEdges]
   );
 
-  useEffect(() => {
-    const selected = nodes.find((node) => node.selected);
-    if (selected && selected.type === 'agentNode') {
-      setSelectedNode(selected);
-      setNodeConfig({
-        name: selected.data?.config?.name || selected.data?.agent?.name || '',
-        description: selected.data?.config?.description || selected.data?.agent?.description || '',
-        model: selected.data?.config?.model || 'gpt-4',
-        temperature: selected.data?.config?.temperature || 0.7,
-        maxTokens: selected.data?.config?.maxTokens || 2000,
-      });
-    } else if (selected && selected.type === 'portfolioNode') {
-      setSelectedNode(selected);
-      setPortfolioConfig({
-        name: selected.data?.portfolio?.name || '',
-        description: selected.data?.portfolio?.description || '',
-      });
-      setSelectedStocks(selected.data?.portfolio?.stocks || []);
-    } else {
-      setSelectedNode(null);
-    }
-  }, [nodes]);
+  // Config panel is shown only on double-click (see handleNodeDoubleClick)
+  // Single click just selects the node for moving/deleting
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -626,12 +606,19 @@ function PipelineBuilderInner() {
     if (node.type === 'agentNode') {
       setSelectedNode(node);
       setNodeConfig({
-        name: node.data?.agent?.name || '',
-        description: node.data?.agent?.description || '',
+        name: node.data?.config?.name || node.data?.agent?.name || '',
+        description: node.data?.config?.description || node.data?.agent?.description || '',
         model: node.data?.config?.model || 'gpt-4',
         temperature: node.data?.config?.temperature || 0.7,
         maxTokens: node.data?.config?.maxTokens || 2000,
       });
+    } else if (node.type === 'portfolioNode') {
+      setSelectedNode(node);
+      setPortfolioConfig({
+        name: node.data?.portfolio?.name || '',
+        description: node.data?.portfolio?.description || '',
+      });
+      setSelectedStocks(node.data?.portfolio?.stocks || []);
     }
   }, []);
 
@@ -1899,6 +1886,9 @@ function PipelineBuilderInner() {
           defaultViewport={{ x: 0, y: 0, zoom: 0.9 }}
           minZoom={0.1}
           maxZoom={2}
+          panOnDrag={true}
+          selectionKeyCode="Shift"
+          multiSelectionKeyCode="Shift"
         >
           <Controls />
           <MiniMap />
