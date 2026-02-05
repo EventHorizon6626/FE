@@ -3,7 +3,7 @@ import { request } from './api';
 export const horizonAgentApi = {
   async create(horizonId, data) {
     try {
-      const response = await request.post('/agents', {
+      const response = await request.post('/horizon-agents', {
         horizonId,
         ...data,
       });
@@ -17,7 +17,7 @@ export const horizonAgentApi = {
   async getByHorizon(horizonId, options = {}) {
     try {
       const { system } = options;
-      const response = await request.get(`/agents/horizon/${horizonId}`, {
+      const response = await request.get(`/horizon-agents/horizon/${horizonId}`, {
         params: system ? { system } : {},
       });
       return response.data || [];
@@ -29,7 +29,7 @@ export const horizonAgentApi = {
 
   async getByTeam(teamId) {
     try {
-      const response = await request.get(`/agents/team/${teamId}`);
+      const response = await request.get(`/horizon-agents/team/${teamId}`);
       return response.data || [];
     } catch (error) {
       console.error('[HorizonAgentAPI] Get by team error:', error);
@@ -40,7 +40,7 @@ export const horizonAgentApi = {
   async getAll(options = {}) {
     try {
       const { page = 1, limit = 20 } = options;
-      const response = await request.get('/agents', {
+      const response = await request.get('/horizon-agents', {
         params: { page, limit },
       });
       return response;
@@ -52,7 +52,7 @@ export const horizonAgentApi = {
 
   async getById(agentId) {
     try {
-      const response = await request.get(`/agents/${agentId}`);
+      const response = await request.get(`/horizon-agents/${agentId}`);
       return response.data;
     } catch (error) {
       console.error('[HorizonAgentAPI] Get by ID error:', error);
@@ -62,7 +62,7 @@ export const horizonAgentApi = {
 
   async update(agentId, data) {
     try {
-      const response = await request.put(`/agents/${agentId}`, data);
+      const response = await request.put(`/horizon-agents/${agentId}`, data);
       return response;
     } catch (error) {
       console.error('[HorizonAgentAPI] Update error:', error);
@@ -72,7 +72,7 @@ export const horizonAgentApi = {
 
   async delete(agentId) {
     try {
-      const response = await request.delete(`/agents/${agentId}`);
+      const response = await request.delete(`/horizon-agents/${agentId}`);
       return response;
     } catch (error) {
       console.error('[HorizonAgentAPI] Delete error:', error);
@@ -82,7 +82,7 @@ export const horizonAgentApi = {
 
   async restore(agentId) {
     try {
-      const response = await request.post(`/agents/${agentId}/restore`);
+      const response = await request.post(`/horizon-agents/${agentId}/restore`);
       return response;
     } catch (error) {
       console.error('[HorizonAgentAPI] Restore error:', error);
