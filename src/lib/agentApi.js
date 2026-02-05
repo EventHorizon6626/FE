@@ -62,10 +62,49 @@ export const runResearchManagerAgent = async (bullThesis, bearThesis) => {
   return response;
 };
 
+// ===== System 2 Team 1: Analyst Agents =====
+export const runFundamentalsAnalystAgent = async (stocks) => {
+  const response = await request.post('/ai/agents/fundamentals-analyst', { stocks });
+  return response;
+};
+
+export const runSentimentAnalystAgent = async (stocks) => {
+  const response = await request.post('/ai/agents/sentiment-analyst', { stocks });
+  return response;
+};
+
+export const runNewsAnalystAgent = async (stocks) => {
+  const response = await request.post('/ai/agents/news-analyst', { stocks });
+  return response;
+};
+
+export const runTechnicalAnalystAgent = async (stocks) => {
+  const response = await request.post('/ai/agents/technical-analyst', { stocks });
+  return response;
+};
+
+// ===== System 2 Team 3: Portfolio =====
+export const runPortfolioManagerAgent = async (stocks, data) => {
+  const response = await request.post('/ai/agents/portfolio-manager', { stocks, data });
+  return response;
+};
+
+// ===== System 2 Team 4: Risk & Execution =====
+export const runRiskManagerAgent = async (stocks, data) => {
+  const response = await request.post('/ai/agents/risk-manager', { stocks, data });
+  return response;
+};
+
+export const runTraderAgent = async (stocks, data) => {
+  const response = await request.post('/ai/agents/trader', { stocks, data });
+  return response;
+};
+
 export const runAgent = async (agentType, inputData) => {
   const { stocks, data } = inputData;
 
   switch (agentType) {
+    // ===== System 1: Data Pipeline Agents =====
     case 'candlestick':
     case 'data_retriever':
       return await runCandlestickAgent(stocks);
@@ -85,14 +124,39 @@ export const runAgent = async (agentType, inputData) => {
     case 'financial_metrics':
       return await runFundamentalsAgent(stocks);
 
+    // ===== System 2 Team 1: Analyst Agents =====
+    case 'fundamentals_analyst':
+      return await runFundamentalsAnalystAgent(stocks);
+
+    case 'sentiment_analyst':
+      return await runSentimentAnalystAgent(stocks);
+
+    case 'news_analyst':
+      return await runNewsAnalystAgent(stocks);
+
+    case 'technical_analyst':
+      return await runTechnicalAnalystAgent(stocks);
+
+    // ===== System 2 Team 2: Researcher Agents =====
     case 'bull_researcher':
-      return await runBullResearcherAgent(data);
+      return await runBullResearcherAgent(data || { stocks });
 
     case 'bear_researcher':
-      return await runBearResearcherAgent(data);
+      return await runBearResearcherAgent(data || { stocks });
 
     case 'research_manager':
-      return await runResearchManagerAgent(data.bullThesis, data.bearThesis);
+      return await runResearchManagerAgent(data?.bullThesis, data?.bearThesis);
+
+    // ===== System 2 Team 3: Portfolio =====
+    case 'portfolio_manager':
+      return await runPortfolioManagerAgent(stocks, data);
+
+    // ===== System 2 Team 4: Risk & Execution =====
+    case 'risk_manager':
+      return await runRiskManagerAgent(stocks, data);
+
+    case 'trader_agent':
+      return await runTraderAgent(stocks, data);
 
     default:
       throw new Error(`Unknown agent type: ${agentType}`);

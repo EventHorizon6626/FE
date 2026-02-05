@@ -56,10 +56,12 @@ import {
 import Card from 'components/card/Card.js';
 
 // Built-in System 1 Agents
+// IMPORTANT: 'type' field must match the switch cases in agentApi.js
 const BUILTIN_SYSTEM1_AGENTS = [
   {
     id: 'builtin_1',
     name: 'Price Data Retriever',
+    type: 'candlestick', // API endpoint type
     description: 'Fetches real-time and historical price data from Yahoo Finance',
     category: 'Data Retriever',
     system: 'System 1',
@@ -71,6 +73,7 @@ const BUILTIN_SYSTEM1_AGENTS = [
   {
     id: 'builtin_2',
     name: 'News Sentiment Analyzer',
+    type: 'news',
     description: 'Analyzes market news sentiment using NLP',
     category: 'News Agent',
     system: 'System 1',
@@ -82,6 +85,7 @@ const BUILTIN_SYSTEM1_AGENTS = [
   {
     id: 'builtin_3',
     name: 'Technical Indicator Engine',
+    type: 'technical',
     description: 'Calculates RSI, MACD, Moving Averages, and more',
     category: 'Technical Agent',
     system: 'System 1',
@@ -93,11 +97,13 @@ const BUILTIN_SYSTEM1_AGENTS = [
 ];
 
 // Built-in System 2 Agents (Based on TradingAgents Multi-Agent Framework)
+// IMPORTANT: 'type' field must match the switch cases in agentApi.js
 const BUILTIN_SYSTEM2_AGENTS = [
   // ===== TEAM 1: MARKET ANALYSIS (Analyst Team) =====
   {
     id: 'builtin_4',
     name: 'Fundamentals Analyst',
+    type: 'fundamentals_analyst', // API endpoint type
     description: 'Assesses company financials, performance metrics, and intrinsic values using fundamental analysis',
     category: 'Strategy Agent',
     system: 'System 2',
@@ -109,6 +115,7 @@ const BUILTIN_SYSTEM2_AGENTS = [
   {
     id: 'builtin_5',
     name: 'Sentiment Analyst',
+    type: 'sentiment_analyst',
     description: 'Examines social media, public opinion, and market sentiment using sentiment algorithms',
     category: 'Strategy Agent',
     system: 'System 2',
@@ -120,6 +127,7 @@ const BUILTIN_SYSTEM2_AGENTS = [
   {
     id: 'builtin_6',
     name: 'News Analyst',
+    type: 'news_analyst',
     description: 'Tracks global news and macroeconomic indicators for market impact assessment',
     category: 'Strategy Agent',
     system: 'System 2',
@@ -131,6 +139,7 @@ const BUILTIN_SYSTEM2_AGENTS = [
   {
     id: 'builtin_7',
     name: 'Technical Analyst',
+    type: 'technical_analyst',
     description: 'Applies technical indicators (MACD, RSI, patterns) to detect trends and forecast movements',
     category: 'Strategy Agent',
     system: 'System 2',
@@ -144,6 +153,7 @@ const BUILTIN_SYSTEM2_AGENTS = [
   {
     id: 'builtin_8',
     name: 'Bull Researcher',
+    type: 'bull_researcher',
     description: 'Builds the strongest possible bullish case by critically evaluating analyst insights',
     category: 'Strategy Agent',
     system: 'System 2',
@@ -155,6 +165,7 @@ const BUILTIN_SYSTEM2_AGENTS = [
   {
     id: 'builtin_9',
     name: 'Bear Researcher',
+    type: 'bear_researcher',
     description: 'Builds the strongest possible bearish case through structured counter-arguments',
     category: 'Strategy Agent',
     system: 'System 2',
@@ -166,6 +177,7 @@ const BUILTIN_SYSTEM2_AGENTS = [
   {
     id: 'builtin_10',
     name: 'Research Manager',
+    type: 'research_manager',
     description: 'Synthesizes bull and bear arguments through dynamic discussions to determine optimal strategy',
     category: 'Strategy Agent',
     system: 'System 2',
@@ -179,6 +191,7 @@ const BUILTIN_SYSTEM2_AGENTS = [
   {
     id: 'builtin_11',
     name: 'Portfolio Manager',
+    type: 'portfolio_manager',
     description: 'Evaluates portfolio-level decisions, position sizing, and asset allocation strategies',
     category: 'Strategy Agent',
     system: 'System 2',
@@ -192,6 +205,7 @@ const BUILTIN_SYSTEM2_AGENTS = [
   {
     id: 'builtin_12',
     name: 'Risk Manager',
+    type: 'risk_manager',
     description: 'Evaluates portfolio risk, volatility, and liquidity before approving or rejecting transactions',
     category: 'Risk Manager',
     system: 'System 2',
@@ -203,6 +217,7 @@ const BUILTIN_SYSTEM2_AGENTS = [
   {
     id: 'builtin_13',
     name: 'Trader Agent',
+    type: 'trader_agent',
     description: 'Synthesizes analyst and researcher reports to determine trade timing, sizing, and execution',
     category: 'Strategy Agent',
     system: 'System 2',
