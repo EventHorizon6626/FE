@@ -10,6 +10,10 @@ import {
   Icon,
   IconButton,
   Input,
+  Menu,
+  MenuButton,
+  MenuItem,
+  MenuList,
   Modal,
   ModalBody,
   ModalCloseButton,
@@ -37,6 +41,7 @@ import {
   MdGroups,
   MdHome,
   MdHub,
+  MdMoreVert,
   MdPlayArrow,
   MdSave,
   MdShowChart,
@@ -66,6 +71,9 @@ import '../../../assets/css/ReactFlowCustom.css';
 import { searchSecurities, SECURITIES } from 'data/securities';
 import { runAgent, getAgentInputData } from 'lib/agentApi';
 import { request } from 'lib/api';
+import portfolioApi from 'lib/portfolioApi';
+import horizonAgentApi from 'lib/horizonAgentApi';
+import teamApi from 'lib/teamApi';
 import { CustomAgentNode } from 'components/pipeline/CustomAgentNode';
 
 const BUILTIN_AGENTS = [
@@ -830,7 +838,7 @@ function PipelineBuilderInner() {
   }, [draggingAgent, tempNodeId, screenToFlowPosition, setNodes]);
 
   // Create custom agent
-  const handleCreateAgent = () => {
+  const handleCreateAgent = async () => {
     if (!newAgent.name.trim()) {
       toast({
         title: 'Name required',
@@ -841,87 +849,106 @@ function PipelineBuilderInner() {
       return;
     }
 
-    if (editingAgent) {
-      // Update existing agent
-      const updatedAgent = {
-        ...editingAgent,
-        name: newAgent.name,
-        description: newAgent.description,
+    try {
+      const agentData = {
+        name: newAgent.name.trim(),
+        description: newAgent.description.trim(),
         type: newAgent.category,
         system: newAgent.system,
         teamId: newAgent.teamId,
         model: newAgent.model,
-        color: newAgent.system === 'data' ? 'blue' : 'pink',
-      };
-
-      if (newAgent.system === 'data') {
-        setAvailableAgents(availableAgents.map(a => a.id === editingAgent.id ? updatedAgent : a));
-      } else if (newAgent.system === 'team' && newAgent.teamId) {
-        setAvailableTeams(availableTeams.map(team => {
-          if (team.id === newAgent.teamId) {
-            return {
-              ...team,
-              agents: team.agents.map(a => a.id === editingAgent.id ? updatedAgent : a),
-            };
-          }
-          return team;
-        }));
-      }
-      setCustomAgents(customAgents.map(a => a.id === editingAgent.id ? updatedAgent : a));
-
-      toast({
-        title: 'Agent updated',
-        description: `${updatedAgent.name} has been updated`,
-        status: 'success',
-        duration: 2000,
-        isClosable: true,
-      });
-    } else {
-      const agent = {
-        id: `custom-${Date.now()}`,
-        name: newAgent.name,
-        description: newAgent.description,
-        type: newAgent.category,
-        system: newAgent.system,
-        teamId: newAgent.teamId,
-        icon: MdSmartToy,
+        icon: 'MdSmartToy',
         color: newAgent.system === 'data' ? 'blue' : 'purple',
         isBuiltin: false,
-        model: newAgent.model,
       };
 
-      if (newAgent.system === 'data') {
-        setAvailableAgents([...availableAgents, agent]);
-      } else if (newAgent.system === 'team' && newAgent.teamId) {
-        setAvailableTeams(availableTeams.map(team => {
-          if (team.id === newAgent.teamId) {
-            return { ...team, agents: [...team.agents, agent] };
+      if (editingAgent) {
+        // Update existing agent via API
+        const response = await horizonAgentApi.update(editingAgent.id, agentData);
+        
+        if (response.success) {
+          const updatedAgent = response.data;
+
+          // Update local state
+          if (newAgent.system === 'data') {
+            setAvailableAgents(availableAgents.map(a => 
+              a.id === editingAgent.id ? updatedAgent : a
+            ));
+          } else if (newAgent.system === 'team' && newAgent.teamId) {
+            setAvailableTeams(availableTeams.map(team => {
+              if (team.id === newAgent.teamId) {
+                return {
+                  ...team,
+                  agents: team.agents.map(a => a.id === editingAgent.id ? updatedAgent : a),
+                };
+              }
+              return team;
+            }));
           }
-          return team;
-        }));
+          setCustomAgents(customAgents.map(a => 
+            a.id === editingAgent.id ? updatedAgent : a
+          ));
+
+          toast({
+            title: 'Agent updated',
+            description: `${updatedAgent.name} has been updated`,
+            status: 'success',
+            duration: 2000,
+            isClosable: true,
+          });
+        }
+      } else {
+        // Create new agent via API
+        const response = await horizonAgentApi.create(currentHorizonId, agentData);
+
+        if (response.success) {
+          const createdAgent = response.data;
+
+          // Update local state
+          if (newAgent.system === 'data') {
+            setAvailableAgents([...availableAgents, createdAgent]);
+          } else if (newAgent.system === 'team' && newAgent.teamId) {
+            setAvailableTeams(availableTeams.map(team => {
+              if (team.id === newAgent.teamId) {
+                return { ...team, agents: [...team.agents, createdAgent] };
+              }
+              return team;
+            }));
+          }
+
+          setCustomAgents([...customAgents, createdAgent]);
+
+          toast({
+            title: 'Agent created',
+            description: `${createdAgent.name} added`,
+            status: 'success',
+            duration: 2000,
+            isClosable: true,
+          });
+        }
       }
 
-      setCustomAgents([...customAgents, agent]);
-
+      // Reset form
+      setNewAgent({
+        name: '',
+        description: '',
+        category: 'data_retriever',
+        system: 'data',
+        teamId: null,
+        model: 'gpt-4',
+      });
+      setEditingAgent(null);
+      onAgentClose();
+    } catch (error) {
+      console.error('[Agent] Save error:', error);
       toast({
-        title: 'Agent created',
-        description: `${agent.name} added`,
-        status: 'success',
-        duration: 2000,
+        title: 'Failed to save agent',
+        description: error.message || 'An error occurred',
+        status: 'error',
+        duration: 3000,
         isClosable: true,
       });
     }
-
-    setNewAgent({
-      name: '',
-      description: '',
-      category: 'data_retriever',
-      system: 'data',
-      teamId: null,
-      model: 'gpt-4',
-    });
-    setEditingAgent(null);
-    onAgentClose();
   };
 
   const handleAddAgentToTeam = (teamId) => {
@@ -936,7 +963,7 @@ function PipelineBuilderInner() {
     onAgentOpen();
   };
 
-  const handleCreateTeam = () => {
+  const handleCreateTeam = async () => {
     if (!newTeam.name.trim()) {
       toast({
         title: 'Team name required',
@@ -947,24 +974,144 @@ function PipelineBuilderInner() {
       return;
     }
 
-    const team = {
-      id: `team-${Date.now()}`,
-      name: newTeam.name,
-      description: newTeam.description,
-      agents: [],
-    };
+    try {
+      const response = await teamApi.create(currentHorizonId, {
+        name: newTeam.name,
+        description: newTeam.description,
+      });
 
-    setAvailableTeams([...availableTeams, team]);
-    setNewTeam({ name: '', description: '' });
-    onTeamClose();
+      const team = response.data;
+      setAvailableTeams([...availableTeams, team]);
+      setNewTeam({ name: '', description: '' });
+      onTeamClose();
 
-    toast({
-      title: 'Team created',
-      description: `${team.name} added`,
-      status: 'success',
-      duration: 2000,
-      isClosable: true,
-    });
+      toast({
+        title: 'Team created',
+        description: `${team.name} added successfully`,
+        status: 'success',
+        duration: 2000,
+        isClosable: true,
+      });
+    } catch (error) {
+      console.error('[Team] Save error:', error);
+      toast({
+        title: 'Failed to create team',
+        description: error.message || 'An error occurred',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+    }
+  };
+
+  const handleDeletePortfolio = async (portfolioId) => {
+    try {
+      await portfolioApi.delete(portfolioId);
+      
+      // Remove from local state (use 'id' not '_id' since backend returns 'id')
+      setPortfolios(portfolios.filter(p => p.id !== portfolioId));
+      
+      // Remove any nodes using this portfolio
+      setNodes((nds) => nds.filter(node => {
+        if (node.type === 'dataSource' && node.data?.portfolioId === portfolioId) {
+          return false;
+        }
+        return true;
+      }));
+
+      toast({
+        title: 'Portfolio deleted',
+        status: 'success',
+        duration: 2000,
+        isClosable: true,
+      });
+    } catch (error) {
+      console.error('[Portfolio] Delete error:', error);
+      toast({
+        title: 'Failed to delete portfolio',
+        description: error.message || 'An error occurred',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+    }
+  };
+
+  const handleDeleteAgent = async (agentId) => {
+    try {
+      await horizonAgentApi.delete(agentId);
+      
+      // Remove from teams in local state (use 'id' not '_id')
+      setAvailableTeams(availableTeams.map(team => ({
+        ...team,
+        agents: team.agents.filter(a => a.id !== agentId),
+      })));
+
+      // Also remove from availableAgents (data agents) if it's there
+      setAvailableAgents(availableAgents.filter(a => a.id !== agentId));
+      
+      // Remove any nodes using this agent
+      setNodes((nds) => nds.filter(node => {
+        if ((node.type === 'agent' || node.type === 'teamAgent') && node.data?.agentId === agentId) {
+          return false;
+        }
+        return true;
+      }));
+
+      toast({
+        title: 'Agent deleted',
+        status: 'success',
+        duration: 2000,
+        isClosable: true,
+      });
+    } catch (error) {
+      console.error('[Agent] Delete error:', error);
+      toast({
+        title: 'Failed to delete agent',
+        description: error.message || 'An error occurred',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+    }
+  };
+
+  const handleDeleteTeam = async (teamId) => {
+    try {
+      await teamApi.delete(teamId);
+      
+      // Remove from local state (use 'id' not '_id')
+      setAvailableTeams(availableTeams.filter(t => t.id !== teamId));
+      
+      // Remove any nodes using this team
+      setNodes((nds) => nds.filter(node => {
+        if (node.type === 'team' && node.data?.teamId === teamId) {
+          return false;
+        }
+        // Also remove team agents from this team
+        if (node.type === 'teamAgent' && node.data?.teamId === teamId) {
+          return false;
+        }
+        return true;
+      }));
+
+      toast({
+        title: 'Team deleted',
+        description: 'Team and its agents have been removed',
+        status: 'success',
+        duration: 2000,
+        isClosable: true,
+      });
+    } catch (error) {
+      console.error('[Team] Delete error:', error);
+      toast({
+        title: 'Failed to delete team',
+        description: error.message || 'An error occurred',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+    }
   };
 
 
@@ -1056,11 +1203,30 @@ function PipelineBuilderInner() {
           setNodes(horizon.nodes || []);
           setEdges(horizon.edges || []);
           
-          const loadedAgents = horizon.agents || horizon.availableAgents;
-          setAvailableAgents(loadedAgents && loadedAgents.length > 0 ? loadedAgents : [...BUILTIN_AGENTS]);
+          // Merge builtin data agents with custom agents from API
+          const loadedDataAgents = horizon.agents || horizon.availableAgents || [];
+          const customDataAgents = loadedDataAgents.filter(a => !a.isBuiltin);
+          const mergedDataAgents = [...BUILTIN_AGENTS, ...customDataAgents];
+          setAvailableAgents(mergedDataAgents);
           
-          const loadedTeams = horizon.teams || horizon.availableTeams;
-          setAvailableTeams(loadedTeams && loadedTeams.length > 0 ? loadedTeams : [...DEFAULT_TEAMS]);
+          // Merge builtin teams with custom teams from API
+          const loadedTeams = horizon.teams || horizon.availableTeams || [];
+          const customTeams = loadedTeams.filter(t => !t.id?.startsWith('team'));
+          
+          // Merge: keep builtin teams structure, add custom teams, populate agents
+          const mergedTeams = DEFAULT_TEAMS.map(builtinTeam => {
+            // Find if there are custom team agents for this builtin team
+            const customTeamAgents = loadedTeams
+              .find(t => t.id === builtinTeam.id)?.agents?.filter(a => !a.isBuiltin) || [];
+            
+            return {
+              ...builtinTeam,
+              agents: [...builtinTeam.agents, ...customTeamAgents],
+            };
+          });
+          
+          // Add fully custom teams
+          setAvailableTeams([...mergedTeams, ...customTeams]);
           
           setCustomAgents(horizon.customAgents || []);
           setCurrentHorizonName(horizon.name);
@@ -1199,43 +1365,77 @@ function PipelineBuilderInner() {
                   </Text>
                 ) : (
                   portfolios.map((portfolio) => (
-                  <Box
+                  <HStack
                     key={portfolio.id}
                     p="10px"
                     bg="white"
                     borderRadius="8px"
                     border="1px solid"
                     borderColor="gray.200"
-                    cursor="grab"
                     _hover={{ bg: 'green.50', borderColor: 'green.400', boxShadow: 'sm' }}
-                    _active={{ cursor: 'grabbing' }}
                     w="full"
-                    onMouseDown={(e) => {
-                      // Drag portfolio as a data source node
-                      handlePortfolioMouseDown(e, portfolio);
-                    }}
-                    onContextMenu={(e) => {
-                      // Right-click to edit
-                      e.preventDefault();
-                      setEditingPortfolio(portfolio);
-                      setSelectedStocks([...portfolio.stocks]);
-                      onPortfolioOpen();
-                    }}
+                    spacing="8px"
                   >
-                    <VStack align="start" spacing="4px">
-                      <HStack spacing="8px" w="full" justify="space-between">
-                        <Text fontSize="sm" fontWeight="600">
-                          {portfolio.name}
+                    <Box
+                      flex="1"
+                      cursor="grab"
+                      _active={{ cursor: 'grabbing' }}
+                      onMouseDown={(e) => {
+                        // Drag portfolio as a data source node
+                        handlePortfolioMouseDown(e, portfolio);
+                      }}
+                    >
+                      <VStack align="start" spacing="4px">
+                        <HStack spacing="8px" w="full" justify="space-between">
+                          <Text fontSize="sm" fontWeight="600">
+                            {portfolio.name}
+                          </Text>
+                          <Badge colorScheme="green" fontSize="xs">
+                            {portfolio.stocks.length}
+                          </Badge>
+                        </HStack>
+                        <Text fontSize="xs" color="gray.600" noOfLines={1}>
+                          {portfolio.stocks.join(', ') || 'Empty'}
                         </Text>
-                        <Badge colorScheme="green" fontSize="xs">
-                          {portfolio.stocks.length}
-                        </Badge>
-                      </HStack>
-                      <Text fontSize="xs" color="gray.600" noOfLines={1}>
-                        {portfolio.stocks.join(', ') || 'Empty'}
-                      </Text>
-                    </VStack>
-                  </Box>
+                      </VStack>
+                    </Box>
+                    
+                    <Menu>
+                      <MenuButton
+                        as={IconButton}
+                        icon={<Icon as={MdMoreVert} />}
+                        size="sm"
+                        variant="ghost"
+                        aria-label="Portfolio options"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <MenuList>
+                        <MenuItem
+                          icon={<Icon as={MdEdit} />}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingPortfolio(portfolio);
+                            setSelectedStocks([...portfolio.stocks]);
+                            onPortfolioOpen();
+                          }}
+                        >
+                          Edit
+                        </MenuItem>
+                        <MenuItem
+                          icon={<Icon as={MdDelete} />}
+                          color="red.600"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (window.confirm(`Delete portfolio "${portfolio.name}"?`)) {
+                              handleDeletePortfolio(portfolio.id);
+                            }
+                          }}
+                        >
+                          Delete
+                        </MenuItem>
+                      </MenuList>
+                    </Menu>
+                  </HStack>
                   ))
                 )}
               </VStack>
@@ -1304,20 +1504,24 @@ function PipelineBuilderInner() {
                 overflowY="auto"
               >
               {availableAgents.map((agent) => (
-                <Box
+                <HStack
                   key={agent.id}
                   p="10px"
                   bg="white"
                   borderRadius="8px"
                   border="1px solid"
                   borderColor="gray.200"
-                  cursor="grab"
                   _hover={{ bg: 'blue.50', borderColor: 'blue.400', boxShadow: 'sm' }}
-                  _active={{ cursor: 'grabbing' }}
-                  onMouseDown={(e) => handleAgentMouseDown(e, agent)}
                   w="full"
+                  spacing="8px"
                 >
-                  <HStack spacing="10px">
+                  <HStack
+                    flex="1"
+                    spacing="10px"
+                    cursor="grab"
+                    _active={{ cursor: 'grabbing' }}
+                    onMouseDown={(e) => handleAgentMouseDown(e, agent)}
+                  >
                     <Icon as={agent.icon} color={`${agent.color}.600`} boxSize="20px" />
                     <Text fontSize="sm" fontWeight="600" flex="1">
                       {agent.name}
@@ -1328,7 +1532,52 @@ function PipelineBuilderInner() {
                       </Badge>
                     )}
                   </HStack>
-                </Box>
+                  
+                  {!agent.isBuiltin && (
+                    <Menu>
+                      <MenuButton
+                        as={IconButton}
+                        icon={<Icon as={MdMoreVert} />}
+                        size="sm"
+                        variant="ghost"
+                        aria-label="Agent options"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <MenuList>
+                        <MenuItem
+                          icon={<Icon as={MdEdit} />}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingAgent(agent);
+                            setNewAgent({
+                              name: agent.name,
+                              description: agent.description,
+                              category: agent.category,
+                              system: agent.system,
+                              teamId: agent.teamId,
+                              model: agent.model,
+                            });
+                            onAgentOpen();
+                          }}
+                        >
+                          Edit
+                        </MenuItem>
+                        <MenuItem
+                          icon={<Icon as={MdDelete} />}
+                          color="red.600"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (window.confirm(`Delete agent "${agent.name}"?`)) {
+                              handleDeleteAgent(agent.id);
+                            }
+                          }}
+                        >
+                          Delete
+                        </MenuItem>
+                      </MenuList>
+                    </Menu>
+                  )}
+                </HStack>
               ))}
               </VStack>
             </Box>
@@ -1400,30 +1649,51 @@ function PipelineBuilderInner() {
                     <Text fontSize="xs" fontWeight="700" color="purple.700">
                       {team.name}
                     </Text>
-                    <IconButton
-                      icon={<Icon as={MdAdd} />}
-                      size="xs"
-                      variant="ghost"
-                      colorScheme="purple"
-                      aria-label="Add agent to team"
-                      onClick={() => handleAddAgentToTeam(team.id)}
-                    />
+                    <HStack spacing="2px">
+                      <IconButton
+                        icon={<Icon as={MdAdd} />}
+                        size="xs"
+                        variant="ghost"
+                        colorScheme="purple"
+                        aria-label="Add agent to team"
+                        onClick={() => handleAddAgentToTeam(team.id)}
+                      />
+                      {/* Only show delete for custom teams (not builtin) */}
+                      {!team.id?.startsWith('team') && (
+                        <IconButton
+                          icon={<Icon as={MdDelete} />}
+                          size="xs"
+                          variant="ghost"
+                          colorScheme="red"
+                          aria-label="Delete team"
+                          onClick={() => {
+                            if (window.confirm(`Delete team "${team.name}" and all its agents?`)) {
+                              handleDeleteTeam(team.id);
+                            }
+                          }}
+                        />
+                      )}
+                    </HStack>
                   </HStack>
                   {team.agents.length > 0 ? (
                     team.agents.map((agent) => (
-                      <Box
+                      <HStack
                         key={agent.id}
                         p="10px"
                         bg="white"
                         borderRadius="8px"
                         border="1px solid"
                         borderColor="gray.200"
-                        cursor="grab"
                         _hover={{ bg: 'purple.50', borderColor: 'purple.400', boxShadow: 'sm' }}
-                        _active={{ cursor: 'grabbing' }}
-                        onMouseDown={(e) => handleAgentMouseDown(e, agent)}
+                        spacing="8px"
                       >
-                        <HStack spacing="10px">
+                        <HStack
+                          flex="1"
+                          spacing="10px"
+                          cursor="grab"
+                          _active={{ cursor: 'grabbing' }}
+                          onMouseDown={(e) => handleAgentMouseDown(e, agent)}
+                        >
                           <Icon as={agent.icon} color={`${agent.color}.600`} boxSize="20px" />
                           <Text fontSize="sm" fontWeight="600" flex="1">
                             {agent.name}
@@ -1434,7 +1704,52 @@ function PipelineBuilderInner() {
                             </Badge>
                           )}
                         </HStack>
-                      </Box>
+                        
+                        {!agent.isBuiltin && (
+                          <Menu>
+                            <MenuButton
+                              as={IconButton}
+                              icon={<Icon as={MdMoreVert} />}
+                              size="sm"
+                              variant="ghost"
+                              aria-label="Agent options"
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                            <MenuList>
+                              <MenuItem
+                                icon={<Icon as={MdEdit} />}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingAgent(agent);
+                                  setNewAgent({
+                                    name: agent.name,
+                                    description: agent.description,
+                                    category: agent.category,
+                                    system: agent.system,
+                                    teamId: agent.teamId,
+                                    model: agent.model,
+                                  });
+                                  onAgentOpen();
+                                }}
+                              >
+                                Edit
+                              </MenuItem>
+                              <MenuItem
+                                icon={<Icon as={MdDelete} />}
+                                color="red.600"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (window.confirm(`Delete agent "${agent.name}"?`)) {
+                                    handleDeleteAgent(agent.id);
+                                  }
+                                }}
+                              >
+                                Delete
+                              </MenuItem>
+                            </MenuList>
+                          </Menu>
+                        )}
+                      </HStack>
                     ))
                   ) : (
                     <Text fontSize="xs" color="gray.500" px="8px" py="4px">
@@ -1896,38 +2211,77 @@ function PipelineBuilderInner() {
                 size="md"
                 w="full"
                 isDisabled={!portfolioConfig.name.trim() || selectedStocks.length === 0}
-                onClick={() => {
-                  setNodes((nds) =>
-                    nds.map((node) => {
-                      if (node.id === selectedNode.id) {
-                        return {
-                          ...node,
-                          data: {
-                            ...node.data,
-                            portfolio: {
-                              ...node.data.portfolio,
-                              name: portfolioConfig.name.trim(),
-                              description: portfolioConfig.description.trim(),
-                              stocks: [...selectedStocks],
-                            },
-                          },
-                        };
+                onClick={async () => {
+                  try {
+                    const portfolioData = {
+                      name: portfolioConfig.name.trim(),
+                      description: portfolioConfig.description.trim(),
+                      stocks: [...selectedStocks],
+                    };
+
+                    // Check if portfolio exists in DB (has valid MongoDB ID)
+                    const existingPortfolio = selectedNode.data.portfolio;
+                    let savedPortfolio;
+
+                    if (existingPortfolio && existingPortfolio.id && existingPortfolio.id.match(/^[0-9a-fA-F]{24}$/)) {
+                      // Update existing portfolio in DB
+                      const response = await portfolioApi.update(existingPortfolio.id, portfolioData);
+                      if (response.success) {
+                        savedPortfolio = response.data;
+                        
+                        // Update portfolios list
+                        setPortfolios(portfolios.map(p => 
+                          p.id === existingPortfolio.id ? savedPortfolio : p
+                        ));
                       }
-                      return node;
-                    })
-                  );
+                    } else {
+                      // Create new portfolio in DB
+                      const response = await portfolioApi.create(currentHorizonId, portfolioData);
+                      if (response.success) {
+                        savedPortfolio = response.data;
+                        
+                        // Add to portfolios list
+                        setPortfolios([...portfolios, savedPortfolio]);
+                      }
+                    }
 
-                  toast({
-                    title: 'Portfolio configuration saved',
-                    description: `${portfolioConfig.name.trim()} with ${selectedStocks.length} stocks`,
-                    status: 'success',
-                    duration: 2000,
-                    isClosable: true,
-                  });
+                    // Update node with saved portfolio data
+                    setNodes((nds) =>
+                      nds.map((node) => {
+                        if (node.id === selectedNode.id) {
+                          return {
+                            ...node,
+                            data: {
+                              ...node.data,
+                              portfolio: savedPortfolio,
+                            },
+                          };
+                        }
+                        return node;
+                      })
+                    );
 
-                  setNodes((nds) =>
-                    nds.map((n) => ({ ...n, selected: false }))
-                  );
+                    toast({
+                      title: 'Portfolio configuration saved',
+                      description: `${portfolioData.name} with ${selectedStocks.length} stocks`,
+                      status: 'success',
+                      duration: 2000,
+                      isClosable: true,
+                    });
+
+                    setNodes((nds) =>
+                      nds.map((n) => ({ ...n, selected: false }))
+                    );
+                  } catch (error) {
+                    console.error('[Portfolio] Save configuration error:', error);
+                    toast({
+                      title: 'Failed to save portfolio',
+                      description: error.message || 'An error occurred',
+                      status: 'error',
+                      duration: 3000,
+                      isClosable: true,
+                    });
+                  }
                 }}
                 fontWeight="600"
               >
@@ -2261,71 +2615,86 @@ function PipelineBuilderInner() {
                 size="md"
                 w="full"
                 isDisabled={selectedStocks.length === 0 || !portfolioConfig.name.trim()}
-                onClick={() => {
-                  if (editingPortfolio) {
-                    const updatedPortfolios = portfolios.map(p =>
-                      p.id === editingPortfolio.id
-                        ? { 
-                            ...p, 
-                            name: portfolioConfig.name.trim(),
-                            description: portfolioConfig.description.trim(),
-                            stocks: [...selectedStocks] 
-                          }
-                        : p
-                    );
-                    setPortfolios(updatedPortfolios);
+                onClick={async () => {
+                  try {
+                    if (editingPortfolio) {
+                      // Update existing portfolio via API
+                      const response = await portfolioApi.update(editingPortfolio.id, {
+                        name: portfolioConfig.name.trim(),
+                        description: portfolioConfig.description.trim(),
+                        stocks: [...selectedStocks],
+                      });
 
-                    if (editingPortfolioNodeId) {
-                      setNodes((nds) =>
-                        nds.map((n) =>
-                          n.id === editingPortfolioNodeId
-                            ? {
-                                ...n,
-                                data: {
-                                  ...n.data,
-                                  portfolio: {
-                                    ...n.data.portfolio,
-                                    name: portfolioConfig.name.trim(),
-                                    description: portfolioConfig.description.trim(),
-                                    stocks: [...selectedStocks],
-                                  },
-                                },
-                              }
-                            : n
-                        )
-                      );
-                      setEditingPortfolioNodeId(null);
+                      if (response.success) {
+                        // Update local state
+                        const updatedPortfolios = portfolios.map(p =>
+                          p.id === editingPortfolio.id ? response.data : p
+                        );
+                        setPortfolios(updatedPortfolios);
+
+                        // Update node if editing from node
+                        if (editingPortfolioNodeId) {
+                          setNodes((nds) =>
+                            nds.map((n) =>
+                              n.id === editingPortfolioNodeId
+                                ? {
+                                    ...n,
+                                    data: {
+                                      ...n.data,
+                                      portfolio: response.data,
+                                    },
+                                  }
+                                : n
+                            )
+                          );
+                          setEditingPortfolioNodeId(null);
+                        }
+
+                        toast({
+                          title: 'Portfolio Updated',
+                          description: `${response.data.name} updated successfully`,
+                          status: 'success',
+                          duration: 2000,
+                          isClosable: true,
+                        });
+                      }
+                    } else {
+                      // Create new portfolio via API
+                      const response = await portfolioApi.create(currentHorizonId, {
+                        name: portfolioConfig.name.trim(),
+                        description: portfolioConfig.description.trim(),
+                        stocks: [...selectedStocks],
+                      });
+
+                      if (response.success) {
+                        setPortfolios([...portfolios, response.data]);
+                        
+                        toast({
+                          title: 'Portfolio Created',
+                          description: `${response.data.name} with ${selectedStocks.length} stocks`,
+                          status: 'success',
+                          duration: 2000,
+                          isClosable: true,
+                        });
+                      }
                     }
 
+                    // Reset form
+                    setSelectedStocks([]);
+                    setPortfolioSearch('');
+                    setPortfolioConfig({ name: '', description: '' });
+                    setEditingPortfolio(null);
+                    onPortfolioClose();
+                  } catch (error) {
+                    console.error('[Portfolio] Save error:', error);
                     toast({
-                      title: 'Portfolio Updated',
-                      description: `${portfolioConfig.name.trim()} now has ${selectedStocks.length} stocks`,
-                      status: 'success',
-                      duration: 2000,
-                      isClosable: true,
-                    });
-                  } else {
-                    const newPortfolio = {
-                      id: Date.now(),
-                      name: portfolioConfig.name.trim() || `Portfolio ${portfolios.length + 1}`,
-                      description: portfolioConfig.description.trim(),
-                      stocks: [...selectedStocks],
-                      createdAt: new Date().toISOString(),
-                    };
-                    setPortfolios([...portfolios, newPortfolio]);
-                    toast({
-                      title: 'Portfolio Created',
-                      description: `${newPortfolio.name} with ${selectedStocks.length} stocks`,
-                      status: 'success',
-                      duration: 2000,
+                      title: 'Failed to save portfolio',
+                      description: error.message || 'An error occurred',
+                      status: 'error',
+                      duration: 3000,
                       isClosable: true,
                     });
                   }
-                  setSelectedStocks([]);
-                  setPortfolioSearch('');
-                  setPortfolioConfig({ name: '', description: '' });
-                  setEditingPortfolio(null);
-                  onPortfolioClose();
                 }}
               >
                 {editingPortfolio ? 'Update Portfolio' : 'Create Portfolio'}
