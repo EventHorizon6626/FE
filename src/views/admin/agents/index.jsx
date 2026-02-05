@@ -44,6 +44,14 @@ import {
   MdApi,
   MdSettings,
   MdCheckCircle,
+  MdAccountBalance,
+  MdSentimentSatisfied,
+  MdInsights,
+  MdGavel,
+  MdShield,
+  MdSwapHoriz,
+  MdBalance,
+  MdAssessment,
 } from 'react-icons/md';
 import Card from 'components/card/Card.js';
 
@@ -84,12 +92,59 @@ const BUILTIN_SYSTEM1_AGENTS = [
   },
 ];
 
-// Built-in System 2 Agents
+// Built-in System 2 Agents (Based on TradingAgents Multi-Agent Framework)
 const BUILTIN_SYSTEM2_AGENTS = [
+  // ===== TEAM 1: MARKET ANALYSIS (Analyst Team) =====
   {
     id: 'builtin_4',
+    name: 'Fundamentals Analyst',
+    description: 'Assesses company financials, performance metrics, and intrinsic values using fundamental analysis',
+    category: 'Strategy Agent',
+    system: 'System 2',
+    stage: 'Team 1',
+    icon: MdAccountBalance,
+    status: 'active',
+    isBuiltin: true,
+  },
+  {
+    id: 'builtin_5',
+    name: 'Sentiment Analyst',
+    description: 'Examines social media, public opinion, and market sentiment using sentiment algorithms',
+    category: 'Strategy Agent',
+    system: 'System 2',
+    stage: 'Team 1',
+    icon: MdSentimentSatisfied,
+    status: 'active',
+    isBuiltin: true,
+  },
+  {
+    id: 'builtin_6',
+    name: 'News Analyst',
+    description: 'Tracks global news and macroeconomic indicators for market impact assessment',
+    category: 'Strategy Agent',
+    system: 'System 2',
+    stage: 'Team 1',
+    icon: MdArticle,
+    status: 'active',
+    isBuiltin: true,
+  },
+  {
+    id: 'builtin_7',
+    name: 'Technical Analyst',
+    description: 'Applies technical indicators (MACD, RSI, patterns) to detect trends and forecast movements',
+    category: 'Strategy Agent',
+    system: 'System 2',
+    stage: 'Team 1',
+    icon: MdInsights,
+    status: 'active',
+    isBuiltin: true,
+  },
+
+  // ===== TEAM 2: BULL/BEAR DEBATE (Researcher Team) =====
+  {
+    id: 'builtin_8',
     name: 'Bull Researcher',
-    description: 'Generates bullish investment arguments',
+    description: 'Builds the strongest possible bullish case by critically evaluating analyst insights',
     category: 'Strategy Agent',
     system: 'System 2',
     stage: 'Team 2',
@@ -98,13 +153,61 @@ const BUILTIN_SYSTEM2_AGENTS = [
     isBuiltin: true,
   },
   {
-    id: 'builtin_5',
+    id: 'builtin_9',
     name: 'Bear Researcher',
-    description: 'Generates bearish investment arguments',
+    description: 'Builds the strongest possible bearish case through structured counter-arguments',
     category: 'Strategy Agent',
     system: 'System 2',
     stage: 'Team 2',
     icon: MdWarning,
+    status: 'active',
+    isBuiltin: true,
+  },
+  {
+    id: 'builtin_10',
+    name: 'Research Manager',
+    description: 'Synthesizes bull and bear arguments through dynamic discussions to determine optimal strategy',
+    category: 'Strategy Agent',
+    system: 'System 2',
+    stage: 'Team 2',
+    icon: MdGavel,
+    status: 'active',
+    isBuiltin: true,
+  },
+
+  // ===== TEAM 3: PORTFOLIO OPTIMIZATION =====
+  {
+    id: 'builtin_11',
+    name: 'Portfolio Manager',
+    description: 'Evaluates portfolio-level decisions, position sizing, and asset allocation strategies',
+    category: 'Strategy Agent',
+    system: 'System 2',
+    stage: 'Team 3',
+    icon: MdBalance,
+    status: 'active',
+    isBuiltin: true,
+  },
+
+  // ===== TEAM 4: RISK ASSESSMENT =====
+  {
+    id: 'builtin_12',
+    name: 'Risk Manager',
+    description: 'Evaluates portfolio risk, volatility, and liquidity before approving or rejecting transactions',
+    category: 'Risk Manager',
+    system: 'System 2',
+    stage: 'Team 4',
+    icon: MdShield,
+    status: 'active',
+    isBuiltin: true,
+  },
+  {
+    id: 'builtin_13',
+    name: 'Trader Agent',
+    description: 'Synthesizes analyst and researcher reports to determine trade timing, sizing, and execution',
+    category: 'Strategy Agent',
+    system: 'System 2',
+    stage: 'Team 4',
+    icon: MdSwapHoriz,
     status: 'active',
     isBuiltin: true,
   },
@@ -134,12 +237,72 @@ const SYSTEM2_TEAMS = [
   { value: 'team4', label: 'Team 4 - Risk Assessment' },
 ];
 
-const MODELS = [
-  { value: 'gpt-4', label: 'GPT-4' },
-  { value: 'gpt-4-turbo', label: 'GPT-4 Turbo' },
-  { value: 'claude-3-opus', label: 'Claude 3 Opus' },
-  { value: 'claude-3-sonnet', label: 'Claude 3 Sonnet' },
+// LLM Providers (TradingAgents compatible)
+// Note: Only Ollama is FREE (runs locally). All others require API keys + payment.
+const LLM_PROVIDERS = [
+  { value: 'ollama', label: 'Ollama (Local - FREE)', icon: '🦙', free: true },
+  { value: 'openai', label: 'OpenAI', icon: '✨', free: false },
+  { value: 'anthropic', label: 'Anthropic (Claude)', icon: '🤖', free: false },
+  { value: 'google', label: 'Google (Gemini)', icon: '💎', free: false },
+  { value: 'xai', label: 'xAI (Grok)', icon: '🚀', free: false },
+  { value: 'openrouter', label: 'OpenRouter', icon: '🔀', free: false },
 ];
+
+// Deep Think Models by provider
+const DEEP_THINK_MODELS = {
+  openai: [
+    { value: 'gpt-4o', label: 'GPT-4o' },
+    { value: 'gpt-4-turbo', label: 'GPT-4 Turbo' },
+    { value: 'o1', label: 'O1' },
+  ],
+  anthropic: [
+    { value: 'claude-opus-4-5', label: 'Claude Opus 4.5' },
+    { value: 'claude-sonnet-4-5', label: 'Claude Sonnet 4.5' },
+    { value: 'claude-3-5-sonnet', label: 'Claude 3.5 Sonnet' },
+  ],
+  google: [
+    { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
+  ],
+  xai: [
+    { value: 'grok-2', label: 'Grok 2' },
+  ],
+  openrouter: [
+    { value: 'openai/gpt-4o', label: 'GPT-4o' },
+    { value: 'anthropic/claude-3.5-sonnet', label: 'Claude 3.5 Sonnet' },
+  ],
+  ollama: [
+    { value: 'llama3.3:70b', label: 'Llama 3.3 70B' },
+    { value: 'mixtral:8x7b', label: 'Mixtral 8x7B' },
+    { value: 'deepseek-r1:70b', label: 'DeepSeek R1 70B' },
+  ],
+};
+
+// Quick Think Models by provider
+const QUICK_THINK_MODELS = {
+  openai: [
+    { value: 'gpt-4o-mini', label: 'GPT-4o Mini' },
+    { value: 'o1-mini', label: 'O1 Mini' },
+    { value: 'o3-mini', label: 'O3 Mini' },
+  ],
+  anthropic: [
+    { value: 'claude-3-5-haiku', label: 'Claude 3.5 Haiku' },
+  ],
+  google: [
+    { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
+    { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash' },
+  ],
+  xai: [
+    { value: 'grok-2-mini', label: 'Grok 2 Mini' },
+  ],
+  openrouter: [
+    { value: 'openai/gpt-4o-mini', label: 'GPT-4o Mini' },
+  ],
+  ollama: [
+    { value: 'llama3.1:8b', label: 'Llama 3.1 8B' },
+    { value: 'mistral:7b', label: 'Mistral 7B' },
+    { value: 'deepseek-r1:14b', label: 'DeepSeek R1 14B' },
+  ],
+};
 
 export default function AgentsPage() {
   const [customAgents, setCustomAgents] = useState([]);
@@ -148,14 +311,17 @@ export default function AgentsPage() {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const toast = useToast();
 
-  // New agent form state
+  // New agent form state (TradingAgents dual-LLM config)
+  // Default to Ollama (FREE local inference) - users can switch to paid APIs
   const [newAgent, setNewAgent] = useState({
     name: '',
     description: '',
     category: 'data_retriever',
     system: 'System 1',
     stage: 'stage1',
-    model: 'gpt-4',
+    provider: 'ollama',
+    deepThinkModel: 'llama3.3:70b',
+    quickThinkModel: 'llama3.1:8b',
     status: 'inactive',
   });
 
@@ -181,6 +347,7 @@ export default function AgentsPage() {
     }
 
     const categoryInfo = AGENT_CATEGORIES.find((c) => c.value === newAgent.category);
+    const providerInfo = LLM_PROVIDERS.find((p) => p.value === newAgent.provider);
     const agent = {
       id: Date.now().toString(),
       name: newAgent.name,
@@ -192,7 +359,13 @@ export default function AgentsPage() {
         : SYSTEM2_TEAMS.find(t => t.value === newAgent.stage)?.label,
       icon: MdSmartToy,
       status: newAgent.status,
-      model: newAgent.model,
+      // TradingAgents dual-LLM configuration
+      llm: {
+        provider: newAgent.provider,
+        providerName: providerInfo?.label,
+        deepThinkModel: newAgent.deepThinkModel,
+        quickThinkModel: newAgent.quickThinkModel,
+      },
       isBuiltin: false,
       created: 'Just now',
     };
@@ -204,7 +377,9 @@ export default function AgentsPage() {
       category: 'data_retriever',
       system: 'System 1',
       stage: 'stage1',
-      model: 'gpt-4',
+      provider: 'ollama',
+      deepThinkModel: 'llama3.3:70b',
+      quickThinkModel: 'llama3.1:8b',
       status: 'inactive',
     });
     onClose();
@@ -766,22 +941,76 @@ export default function AgentsPage() {
 
               <FormControl isRequired>
                 <FormLabel fontSize="sm" fontWeight="600">
-                  Model
+                  LLM Provider
                 </FormLabel>
                 <Select
-                  value={newAgent.model}
-                  onChange={(e) =>
-                    setNewAgent({ ...newAgent, model: e.target.value })
-                  }
+                  value={newAgent.provider}
+                  onChange={(e) => {
+                    const provider = e.target.value;
+                    const deepModels = DEEP_THINK_MODELS[provider] || [];
+                    const quickModels = QUICK_THINK_MODELS[provider] || [];
+                    setNewAgent({
+                      ...newAgent,
+                      provider,
+                      deepThinkModel: deepModels[0]?.value || '',
+                      quickThinkModel: quickModels[0]?.value || '',
+                    });
+                  }}
                   size="md"
                 >
-                  {MODELS.map((model) => (
-                    <option key={model.value} value={model.value}>
-                      {model.label}
+                  {LLM_PROVIDERS.map((provider) => (
+                    <option key={provider.value} value={provider.value}>
+                      {provider.icon} {provider.label}
                     </option>
                   ))}
                 </Select>
               </FormControl>
+
+              <SimpleGrid columns={2} spacing="15px">
+                <FormControl isRequired>
+                  <FormLabel fontSize="sm" fontWeight="600">
+                    Deep Think Model
+                  </FormLabel>
+                  <Select
+                    value={newAgent.deepThinkModel}
+                    onChange={(e) =>
+                      setNewAgent({ ...newAgent, deepThinkModel: e.target.value })
+                    }
+                    size="md"
+                  >
+                    {(DEEP_THINK_MODELS[newAgent.provider] || []).map((model) => (
+                      <option key={model.value} value={model.value}>
+                        {model.label}
+                      </option>
+                    ))}
+                  </Select>
+                  <Text fontSize="xs" color="gray.500" mt="4px">
+                    For complex reasoning & synthesis
+                  </Text>
+                </FormControl>
+
+                <FormControl isRequired>
+                  <FormLabel fontSize="sm" fontWeight="600">
+                    Quick Think Model
+                  </FormLabel>
+                  <Select
+                    value={newAgent.quickThinkModel}
+                    onChange={(e) =>
+                      setNewAgent({ ...newAgent, quickThinkModel: e.target.value })
+                    }
+                    size="md"
+                  >
+                    {(QUICK_THINK_MODELS[newAgent.provider] || []).map((model) => (
+                      <option key={model.value} value={model.value}>
+                        {model.label}
+                      </option>
+                    ))}
+                  </Select>
+                  <Text fontSize="xs" color="gray.500" mt="4px">
+                    For rapid tasks & data processing
+                  </Text>
+                </FormControl>
+              </SimpleGrid>
 
               <FormControl display="flex" alignItems="center">
                 <FormLabel fontSize="sm" fontWeight="600" mb="0">
