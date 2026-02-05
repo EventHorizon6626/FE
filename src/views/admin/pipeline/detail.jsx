@@ -26,6 +26,7 @@ import {
 } from '@chakra-ui/react';
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+// useMutation removed - now used in CustomAgentNode component
 import {
   MdAccountBalance,
   MdAdd,
@@ -65,6 +66,7 @@ import '../../../assets/css/ReactFlowCustom.css';
 import { searchSecurities, SECURITIES } from 'data/securities';
 import { runAgent, getAgentInputData } from 'lib/agentApi';
 import { request } from 'lib/api';
+import { CustomAgentNode } from 'components/pipeline/CustomAgentNode';
 
 const BUILTIN_AGENTS = [
   // System 1: Data Pipeline Agents
@@ -194,6 +196,9 @@ const MODELS = [
 const initialNodes = [];
 const initialEdges = [];
 
+// CustomAgentNode moved to components/pipeline/CustomAgentNode.jsx
+// This component now uses useMutation hook for better loading state management
+/*
 function CustomAgentNode({ data, id, selected }) {
   const handlePlay = (e) => {
     e.stopPropagation();
@@ -201,6 +206,8 @@ function CustomAgentNode({ data, id, selected }) {
       data.onPlay(id);
     }
   };
+
+  const isLoading = data.isLoading || false;
 
   return (
     <Box position="relative" className="custom-agent-node">
@@ -232,6 +239,8 @@ function CustomAgentNode({ data, id, selected }) {
           boxShadow="md"
           _hover={{ transform: 'scale(1.1)', boxShadow: 'lg' }}
           transition="all 0.2s"
+          isLoading={isLoading}
+          isDisabled={isLoading}
         />
       </Box>
 
@@ -255,6 +264,7 @@ function CustomAgentNode({ data, id, selected }) {
     </Box>
   );
 }
+*/
 
 function CustomPortfolioNode({ data, id, selected }) {
   return (
@@ -560,6 +570,8 @@ function PipelineBuilderInner() {
 
   const toast = useToast();
   const { screenToFlowPosition } = useReactFlow();
+  
+  // loadingNodes state removed - now managed internally by CustomAgentNode with useMutation
 
   useEffect(() => {
     if (!currentHorizonId || isLoading) return;
@@ -703,113 +715,12 @@ function PipelineBuilderInner() {
 
   const { getNodes, getEdges } = useReactFlow();
 
+  // handleNodePlay is no longer needed - logic moved to CustomAgentNode component with useMutation hook
+  /*
   const handleNodePlay = useCallback(async (nodeId) => {
-    const currentNodes = getNodes();
-    const currentEdges = getEdges();
-
-    const node = currentNodes.find((n) => n.id === nodeId);
-    const agentName = node?.data?.agent?.name || 'agent';
-    const agentType = node?.data?.agent?.type;
-
-    console.log('[handleNodePlay] Starting execution for node:', nodeId);
-    console.log('[handleNodePlay] Total nodes:', currentNodes.length);
-    console.log('[handleNodePlay] Total edges:', currentEdges.length);
-    console.log('[handleNodePlay] Edges:', currentEdges);
-
-    try {
-      const loadingToast = toast({
-        title: 'Running agent',
-        description: `Executing ${agentName}...`,
-        status: 'info',
-        duration: null,
-        isClosable: false,
-      });
-
-      const inputData = getAgentInputData(node, currentEdges, currentNodes);
-
-      const result = await runAgent(agentType, inputData);
-
-      setNodes((nds) =>
-        nds.map((n) =>
-          n.id === nodeId
-            ? {
-                ...n,
-                data: {
-                  ...n.data,
-                  output: result,
-                  lastRun: new Date().toISOString(),
-                },
-              }
-            : n
-        )
-      );
-
-      setEdges((eds) =>
-        eds.map((edge) =>
-          edge.source === nodeId
-            ? {
-                ...edge,
-                data: { ...edge.data, output: result },
-                animated: true,
-              }
-            : edge
-        )
-      );
-
-      toast.close(loadingToast);
-      toast({
-        title: 'Agent completed',
-        description: `${agentName} finished successfully`,
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
-      });
-
-      console.log(`[${agentName}] Output:`, result);
-
-      const hasOutgoingEdge = currentEdges.some(edge => edge.source === nodeId);
-      if (!hasOutgoingEdge) {
-        const outputNodeId = `output-${Date.now()}`;
-        const agentNodePosition = currentNodes.find(n => n.id === nodeId)?.position || { x: 0, y: 0 };
-
-        const outputNode = {
-          id: outputNodeId,
-          type: 'outputNode',
-          position: {
-            x: agentNodePosition.x + 350,
-            y: agentNodePosition.y,
-          },
-          data: {
-            result: result,
-            agentName: agentName,
-            timestamp: new Date().toISOString(),
-            onDelete: handleNodeDelete,
-          },
-        };
-
-        const outputEdge = {
-          id: `edge-${nodeId}-${outputNodeId}`,
-          source: nodeId,
-          target: outputNodeId,
-          type: 'custom',
-          data: { output: result },
-          animated: true,
-        };
-
-        setNodes((nds) => [...nds, outputNode]);
-        setEdges((eds) => [...eds, outputEdge]);
-      }
-    } catch (error) {
-      toast({
-        title: 'Agent failed',
-        description: error.message || `Failed to execute ${agentName}`,
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
-      console.error(`[${agentName}] Error:`, error);
-    }
+    ...
   }, [getNodes, getEdges, setNodes, toast]);
+  */
 
   const handleAgentMouseDown = useCallback(async (event, agent) => {
     event.preventDefault();
@@ -828,7 +739,7 @@ function PipelineBuilderInner() {
       data: {
         agent: agent,
         onDelete: handleNodeDelete,
-        onPlay: handleNodePlay,
+        // onPlay removed - now handled internally by CustomAgentNode with useMutation
         config: {
           name: agent.name,
           description: agent.description || '',
@@ -851,7 +762,7 @@ function PipelineBuilderInner() {
       isClosable: true,
     });
 
-  }, [screenToFlowPosition, setNodes, toast, handleNodeDelete, handleNodePlay]);
+  }, [screenToFlowPosition, setNodes, toast, handleNodeDelete]);
 
   const handlePortfolioMouseDown = useCallback((event, portfolio) => {
     event.preventDefault();
