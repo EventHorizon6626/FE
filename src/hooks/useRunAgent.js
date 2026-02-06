@@ -8,7 +8,9 @@ export const useRunAgent = ({
   setNodes,
   setEdges,
   getNodes,
-  getEdges
+  getEdges,
+  horizonId,  // Add horizonId parameter
+  refetchHorizon,  // Add refetchHorizon parameter
 }) => {
   const toast = useToast();
 
@@ -40,7 +42,15 @@ export const useRunAgent = ({
       console.log('[useRunAgent] Total edges:', currentEdges.length);
 
       const inputData = getAgentInputData(node, currentEdges, currentNodes);
-      const result = await runAgent(agentType, inputData, customAgentConfig);
+      
+      // Build execution context for backend auto-save
+      const executionContext = horizonId ? {
+        horizonId,
+        agentNodeId: nodeId,
+        agentPosition: node?.position || { x: 0, y: 0 },
+      } : undefined;
+
+      const result = await runAgent(agentType, inputData, customAgentConfig, executionContext);
 
       return {
         nodeId,
@@ -48,6 +58,7 @@ export const useRunAgent = ({
         result,
         currentNodes,
         currentEdges,
+        node,
       };
     },
     onMutate: async ({ nodeId }) => {
@@ -67,7 +78,7 @@ export const useRunAgent = ({
       return { loadingToastId, agentName };
     },
     onSuccess: (data, variables, context) => {
-      const { nodeId, agentName, result, currentNodes, currentEdges } = data;
+      const { nodeId, agentName, result, currentNodes, node } = data;
 
       // Update node with result
       setNodes((nds) =>
@@ -113,10 +124,83 @@ export const useRunAgent = ({
 
       console.log(`[${agentName}] Output:`, result);
 
-      // Create output node if no outgoing edge
-      const hasOutgoingEdge = currentEdges.some(edge => edge.source === nodeId);
-      if (!hasOutgoingEdge && onSuccess) {
+      // Handle backend-saved outputNode
+      const savedOutputNode = result?._outputNode;
+      
+      if (savedOutputNode) {
+        console.log('[useRunAgent] Backend saved outputNode:', savedOutputNode);
+        
+        // Remove old outputNode from canvas (if exists)
+        const oldOutputNode = currentNodes.find(n => 
+          n.type === 'outputNode' && n.data?.sourceAgentNodeId === nodeId
+        );
+        
+        if (oldOutputNode) {
+          console.log('[useRunAgent] Removing old output:', oldOutputNode.id);
+          setNodes((nds) => nds.filter((n) => n.id !== oldOutputNode.id));
+          setEdges((eds) => eds.filter((e) => 
+            e.source !== oldOutputNode.id && e.target !== oldOutputNode.id
+          ));
+        }
+
+        // Add NEW outputNode to canvas (use id from backend)
+        const agentNodePosition = node?.position || { x: 0, y: 0 };
+        const newOutputNode = {
+          id: savedOutputNode.id, // Use backend _id
+          type: 'outputNode',
+          position: {
+            x: agentNodePosition.x + 350,
+            y: agentNodePosition.y,
+          },
+          data: {
+            result: result,
+            agentName: agentName,
+            timestamp: savedOutputNode.createdAt,
+            sourceAgentNodeId: nodeId,
+          },
+        };
+
+        setNodes((nds) => [...nds, newOutputNode]);
+
+        // Create edge from agent to new output
+        const newOutputEdge = {
+          id: `edge-${nodeId}-${savedOutputNode.id}`,
+          source: nodeId,
+          target: savedOutputNode.id,
+          type: 'custom',
+          data: { output: result },
+          animated: true,
+        };
+
+        setEdges((eds) => [...eds, newOutputEdge]);
+
+        // Update agentNode with current outputNodeId reference
+        setNodes((nds) =>
+          nds.map((n) =>
+            n.id === nodeId
+              ? {
+                  ...n,
+                  data: {
+                    ...n.data,
+                    currentOutputNodeId: savedOutputNode.id,
+                    lastExecutedAt: savedOutputNode.createdAt,
+                  },
+                }
+              : n
+          )
+        );
+      }
+
+      // Call custom onSuccess callback if provided
+      if (onSuccess) {
         onSuccess({ nodeId, result, agentName, currentNodes });
+      }
+
+      // Refetch horizon data after successful agent execution
+      // Note: This ensures data sync even if CustomAgentNode doesn't call refetch
+      if (refetchHorizon) {
+        console.log('[useRunAgent] Refetching horizon data after agent execution');
+        refetchHorizon();
       }
     },
     onError: (error, variables, context) => {

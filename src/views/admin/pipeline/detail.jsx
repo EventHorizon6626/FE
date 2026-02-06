@@ -34,6 +34,7 @@ import {
 } from '@chakra-ui/react';
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 // useMutation removed - now used in CustomAgentNode component
 import {
   MdAccountBalance,
@@ -80,8 +81,11 @@ import { request } from 'lib/api';
 import portfolioApi from 'lib/portfolioApi';
 import horizonAgentApi from 'lib/horizonAgentApi';
 import teamApi from 'lib/teamApi';
+import nodeApi from 'lib/nodeApi';
 import { CustomAgentNode } from 'components/pipeline/CustomAgentNode';
 import { RobotHead } from 'components/pipeline/RobotHead';
+import Chart from 'react-apexcharts';
+import StockAnalysisCard from 'views/admin/portfolio/components/StockAnalysisCard';
 
 const BUILTIN_AGENTS = [
   // System 1: Data Pipeline Agents
@@ -390,9 +394,16 @@ function CustomOutputNode({ data, id, selected }) {
             />
           </HStack>
 
-          <Badge colorScheme="teal" fontSize="xs">
-            📤 Result
-          </Badge>
+          <HStack spacing="6px">
+            <Badge colorScheme="teal" fontSize="xs">
+              📤 Result
+            </Badge>
+            {data.revisionCount && data.revisionCount > 1 && (
+              <Badge colorScheme="purple" fontSize="xs">
+                {data.revisionCount} runs
+              </Badge>
+            )}
+          </HStack>
 
           <VStack align="start" spacing="4px" w="full">
             <Text fontSize="xs" color="gray.600">
@@ -443,13 +454,44 @@ function PipelineBuilderInner() {
   const navigate = useNavigate();
   
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  const [edges, setEdges, onEdgesChangeDefault] = useEdgesState(initialEdges);
+  
+  // Custom onEdgesChange to handle edge deletion
+  const onEdgesChange = useCallback(
+    async (changes) => {
+      // Apply changes to ReactFlow immediately
+      onEdgesChangeDefault(changes);
+
+      // Check if any edge was removed
+      const removedEdges = changes.filter(change => change.type === 'remove');
+      
+      if (removedEdges.length > 0) {
+        // Find the edge details before it's removed
+        const currentEdges = edges;
+        
+        for (const change of removedEdges) {
+          const edge = currentEdges.find(e => e.id === change.id);
+          if (edge) {
+            try {
+              // Clear parentId of the target node
+              await nodeApi.update(edge.target, {
+                parentId: null,
+              });
+              console.log(`[onEdgesChange] Cleared parentId for node ${edge.target}`);
+            } catch (error) {
+              console.error('[onEdgesChange] Failed to clear parent relationship:', error);
+            }
+          }
+        }
+      }
+    },
+    [onEdgesChangeDefault, edges]
+  );
   const [availableAgents, setAvailableAgents] = useState([...BUILTIN_AGENTS]); // System 1 agents
   const [availableTeams, setAvailableTeams] = useState([...DEFAULT_TEAMS]); // System 2 teams
   const [customAgents, setCustomAgents] = useState([]);
   const [currentHorizonName, setCurrentHorizonName] = useState('');
   const [currentHorizonId, setCurrentHorizonId] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
 
   const { isOpen: isAgentOpen, onOpen: onAgentOpen, onClose: onAgentClose } = useDisclosure();
   const { isOpen: isTeamOpen, onOpen: onTeamOpen, onClose: onTeamClose } = useDisclosure();
@@ -504,6 +546,12 @@ function PipelineBuilderInner() {
 
   const [draggingAgent, setDraggingAgent] = useState(null);
 
+  // State for right sidebar to show output node data
+  const [selectedOutputNode, setSelectedOutputNode] = useState(null);
+  const [revisions, setRevisions] = useState([]);
+  const [selectedRevisionIndex, setSelectedRevisionIndex] = useState(0);
+  const [isLoadingRevisions, setIsLoadingRevisions] = useState(false);
+  
   useEffect(() => {
     if (editingPortfolio) {
       setSelectedStocks(editingPortfolio.stocks || []);
@@ -518,6 +566,36 @@ function PipelineBuilderInner() {
   const toast = useToast();
   const { screenToFlowPosition } = useReactFlow();
   
+  // Load horizon data from backend using React Query
+  const { isLoading, data: horizonData, error: horizonError, refetch: refetchHorizon } = useQuery({
+    queryKey: ['horizon', id],
+    queryFn: async () => {
+      console.log('[PipelineDetail] Fetching horizon:', id);
+      const result = await request.get(`/horizons/${id}`);
+      if (!result.success || !result.data) {
+        throw new Error('Failed to load horizon data');
+      }
+      return result.data;
+    },
+    enabled: !!id,
+  });
+
+  // Handle horizon loading error
+  useEffect(() => {
+    if (horizonError) {
+      console.error('Failed to load horizon:', horizonError);
+      toast({
+        title: 'Failed to load horizon',
+        description: horizonError.message,
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+      // Redirect back to list if horizon not found
+      navigate('/pipeline');
+    }
+  }, [horizonError, toast, navigate]);
+  
   // loadingNodes state removed - now managed internally by CustomAgentNode with useMutation
 
   useEffect(() => {
@@ -528,7 +606,7 @@ function PipelineBuilderInner() {
         await request.put(`/horizons/${currentHorizonId}`, {
           name: currentHorizonName,
           nodes,
-          edges,
+          // edges are auto-generated from nodes' parentId, no need to save
         });
         console.log('[Auto-save] Horizon saved successfully');
       } catch (error) {
@@ -537,11 +615,13 @@ function PipelineBuilderInner() {
     }, 1000);
 
     return () => clearTimeout(saveTimeout);
-  }, [nodes, edges, currentHorizonName, currentHorizonId, isLoading]);
+  }, [nodes, currentHorizonName, currentHorizonId, isLoading]);
 
   const onConnect = useCallback(
-    (params) => {
+    async (params) => {
       console.log('[onConnect] Connection params:', params);
+      
+      // Add edge to canvas immediately
       setEdges((eds) => {
         const newEdge = {
           ...params,
@@ -552,8 +632,27 @@ function PipelineBuilderInner() {
         console.log('[onConnect] Updated edges:', newEdges);
         return newEdges;
       });
+
+      // Save parent-child relationship to backend
+      try {
+        // Target node's parent is the source node
+        await nodeApi.update(params.target, {
+          parentId: params.source,
+        });
+        
+        console.log(`[onConnect] Updated node ${params.target} with parentId: ${params.source}`);
+      } catch (error) {
+        console.error('[onConnect] Failed to update node relationship:', error);
+        toast({
+          title: 'Failed to save connection',
+          description: 'The connection was added to canvas but not saved to database',
+          status: 'warning',
+          duration: 3000,
+          isClosable: true,
+        });
+      }
     },
-    [setEdges]
+    [setEdges, toast]
   );
 
   // Config panel is shown only on double-click (see handleNodeDoubleClick)
@@ -629,6 +728,61 @@ function PipelineBuilderInner() {
     }
   }, []);
 
+  const handleNodeClick = useCallback(async (event, node) => {
+    // When clicking on an outputNode, show sidebar with its data
+    if (node.type === 'outputNode') {
+      console.log('[OutputNode Click] Full node:', node);
+      console.log('[OutputNode Click] Node data:', node.data);
+      console.log('[OutputNode Click] Result:', node.data?.result);
+      setSelectedOutputNode(node);
+
+      // Get the agentNodeId from this outputNode
+      const agentNodeId = node.data?.sourceAgentNodeId;
+      if (!agentNodeId) {
+        console.error('[OutputNode Click] No sourceAgentNodeId found');
+        setRevisions([]);
+        return;
+      }
+
+      // Load ALL outputNodes (revisions) for this agent
+      setIsLoadingRevisions(true);
+      try {
+        const response = await nodeApi.getByAgent(agentNodeId, currentHorizonId);
+        console.log('[Revisions] Loaded outputs:', response.data);
+        const loadedOutputs = response.data.outputs || [];
+        setRevisions(loadedOutputs);
+        setSelectedRevisionIndex(0); // Default to latest (newest first)
+
+        // Update the node with revision count
+        setNodes((nds) =>
+          nds.map((n) =>
+            n.id === node.id
+              ? {
+                  ...n,
+                  data: {
+                    ...n.data,
+                    revisionCount: loadedOutputs.length,
+                  },
+                }
+              : n
+          )
+        );
+      } catch (error) {
+        console.error('[Revisions] Failed to load:', error);
+        setRevisions([]);
+        toast({
+          title: 'Failed to load revision history',
+          description: error.message,
+          status: 'error',
+          duration: 3000,
+          isClosable: true,
+        });
+      } finally {
+        setIsLoadingRevisions(false);
+      }
+    }
+  }, [toast, setNodes, currentHorizonId]);
+
   const handleNodeDelete = useCallback(async (nodeId) => {
     try {
       await request.delete(`/nodes/${nodeId}`);
@@ -703,7 +857,14 @@ function PipelineBuilderInner() {
         };
       }
 
-      const result = await runAgent(agentType, inputData, customAgentConfig);
+      // Execution context for backend to auto-save outputNode
+      const executionContext = {
+        horizonId: currentHorizonId,
+        agentNodeId: nodeId,
+        agentPosition: node?.position || { x: 0, y: 0 },
+      };
+
+      const result = await runAgent(agentType, inputData, customAgentConfig, executionContext);
 
       // Check if result is a paused thinking agent response
       if (result?.status === 'paused' && result?.reason === 'need_data_agent') {
@@ -787,13 +948,29 @@ function PipelineBuilderInner() {
 
       console.log(`[${agentName}] Output:`, result);
 
-      const hasOutgoingEdge = currentEdges.some(edge => edge.source === nodeId);
-      if (!hasOutgoingEdge) {
-        const outputNodeId = `output-${Date.now()}`;
-        const agentNodePosition = currentNodes.find(n => n.id === nodeId)?.position || { x: 0, y: 0 };
+      // Backend auto-saved outputNode (if horizonId was provided)
+      const savedOutputNode = result?._outputNode;
+      
+      if (savedOutputNode) {
+        console.log('[OutputNode] Backend saved:', savedOutputNode);
+        
+        // Remove OLD outputNode from canvas (if exists)
+        const oldOutputNode = currentNodes.find(n => 
+          n.type === 'outputNode' && n.data?.sourceAgentNodeId === nodeId
+        );
+        
+        if (oldOutputNode) {
+          console.log('[OutputNode] Removing old output from canvas:', oldOutputNode.id);
+          setNodes((nds) => nds.filter((n) => n.id !== oldOutputNode.id));
+          setEdges((eds) => eds.filter((e) => 
+            e.source !== oldOutputNode.id && e.target !== oldOutputNode.id
+          ));
+        }
 
-        const outputNode = {
-          id: outputNodeId,
+        // Add NEW outputNode to canvas (use id from backend)
+        const agentNodePosition = currentNodes.find(n => n.id === nodeId)?.position || { x: 0, y: 0 };
+        const newOutputNode = {
+          id: savedOutputNode.id, // Use _id from backend
           type: 'outputNode',
           position: {
             x: agentNodePosition.x + 350,
@@ -802,22 +979,41 @@ function PipelineBuilderInner() {
           data: {
             result: result,
             agentName: agentName,
-            timestamp: new Date().toISOString(),
+            timestamp: savedOutputNode.createdAt,
+            sourceAgentNodeId: nodeId,
             onDelete: handleNodeDelete,
           },
         };
 
-        const outputEdge = {
-          id: `edge-${nodeId}-${outputNodeId}`,
+        setNodes((nds) => [...nds, newOutputNode]);
+
+        // Create edge from agent to new output
+        const newOutputEdge = {
+          id: `edge-${nodeId}-${savedOutputNode.id}`,
           source: nodeId,
-          target: outputNodeId,
+          target: savedOutputNode.id,
           type: 'custom',
           data: { output: result },
           animated: true,
         };
 
-        setNodes((nds) => [...nds, outputNode]);
-        setEdges((eds) => [...eds, outputEdge]);
+        setEdges((eds) => [...eds, newOutputEdge]);
+
+        // Update agentNode with current outputNodeId reference
+        setNodes((nds) =>
+          nds.map((n) =>
+            n.id === nodeId
+              ? {
+                  ...n,
+                  data: {
+                    ...n.data,
+                    currentOutputNodeId: savedOutputNode.id,
+                    lastExecutedAt: savedOutputNode.createdAt,
+                  },
+                }
+              : n
+          )
+        );
       }
     } catch (error) {
       // Clear running state on error
@@ -848,41 +1044,64 @@ function PipelineBuilderInner() {
       y: event.clientY,
     });
 
-    const nodeId = `agent-${Date.now()}`;
-    
-    const newNode = {
-      id: nodeId,
-      type: 'agentNode',
-      position,
-      data: {
-        agent: agent,
-        onDelete: handleNodeDelete,
-        // onPlay removed - now handled internally by CustomAgentNode with useMutation
-        config: {
-          name: agent.name,
-          description: agent.description || '',
-          model: 'gpt-4',
-          temperature: 0.7,
-          maxTokens: 2000,
+    try {
+      // Create node in backend immediately
+      const response = await nodeApi.create({
+        horizonId: currentHorizonId,
+        type: 'agentNode',
+        position,
+        data: {
+          agent: agent,
+          config: {
+            name: agent.name,
+            description: agent.description || '',
+            model: 'gpt-4',
+            temperature: 0.7,
+            maxTokens: 2000,
+          },
         },
-      },
-    };
+      });
 
-    setNodes((nds) => nds.concat(newNode));
-    setDraggingAgent(agent);
-    setTempNodeId(nodeId);
-    
-    toast({
-      title: 'Agent added',
-      description: `${agent.name} added to pipeline`,
-      status: 'success',
-      duration: 2000,
-      isClosable: true,
-    });
+      const savedNode = response.data;
+      
+      const newNode = {
+        id: savedNode.id, // Use backend-generated ID
+        type: 'agentNode',
+        position,
+        data: {
+          agent: agent,
+          horizonId: currentHorizonId, // Pass horizonId for useRunAgent
+          onDelete: handleNodeDelete,
+          refetchHorizon: refetchHorizon,
+          config: savedNode.data.config,
+        },
+      };
 
-  }, [screenToFlowPosition, setNodes, toast, handleNodeDelete]);
+      setNodes((nds) => nds.concat(newNode));
+      setDraggingAgent(agent);
+      setTempNodeId(savedNode.id);
+      
+      toast({
+        title: 'Agent added',
+        description: `${agent.name} added to pipeline`,
+        status: 'success',
+        duration: 2000,
+        isClosable: true,
+      });
+    } catch (error) {
+      console.error('Failed to create agent node:', error);
+      toast({
+        title: 'Failed to add agent',
+        description: error.message || 'Could not create agent node',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+    }
 
-  const handlePortfolioMouseDown = useCallback((event, portfolio) => {
+  }, [screenToFlowPosition, setNodes, toast, handleNodeDelete, currentHorizonId]);
+
+  const handlePortfolioMouseDown = useCallback(async (event, portfolio) => {
     event.preventDefault();
 
     const position = screenToFlowPosition({
@@ -890,30 +1109,52 @@ function PipelineBuilderInner() {
       y: event.clientY,
     });
 
-    const nodeId = `portfolio-${Date.now()}`;
+    try {
+      // Create node in backend immediately
+      const response = await nodeApi.create({
+        horizonId: currentHorizonId,
+        type: 'portfolioNode',
+        position,
+        data: {
+          portfolio: portfolio,
+        },
+      });
 
-    const newNode = {
-      id: nodeId,
-      type: 'portfolioNode',
-      position,
-      data: {
-        portfolio: portfolio,
-        onDelete: handleNodeDelete,
-      },
-    };
+      const savedNode = response.data;
 
-    setNodes((nds) => nds.concat(newNode));
-    setDraggingAgent(portfolio);
-    setTempNodeId(nodeId);
+      const newNode = {
+        id: savedNode.id, // Use backend-generated ID
+        type: 'portfolioNode',
+        position,
+        data: {
+          portfolio: portfolio,
+          onDelete: handleNodeDelete,
+          refetchHorizon: refetchHorizon,
+        },
+      };
 
-    toast({
-      title: 'Portfolio added',
-      description: `${portfolio.name} data source added`,
-      status: 'success',
-      duration: 2000,
-      isClosable: true,
-    });
-  }, [screenToFlowPosition, setNodes, toast, handleNodeDelete]);
+      setNodes((nds) => nds.concat(newNode));
+      setDraggingAgent(portfolio);
+      setTempNodeId(savedNode.id);
+
+      toast({
+        title: 'Portfolio added',
+        description: `${portfolio.name} data source added`,
+        status: 'success',
+        duration: 2000,
+        isClosable: true,
+      });
+    } catch (error) {
+      console.error('Failed to create portfolio node:', error);
+      toast({
+        title: 'Failed to add portfolio',
+        description: error.message || 'Could not create portfolio node',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+    }
+  }, [screenToFlowPosition, setNodes, toast, handleNodeDelete, currentHorizonId]);
 
   useEffect(() => {
     if (!draggingAgent || !tempNodeId) return;
@@ -1303,68 +1544,57 @@ function PipelineBuilderInner() {
     }
   };
 
-  // Load horizon data from backend on mount
+  // Process horizon data when it changes
   useEffect(() => {
-    const loadHorizon = async () => {
-      try {
-        setIsLoading(true);
-        const result = await request.get(`/horizons/${id}`);
-        if (result.success && result.data) {
-          const horizon = result.data;
-          console.log('[PipelineDetail] Loaded horizon:', horizon);
-          console.log('[PipelineDetail] Horizon ID:', horizon.id, 'URL ID:', id);
-          setNodes(horizon.nodes || []);
-          setEdges(horizon.edges || []);
-          
-          // Merge builtin data agents with custom agents from API
-          const loadedDataAgents = horizon.agents || horizon.availableAgents || [];
-          const customDataAgents = loadedDataAgents.filter(a => !a.isBuiltin);
-          const mergedDataAgents = [...BUILTIN_AGENTS, ...customDataAgents];
-          setAvailableAgents(mergedDataAgents);
-          
-          // Merge builtin teams with custom teams from API
-          const loadedTeams = horizon.teams || horizon.availableTeams || [];
-          const customTeams = loadedTeams.filter(t => !t.id?.startsWith('team'));
-          
-          // Merge: keep builtin teams structure, add custom teams, populate agents
-          const mergedTeams = DEFAULT_TEAMS.map(builtinTeam => {
-            // Find if there are custom team agents for this builtin team
-            const customTeamAgents = loadedTeams
-              .find(t => t.id === builtinTeam.id)?.agents?.filter(a => !a.isBuiltin) || [];
-            
-            return {
-              ...builtinTeam,
-              agents: [...builtinTeam.agents, ...customTeamAgents],
-            };
-          });
-          
-          // Add fully custom teams
-          setAvailableTeams([...mergedTeams, ...customTeams]);
-          
-          setCustomAgents(horizon.customAgents || []);
-          setCurrentHorizonName(horizon.name);
-          setCurrentHorizonId(horizon.id);
-          setPortfolios(horizon.portfolios || []);
+    if (horizonData) {
+      console.log('[PipelineDetail] Loaded horizon:', horizonData);
+      console.log('[PipelineDetail] Horizon ID:', horizonData.id, 'URL ID:', id);
+      
+      // Add horizonId and refetch to all nodes for useRunAgent
+      const nodesWithHorizonId = (horizonData.nodes || []).map(node => ({
+        ...node,
+        data: {
+          ...node.data,
+          horizonId: horizonData.id,
+          onDelete: handleNodeDelete,
+          refetchHorizon: refetchHorizon,
         }
-      } catch (error) {
-        console.error('Failed to load horizon:', error);
-        toast({
-          title: 'Failed to load horizon',
-          description: error.message,
-          status: 'error',
-          duration: 5000,
-          isClosable: true,
-        });
-        // Redirect back to list if horizon not found
-        navigate('/pipeline');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    if (id) {
-      loadHorizon();
+      }));
+      
+      setNodes(nodesWithHorizonId);
+      setEdges(horizonData.edges || []);
+      
+      // Merge builtin data agents with custom agents from API
+      const loadedDataAgents = horizonData.agents || horizonData.availableAgents || [];
+      const customDataAgents = loadedDataAgents.filter(a => !a.isBuiltin);
+      const mergedDataAgents = [...BUILTIN_AGENTS, ...customDataAgents];
+      setAvailableAgents(mergedDataAgents);
+      
+      // Merge builtin teams with custom teams from API
+      const loadedTeams = horizonData.teams || horizonData.availableTeams || [];
+      const customTeams = loadedTeams.filter(t => !t.id?.startsWith('team'));
+      
+      // Merge: keep builtin teams structure, add custom teams, populate agents
+      const mergedTeams = DEFAULT_TEAMS.map(builtinTeam => {
+        // Find if there are custom team agents for this builtin team
+        const customTeamAgents = loadedTeams
+          .find(t => t.id === builtinTeam.id)?.agents?.filter(a => !a.isBuiltin) || [];
+        
+        return {
+          ...builtinTeam,
+          agents: [...builtinTeam.agents, ...customTeamAgents],
+        };
+      });
+      
+      // Add fully custom teams
+      setAvailableTeams([...mergedTeams, ...customTeams]);
+      
+      setCustomAgents(horizonData.customAgents || []);
+      setCurrentHorizonName(horizonData.name);
+      setCurrentHorizonId(horizonData.id);
+      setPortfolios(horizonData.portfolios || []);
     }
-  }, [id, navigate, toast]);
+  }, [horizonData, id]);
 
   // Show loading state
   if (isLoading) {
@@ -1888,6 +2118,7 @@ function PipelineBuilderInner() {
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
+          onNodeClick={handleNodeClick}
           onNodeDoubleClick={handleNodeDoubleClick}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
@@ -2958,6 +3189,361 @@ function PipelineBuilderInner() {
           </ModalFooter>
         </ModalContent>
       </Modal>
+
+      {/* Right Sidebar for Output Node Data with Candlestick Charts */}
+      {selectedOutputNode && (
+        <>
+          {/* Overlay background */}
+          <Box
+            position="absolute"
+            top="0"
+            left="0"
+            w="100%"
+            h="100%"
+            bg="blackAlpha.300"
+            zIndex="15"
+            onClick={() => setSelectedOutputNode(null)}
+          />
+          
+          {/* Sidebar panel */}
+          <Box
+            position="absolute"
+            top="0"
+            right="0"
+            h="100%"
+            w="600px"
+            bg="white"
+            boxShadow="2xl"
+            zIndex="16"
+            overflowY="auto"
+            transition="all 0.3s"
+          >
+            {/* Sidebar Header */}
+            <Box
+              p="20px"
+              borderBottom="2px solid"
+              borderColor="gray.200"
+              bg="teal.50"
+              position="sticky"
+              top="0"
+              zIndex="1"
+            >
+              <HStack justify="space-between" mb="12px">
+                <HStack spacing="10px">
+                  <Icon as={MdArticle} color="teal.600" boxSize="24px" />
+                  <VStack align="start" spacing="0">
+                    <Text fontSize="lg" fontWeight="700" color="teal.900">
+                      {selectedOutputNode?.data?.agentName} Output
+                    </Text>
+                    <Text fontSize="xs" color="gray.600">
+                      {isLoadingRevisions ? (
+                        'Loading revisions...'
+                      ) : revisions.length > 0 ? (
+                        `${revisions.length} run${revisions.length > 1 ? 's' : ''} • Latest: ${new Date(revisions[0]?.createdAt || revisions[0]?.data?.timestamp).toLocaleString()}`
+                      ) : (
+                        new Date(selectedOutputNode?.data?.timestamp).toLocaleString()
+                      )}
+                    </Text>
+                  </VStack>
+                </HStack>
+                <IconButton
+                  icon={<Icon as={MdClose} />}
+                  size="sm"
+                  variant="ghost"
+                  colorScheme="gray"
+                  aria-label="Close sidebar"
+                  onClick={() => setSelectedOutputNode(null)}
+                />
+              </HStack>
+
+              {/* Revision History Selector */}
+              {!isLoadingRevisions && revisions.length > 0 && (
+                <Box>
+                  <Text fontSize="xs" fontWeight="600" color="gray.700" mb="8px">
+                    Revision History ({revisions.length} total):
+                  </Text>
+                  <VStack spacing="6px" align="stretch" maxH="200px" overflowY="auto">
+                    {revisions.map((output, index) => {
+                      const isSelected = index === selectedRevisionIndex;
+                      const timestamp = output.createdAt || output.data?.timestamp;
+                      const symbols = output.data?.metadata?.symbols || output.data?.result?.symbols || [];
+                      const period = output.data?.metadata?.period || output.data?.result?.period || 'N/A';
+                      
+                      return (
+                        <Box
+                          key={output._id || output.id}
+                          p="10px"
+                          bg={isSelected ? 'teal.100' : 'white'}
+                          borderRadius="8px"
+                          border="1px solid"
+                          borderColor={isSelected ? 'teal.400' : 'gray.200'}
+                          cursor="pointer"
+                          onClick={() => setSelectedRevisionIndex(index)}
+                          transition="all 0.2s"
+                          _hover={{ bg: isSelected ? 'teal.100' : 'gray.50' }}
+                        >
+                          <HStack justify="space-between">
+                            <VStack align="start" spacing="2px">
+                              <HStack spacing="6px">
+                                <Text fontSize="xs" fontWeight="600" color="gray.800">
+                                  {new Date(timestamp).toLocaleString()}
+                                </Text>
+                                {index === 0 && (
+                                  <Badge colorScheme="purple" fontSize="2xs">
+                                    Latest
+                                  </Badge>
+                                )}
+                              </HStack>
+                              <Text fontSize="2xs" color="gray.600">
+                                {Array.isArray(symbols) && symbols.length > 0 ? symbols.join(', ') : 'No symbols'} • {period}
+                              </Text>
+                            </VStack>
+                            <Badge colorScheme="green" fontSize="2xs">
+                              success
+                            </Badge>
+                          </HStack>
+                        </Box>
+                      );
+                    })}
+                  </VStack>
+                </Box>
+              )}
+
+              {isLoadingRevisions && (
+                <HStack justify="center" p="20px">
+                  <Spinner size="sm" color="teal.600" />
+                  <Text fontSize="sm" color="gray.600">Loading revisions...</Text>
+                </HStack>
+              )}
+            </Box>
+
+            {/* Sidebar Content */}
+            <Box p="20px">
+              <VStack spacing="20px" align="stretch">
+                {(() => {
+                  // Get the current output node (revision) data to display
+                  const currentOutput = revisions.length > 0 ? revisions[selectedRevisionIndex] : null;
+                  const displayResult = currentOutput ? currentOutput.data?.result : selectedOutputNode?.data?.result;
+                  
+                  return (
+                    <>
+                      {/* Summary Info */}
+                      <Box
+                        p="16px"
+                        bg="gray.50"
+                        borderRadius="12px"
+                        border="1px solid"
+                        borderColor="gray.200"
+                      >
+                        <VStack align="start" spacing="8px">
+                          <HStack justify="space-between" w="full">
+                            <Text fontSize="sm" fontWeight="600" color="gray.700">
+                              Status:
+                            </Text>
+                            <Badge colorScheme="green" fontSize="sm">
+                              {displayResult?.status || 'success'}
+                            </Badge>
+                          </HStack>
+                          <HStack justify="space-between" w="full">
+                            <Text fontSize="sm" fontWeight="600" color="gray.700">
+                              Symbols:
+                            </Text>
+                            <Text fontSize="sm" color="gray.800">
+                              {displayResult?.total_symbols || 0}
+                            </Text>
+                          </HStack>
+                          {currentOutput?.createdAt && (
+                            <HStack justify="space-between" w="full">
+                              <Text fontSize="sm" fontWeight="600" color="gray.700">
+                                Executed:
+                              </Text>
+                              <Text fontSize="sm" color="gray.800">
+                                {new Date(currentOutput.createdAt).toLocaleString()}
+                              </Text>
+                            </HStack>
+                          )}
+                        </VStack>
+                      </Box>
+
+                      {/* Render Charts for each symbol */}
+                      {(() => {
+                        console.log('[Sidebar Render] Full result:', displayResult);
+                        console.log('[Sidebar Render] result keys:', displayResult ? Object.keys(displayResult) : 'no result');
+                        
+                        // Try to find chart data in various possible locations
+                        let chartData = displayResult?.chart_data_by_symbol || displayResult?.chart_data;
+                        
+                        // If chart_data doesn't exist, try to find it in result.data
+                        if (!chartData && displayResult?.data) {
+                          chartData = displayResult.data.chart_data_by_symbol || displayResult.data.chart_data;
+                        }
+                        
+                        // If still no chart data, try result.result (nested)
+                        if (!chartData && displayResult?.result) {
+                          chartData = displayResult.result.chart_data_by_symbol || displayResult.result.chart_data;
+                        }
+                        
+                        console.log('[Sidebar Render] Final chartData:', chartData);
+                        
+                        if (!chartData || Object.keys(chartData).length === 0) {
+                          return (
+                            <Box
+                              p="16px"
+                              bg="yellow.50"
+                              borderRadius="12px"
+                              border="1px solid"
+                              borderColor="yellow.200"
+                            >
+                              <VStack align="start" spacing="8px">
+                                <HStack>
+                                  <Icon as={MdWarning} color="yellow.600" />
+                                  <Text fontSize="sm" fontWeight="600" color="yellow.800">
+                                    No Chart Data Available
+                                  </Text>
+                                </HStack>
+                                <Text fontSize="xs" color="gray.600">
+                                  The output doesn't contain chart data. This might be from a non-candlestick agent.
+                                </Text>
+                                <Text fontSize="xs" color="gray.500" fontFamily="monospace">
+                                  Expected: result.chart_data
+                                </Text>
+                              </VStack>
+                            </Box>
+                          );
+                        }
+
+                        return (
+                          <VStack spacing="20px" align="stretch">
+                            <Text fontSize="md" fontWeight="700" color="gray.800">
+                              Candlestick Charts ({Object.keys(chartData).length} symbols)
+                            </Text>
+                            {Object.keys(chartData).map((symbol) => {
+                              const symbolData = chartData[symbol];
+                              console.log(`[Chart Render] ${symbol} data:`, symbolData);
+                              
+                              // Format data for candlestick chart
+                              if (!symbolData?.candles || symbolData.candles.length === 0) {
+                                return (
+                                  <Box key={symbol} p="16px" bg="gray.50" borderRadius="12px">
+                                    <Text fontSize="sm" color="gray.600">
+                                      No chart data available for {symbol}
+                                    </Text>
+                                  </Box>
+                                );
+                              }
+
+                              const chartSeries = [
+                                {
+                                  name: symbol,
+                                  data: symbolData.candles.map((candle) => ({
+                                    x: new Date(candle.date),
+                                    y: [candle.open, candle.high, candle.low, candle.close],
+                                  })),
+                                },
+                              ];
+
+                              const chartOptions = {
+                                chart: {
+                                  type: 'candlestick',
+                                  height: 350,
+                                  toolbar: {
+                                    show: true,
+                                  },
+                                },
+                                title: {
+                                  text: `${symbol} - ${symbolData.period || '1mo'}`,
+                                  align: 'left',
+                                  style: {
+                                    color: '#1F2937',
+                                  },
+                                },
+                                xaxis: {
+                                  type: 'datetime',
+                                  labels: {
+                                    style: {
+                                      colors: '#6B7280',
+                                    },
+                                  },
+                                },
+                                yaxis: {
+                                  tooltip: {
+                                    enabled: true,
+                                  },
+                                  labels: {
+                                    formatter: (value) => `$${value.toFixed(2)}`,
+                                    style: {
+                                      colors: '#6B7280',
+                                    },
+                                  },
+                                },
+                                plotOptions: {
+                                  candlestick: {
+                                    colors: {
+                                      upward: '#26A69A',
+                                      downward: '#EF5350',
+                                    },
+                                  },
+                                },
+                                tooltip: {
+                                  theme: 'dark',
+                                },
+                                grid: {
+                                  borderColor: '#E5E7EB',
+                                },
+                              };
+
+                              return (
+                                <Box
+                                  key={symbol}
+                                  p="16px"
+                                  bg="white"
+                                  borderRadius="12px"
+                                  border="1px solid"
+                                  borderColor="gray.200"
+                                  boxShadow="sm"
+                                >
+                                  <Chart
+                                    options={chartOptions}
+                                    series={chartSeries}
+                                    type="candlestick"
+                                    height={300}
+                                  />
+                                </Box>
+                              );
+                            })}
+                          </VStack>
+                        );
+                      })()}
+
+                      {/* Raw JSON Data (Collapsible) */}
+                      <Box>
+                        <Text fontSize="md" fontWeight="700" color="gray.800" mb="12px">
+                          Raw Output Data
+                        </Text>
+                        <Box
+                          p="16px"
+                          bg="gray.50"
+                          borderRadius="12px"
+                          border="1px solid"
+                          borderColor="gray.200"
+                          maxH="400px"
+                          overflowY="auto"
+                          fontSize="xs"
+                          fontFamily="monospace"
+                        >
+                          <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                            {JSON.stringify(displayResult, null, 2)}
+                          </pre>
+                        </Box>
+                      </Box>
+                    </>
+                  );
+                })()}
+              </VStack>
+            </Box>
+          </Box>
+        </>
+      )}
 
     </Box>
   );

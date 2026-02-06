@@ -1,4 +1,3 @@
-import React from 'react';
 import {
   Box,
   HStack,
@@ -6,7 +5,7 @@ import {
   IconButton,
   Text,
 } from '@chakra-ui/react';
-import { MdPlayArrow, MdSmartToy } from 'react-icons/md';
+import { MdPlayArrow } from 'react-icons/md';
 import { Handle, Position, useReactFlow } from 'reactflow';
 import { useRunAgent } from '../../hooks/useRunAgent';
 import { RobotHead } from './RobotHead';
@@ -19,48 +18,29 @@ export const CustomAgentNode = ({ data, id, selected }) => {
     setEdges,
     getNodes,
     getEdges,
-    onSuccess: ({ nodeId, result, agentName, currentNodes }) => {
-      // Create output node if no outgoing edge exists
-      const outputNodeId = `output-${Date.now()}`;
-      const agentNodePosition = currentNodes.find(n => n.id === nodeId)?.position || { x: 0, y: 0 };
-
-      const outputNode = {
-        id: outputNodeId,
-        type: 'outputNode',
-        position: {
-          x: agentNodePosition.x + 350,
-          y: agentNodePosition.y,
-        },
-        data: {
-          result: result,
-          agentName: agentName,
-          timestamp: new Date().toISOString(),
-          onDelete: data.onDelete,
-        },
-      };
-
-      const outputEdge = {
-        id: `edge-${nodeId}-${outputNodeId}`,
-        source: nodeId,
-        target: outputNodeId,
-        type: 'custom',
-        data: { output: result },
-        animated: true,
-      };
-
-      setNodes((nds) => [...nds, outputNode]);
-      setEdges((eds) => [...eds, outputEdge]);
-    },
+    horizonId: data.horizonId, // Pass horizonId for backend auto-save
+    refetchHorizon: data.refetchHorizon, // Pass refetch function
   });
 
   const handlePlay = (e) => {
     e.stopPropagation();
-    
+
     if (runAgentMutation.isPending) {
       return; // Prevent multiple clicks
     }
 
-    runAgentMutation.mutate({ nodeId: id });
+    runAgentMutation.mutate(
+      { nodeId: id },
+      {
+        onSuccess: () => {
+          // Refetch horizon data after agent completes
+          if (data.refetchHorizon) {
+            console.log('[CustomAgentNode] Refetching horizon after agent execution');
+            data.refetchHorizon();
+          }
+        },
+      }
+    );
   };
 
   return (
@@ -118,7 +98,7 @@ export const CustomAgentNode = ({ data, id, selected }) => {
             {data.agent?.name || 'Agent'}
           </Text>
         </HStack>
-        
+
         {runAgentMutation.isPending && (
           <Text fontSize="xs" color="gray.500" mt="8px">
             Running...

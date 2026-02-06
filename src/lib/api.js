@@ -78,7 +78,11 @@ api.interceptors.response.use(
         status,
         message,
         url: error?.config?.url,
+        code: error?.code,
+        hasResponse: !!error?.response,
+        request: error?.request ? 'exists' : 'missing',
       });
+      console.error('[API] Full error object:', error);
     }
 
     const wrappedError = new Error(message);

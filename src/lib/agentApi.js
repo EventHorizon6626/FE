@@ -39,114 +39,151 @@ export const generateAgentPrompt = async (name, description, team, category) => 
 
 // ===== Custom Agent Execution =====
 
-export const runCustomAgentApi = async (stocks, systemPrompt, userPrompt = null) => {
+export const runCustomAgentApi = async (stocks, systemPrompt, userPrompt = null, context = {}) => {
   const response = await request.post('/ai/agents/custom', {
     stocks,
     system_prompt: systemPrompt,
     user_prompt: userPrompt,
+    ...context,
   });
   return response;
 };
 
-// ===== Built-in Agent Execution =====
+// ===== System 1: Data Pipeline Agents =====
 
-export const runCandlestickAgent = async (stocks) => {
+export const runCandlestickAgent = async (stocks, context = {}) => {
   const response = await request.post('/ai/agents/candlestick', {
     stocks,
     timeframe: '1d',
     period: '30d',
+    ...context,
   });
   return response;
 };
 
-export const runEarningsAgent = async (stocks) => {
+export const runEarningsAgent = async (stocks, context = {}) => {
   const response = await request.post('/ai/agents/earnings', {
     stocks,
+    ...context,
   });
   return response;
 };
 
-export const runNewsAgent = async (stocks) => {
+export const runNewsAgent = async (stocks, context = {}) => {
   const response = await request.post('/ai/agents/news', {
     stocks,
     days: 7,
+    ...context,
   });
   return response;
 };
 
-export const runTechnicalAgent = async (stocks) => {
+export const runTechnicalAgent = async (stocks, context = {}) => {
   const response = await request.post('/ai/agents/technical', {
     stocks,
-    indicators: ['RSI', 'MACD', 'SMA', 'EMA', 'BB'],
+    indicators: ['SMA', 'RSI', 'MACD'],
+    ...context,
   });
   return response;
 };
 
-export const runFundamentalsAgent = async (stocks) => {
+export const runFundamentalsAgent = async (stocks, context = {}) => {
   const response = await request.post('/ai/agents/fundamentals', {
     stocks,
-    metrics: ['PE', 'PB', 'EPS', 'DIVIDEND_YIELD', 'MARKET_CAP'],
-  });
-  return response;
-};
-
-export const runBullResearcherAgent = async (data) => {
-  const response = await request.post('/ai/agents/bull-researcher', {
-    data,
-  });
-  return response;
-};
-
-export const runBearResearcherAgent = async (data) => {
-  const response = await request.post('/ai/agents/bear-researcher', {
-    data,
-  });
-  return response;
-};
-
-export const runResearchManagerAgent = async (bullThesis, bearThesis) => {
-  const response = await request.post('/ai/agents/research-manager', {
-    bull_thesis: bullThesis,
-    bear_thesis: bearThesis,
+    ...context,
   });
   return response;
 };
 
 // ===== System 2 Team 1: Analyst Agents =====
-export const runFundamentalsAnalystAgent = async (stocks) => {
-  const response = await request.post('/ai/agents/fundamentals-analyst', { stocks });
+
+export const runFundamentalsAnalystAgent = async (stocks, context = {}) => {
+  const response = await request.post('/ai/agents/fundamentals-analyst', {
+    stocks,
+    ...context,
+  });
   return response;
 };
 
-export const runSentimentAnalystAgent = async (stocks) => {
-  const response = await request.post('/ai/agents/sentiment-analyst', { stocks });
+export const runSentimentAnalystAgent = async (stocks, context = {}) => {
+  const response = await request.post('/ai/agents/sentiment-analyst', {
+    stocks,
+    ...context,
+  });
   return response;
 };
 
-export const runNewsAnalystAgent = async (stocks) => {
-  const response = await request.post('/ai/agents/news-analyst', { stocks });
+export const runNewsAnalystAgent = async (stocks, context = {}) => {
+  const response = await request.post('/ai/agents/news-analyst', {
+    stocks,
+    ...context,
+  });
   return response;
 };
 
-export const runTechnicalAnalystAgent = async (stocks) => {
-  const response = await request.post('/ai/agents/technical-analyst', { stocks });
+export const runTechnicalAnalystAgent = async (stocks, context = {}) => {
+  const response = await request.post('/ai/agents/technical-analyst', {
+    stocks,
+    ...context,
+  });
+  return response;
+};
+
+// ===== System 2 Team 2: Researcher Agents =====
+
+export const runBullResearcherAgent = async (data, context = {}) => {
+  const response = await request.post('/ai/agents/bull-researcher', {
+    data,
+    ...context,
+  });
+  return response;
+};
+
+export const runBearResearcherAgent = async (data, context = {}) => {
+  const response = await request.post('/ai/agents/bear-researcher', {
+    data,
+    ...context,
+  });
+  return response;
+};
+
+export const runResearchManagerAgent = async (bullThesis, bearThesis, context = {}) => {
+  const response = await request.post('/ai/agents/research-manager', {
+    bull_thesis: bullThesis,
+    bear_thesis: bearThesis,
+    ...context,
+  });
   return response;
 };
 
 // ===== System 2 Team 3: Portfolio =====
-export const runPortfolioManagerAgent = async (stocks, data) => {
-  const response = await request.post('/ai/agents/portfolio-manager', { stocks, data });
+
+export const runPortfolioManagerAgent = async (stocks, data, context = {}) => {
+  const response = await request.post('/ai/agents/portfolio-manager', {
+    stocks,
+    data,
+    ...context,
+  });
   return response;
 };
 
 // ===== System 2 Team 4: Risk & Execution =====
-export const runRiskManagerAgent = async (stocks, data) => {
-  const response = await request.post('/ai/agents/risk-manager', { stocks, data });
+
+export const runRiskManagerAgent = async (stocks, data, context = {}) => {
+  const response = await request.post('/ai/agents/risk-manager', {
+    stocks,
+    data,
+    ...context,
+  });
   return response;
 };
 
-export const runTraderAgent = async (stocks, data) => {
-  const response = await request.post('/ai/agents/trader', { stocks, data });
+export const runTraderAgent = async (stocks, data, context = {}) => {
+  const response = await request.post('/ai/agents/trader', {
+    stocks,
+    data,
+    ...context,
+  });
   return response;
 };
 
@@ -163,8 +200,13 @@ export const runThinkingAgent = async (stocks, systemPrompt, inputData = null, m
   return response;
 };
 
-export const runAgent = async (agentType, inputData, customAgentConfig = null) => {
+// ===== Main Agent Runner =====
+
+export const runAgent = async (agentType, inputData, customAgentConfig = null, executionContext = null) => {
   const { stocks, data } = inputData;
+
+  // Execution context for auto-saving outputNode
+  const context = executionContext || {};
 
   // Handle custom agents with optional thinking mode
   if (customAgentConfig && customAgentConfig.systemPrompt) {
@@ -177,79 +219,81 @@ export const runAgent = async (agentType, inputData, customAgentConfig = null) =
         customAgentConfig.maxIterations || 5
       );
     }
-    return await runCustomAgentApi(stocks, customAgentConfig.systemPrompt, customAgentConfig.userPrompt);
+    return await runCustomAgentApi(stocks, customAgentConfig.systemPrompt, customAgentConfig.userPrompt, context);
   }
 
   switch (agentType) {
     // ===== Custom Agent =====
     case 'custom_agent':
       if (data?.systemPrompt) {
-        return await runCustomAgentApi(stocks, data.systemPrompt, data.userPrompt);
+        return await runCustomAgentApi(stocks, data.systemPrompt, data.userPrompt, context);
       }
       throw new Error('Custom agent requires a system prompt');
 
     // ===== System 1: Data Pipeline Agents =====
     case 'candlestick':
     case 'data_retriever':
-      return await runCandlestickAgent(stocks);
+      return await runCandlestickAgent(stocks, context);
 
     case 'earnings':
-      return await runEarningsAgent(stocks);
+      return await runEarningsAgent(stocks, context);
 
     case 'news':
     case 'news_agent':
-      return await runNewsAgent(stocks);
+      return await runNewsAgent(stocks, context);
 
     case 'technical':
     case 'technical_agent':
-      return await runTechnicalAgent(stocks);
+      return await runTechnicalAgent(stocks, context);
 
     case 'fundamentals':
     case 'financial_metrics':
-      return await runFundamentalsAgent(stocks);
+      return await runFundamentalsAgent(stocks, context);
 
     // ===== System 2 Team 1: Analyst Agents =====
     case 'fundamentals_analyst':
-      return await runFundamentalsAnalystAgent(stocks);
+      return await runFundamentalsAnalystAgent(stocks, context);
 
     case 'sentiment_analyst':
-      return await runSentimentAnalystAgent(stocks);
+      return await runSentimentAnalystAgent(stocks, context);
 
     case 'news_analyst':
-      return await runNewsAnalystAgent(stocks);
+      return await runNewsAnalystAgent(stocks, context);
 
     case 'technical_analyst':
-      return await runTechnicalAnalystAgent(stocks);
+      return await runTechnicalAnalystAgent(stocks, context);
 
     // ===== System 2 Team 2: Researcher Agents =====
     case 'bull_researcher':
-      return await runBullResearcherAgent(data || { stocks });
+      return await runBullResearcherAgent(data || { stocks }, context);
 
     case 'bear_researcher':
-      return await runBearResearcherAgent(data || { stocks });
+      return await runBearResearcherAgent(data || { stocks }, context);
 
     case 'research_manager':
-      return await runResearchManagerAgent(data?.bullThesis, data?.bearThesis);
+      return await runResearchManagerAgent(data?.bullThesis, data?.bearThesis, context);
 
     // ===== System 2 Team 3: Portfolio =====
     case 'portfolio_manager':
-      return await runPortfolioManagerAgent(stocks, data);
+      return await runPortfolioManagerAgent(stocks, data, context);
 
     // ===== System 2 Team 4: Risk & Execution =====
     case 'risk_manager':
-      return await runRiskManagerAgent(stocks, data);
+      return await runRiskManagerAgent(stocks, data, context);
 
     case 'trader_agent':
-      return await runTraderAgent(stocks, data);
+      return await runTraderAgent(stocks, data, context);
 
     default:
       // Fallback: if the agent has a systemPrompt in data, treat as custom agent
       if (data?.systemPrompt) {
-        return await runCustomAgentApi(stocks, data.systemPrompt, data.userPrompt);
+        return await runCustomAgentApi(stocks, data.systemPrompt, data.userPrompt, context);
       }
       throw new Error(`Unknown agent type: ${agentType}`);
   }
 };
+
+// ===== Helper Function =====
 
 export const getAgentInputData = (node, edges, nodes) => {
   console.log('[getAgentInputData] Node ID:', node.id);
