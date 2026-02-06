@@ -110,14 +110,10 @@ export const CustomAgentNode = ({ data, id, selected }) => {
         opacity={runAgentMutation.isPending ? 0.7 : 1}
       >
         <HStack spacing="12px">
-          {data.agent?.isBuiltin === false ? (
-            <RobotHead
-              description={data.agent?.description || data.agent?.name || 'agent'}
-              size={28}
-            />
-          ) : (
-            <Icon as={data.agent?.icon || MdSmartToy} color={`${data.agent?.color || 'blue'}.600`} boxSize="24px" />
-          )}
+          <RobotHead
+            description={data.agent?.description || data.agent?.name || 'agent'}
+            size={28}
+          />
           <Text fontSize="md" fontWeight="700">
             {data.agent?.name || 'Agent'}
           </Text>

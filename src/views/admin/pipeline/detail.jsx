@@ -1635,11 +1635,7 @@ function PipelineBuilderInner() {
                     _active={{ cursor: 'grabbing' }}
                     onMouseDown={(e) => handleAgentMouseDown(e, agent)}
                   >
-                    {agent.isBuiltin ? (
-                      <Icon as={agent.icon} color={`${agent.color}.600`} boxSize="20px" />
-                    ) : (
-                      <RobotHead description={agent.description || agent.name} size={24} />
-                    )}
+                    <RobotHead description={agent.description || agent.name} size={24} />
                     <Text fontSize="sm" fontWeight="600" flex="1">
                       {agent.name}
                     </Text>
@@ -1812,11 +1808,7 @@ function PipelineBuilderInner() {
                           _active={{ cursor: 'grabbing' }}
                           onMouseDown={(e) => handleAgentMouseDown(e, agent)}
                         >
-                          {agent.isBuiltin ? (
-                            <Icon as={agent.icon} color={`${agent.color}.600`} boxSize="20px" />
-                          ) : (
-                            <RobotHead description={agent.description || agent.name} size={24} />
-                          )}
+                          <RobotHead description={agent.description || agent.name} size={24} />
                           <Text fontSize="sm" fontWeight="600" flex="1">
                             {agent.name}
                           </Text>
