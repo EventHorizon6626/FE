@@ -2439,21 +2439,23 @@ function PipelineBuilderInner() {
                 />
               </FormControl>
 
-              <FormControl>
-                <FormLabel fontSize="sm" fontWeight="600">
-                  Category
-                </FormLabel>
-                <Select
-                  value={newAgent.category}
-                  onChange={(e) => setNewAgent({ ...newAgent, category: e.target.value })}
-                >
-                  {AGENT_CATEGORIES.filter(c => c.system === newAgent.system).map((cat) => (
-                    <option key={cat.value} value={cat.value}>
-                      {cat.label}
-                    </option>
-                  ))}
-                </Select>
-              </FormControl>
+              {newAgent.system === 'data' && (
+                <FormControl>
+                  <FormLabel fontSize="sm" fontWeight="600">
+                    Category
+                  </FormLabel>
+                  <Select
+                    value={newAgent.category}
+                    onChange={(e) => setNewAgent({ ...newAgent, category: e.target.value })}
+                  >
+                    {AGENT_CATEGORIES.filter(c => c.system === 'data').map((cat) => (
+                      <option key={cat.value} value={cat.value}>
+                        {cat.label}
+                      </option>
+                    ))}
+                  </Select>
+                </FormControl>
+              )}
 
               <FormControl>
                 <FormLabel fontSize="sm" fontWeight="600">
