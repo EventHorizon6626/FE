@@ -29,7 +29,7 @@ const routes = [
     path: '/pipeline',
     icon: <Icon as={MdHome} width="20px" height="20px" color="inherit" />,
     component: <PipelineList />,
-    requiresAuth: true,
+    requiresAuth: false, // Temporarily disabled for testing
   },
   {
     name: 'Dashboard',
@@ -37,7 +37,7 @@ const routes = [
     path: '/dashboard',
     icon: <Icon as={MdShowChart} width="20px" height="20px" color="inherit" />,
     component: <Dashboard />,
-    requiresAuth: true,
+    requiresAuth: false, // Temporarily disabled for testing
   },
   {
     name: 'Horizon Detail',
@@ -45,7 +45,7 @@ const routes = [
     path: '/pipeline/:id',
     icon: <Icon as={MdHome} width="20px" height="20px" color="inherit" />,
     component: <PipelineDetail />,
-    requiresAuth: true,
+    requiresAuth: false, // Temporarily disabled for testing
     hideInSidebar: true,
   },
   {

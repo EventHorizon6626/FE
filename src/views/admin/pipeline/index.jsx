@@ -199,7 +199,7 @@ export default function PipelineList() {
       <VStack spacing="30px" maxW="1200px" mx="auto">
         <HStack justify="space-between" w="full" mb="20px">
           <Text fontSize="3xl" fontWeight="bold" color="gray.800">
-            Projects
+            Horizons
           </Text>
           <Button
             leftIcon={<Icon as={MdAdd} />}
@@ -207,7 +207,7 @@ export default function PipelineList() {
             size="md"
             onClick={handleNewHorizon}
           >
-            New project
+            New Horizon
           </Button>
         </HStack>
 
@@ -217,7 +217,7 @@ export default function PipelineList() {
               <Icon as={MdSearch} color="gray.400" />
             </InputLeftElement>
             <Input
-              placeholder="Search projects..."
+              placeholder="Search horizons..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               bg="white"
@@ -266,10 +266,10 @@ export default function PipelineList() {
               <>
                 <Icon as={MdSearch} boxSize="64px" color="gray.300" mb="20px" />
                 <Text fontSize="xl" fontWeight="600" color="gray.600" mb="10px">
-                  No projects found
+                  No horizons found
                 </Text>
                 <Text fontSize="md" color="gray.500" mb="20px">
-                  No projects match "{searchQuery}"
+                  No horizons match "{searchQuery}"
                 </Text>
                 <Button
                   variant="outline"
@@ -283,10 +283,10 @@ export default function PipelineList() {
               <>
                 <Icon as={MdHub} boxSize="64px" color="gray.300" mb="20px" />
                 <Text fontSize="xl" fontWeight="600" color="gray.600" mb="10px">
-                  No projects yet
+                  No horizons yet
                 </Text>
                 <Text fontSize="md" color="gray.500" mb="20px">
-                  Create your first project to get started
+                  Create your first horizon to get started
                 </Text>
                 <Button
                   leftIcon={<Icon as={MdAdd} />}
@@ -294,7 +294,7 @@ export default function PipelineList() {
                   size="lg"
                   onClick={handleNewHorizon}
                 >
-                  Create First Project
+                  Create First Horizon
                 </Button>
               </>
             )}
@@ -332,7 +332,7 @@ export default function PipelineList() {
                   variant="ghost"
                   colorScheme="red"
                   onClick={(e) => handleDeleteClick(e, horizon)}
-                  aria-label="Delete project"
+                  aria-label="Delete horizon"
                   position="absolute"
                   top="16px"
                   right="16px"
@@ -340,7 +340,7 @@ export default function PipelineList() {
                   _groupHover={{ opacity: 1 }}
                 />
 
-                {/* Project Title */}
+                {/* Horizon Title */}
                 <Text
                   fontSize="lg"
                   fontWeight="bold"

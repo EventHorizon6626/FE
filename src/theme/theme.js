@@ -10,8 +10,15 @@ import { switchStyles } from "./components/switch";
 import { linkStyles } from "./components/link";
 import { breakpoints } from "./foundations/breakpoints";
 import { globalStyles } from "./styles";
+
 export default extendTheme(
-  { breakpoints }, // Breakpoints
+  {
+    breakpoints,
+    fonts: {
+      heading: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      body: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    },
+  }, // Breakpoints and fonts
   globalStyles,
   badgeStyles, // badge styles
   buttonStyles, // button styles
