@@ -566,13 +566,11 @@ function PipelineBuilderInner() {
     const handleKeyDown = (event) => {
       // Escape closes any open config panel
       if (event.key === 'Escape') {
-        const hasSelectedNode = nodes.some((n) => n.selected);
-        if (hasSelectedNode) {
-          setNodes((nds) =>
-            nds.map((n) => ({ ...n, selected: false }))
-          );
-          return;
-        }
+        setSelectedNode(null);
+        setNodes((nds) =>
+          nds.map((n) => ({ ...n, selected: false }))
+        );
+        return;
       }
 
       const target = event.target;
@@ -1255,6 +1253,8 @@ function PipelineBuilderInner() {
       })
     );
 
+    setSelectedNode(null);
+
     toast({
       title: 'Configuration saved',
       description: 'Node configuration updated successfully',
@@ -1934,6 +1934,7 @@ function PipelineBuilderInner() {
           bg="blackAlpha.400"
           zIndex="19"
           onClick={() => {
+            setSelectedNode(null);
             setNodes((nds) =>
               nds.map((n) => ({ ...n, selected: false }))
             );
@@ -1984,6 +1985,7 @@ function PipelineBuilderInner() {
                   colorScheme="gray"
                   aria-label="Close panel"
                   onClick={() => {
+                    setSelectedNode(null);
                     setNodes((nds) =>
                       nds.map((n) => ({ ...n, selected: false }))
                     );
@@ -2105,6 +2107,7 @@ function PipelineBuilderInner() {
           bg="blackAlpha.400"
           zIndex="19"
           onClick={() => {
+            setSelectedNode(null);
             setNodes((nds) =>
               nds.map((n) => ({ ...n, selected: false }))
             );
@@ -2155,6 +2158,7 @@ function PipelineBuilderInner() {
                   colorScheme="gray"
                   aria-label="Close panel"
                   onClick={() => {
+                    setSelectedNode(null);
                     setNodes((nds) =>
                       nds.map((n) => ({ ...n, selected: false }))
                     );
@@ -2367,6 +2371,7 @@ function PipelineBuilderInner() {
                       isClosable: true,
                     });
 
+                    setSelectedNode(null);
                     setNodes((nds) =>
                       nds.map((n) => ({ ...n, selected: false }))
                     );
