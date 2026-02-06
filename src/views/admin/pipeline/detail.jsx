@@ -195,9 +195,9 @@ const AGENT_CATEGORIES = [
   { value: 'technical_agent', label: '📈 Technical Agent', system: 'data' },
   { value: 'financial_metrics', label: '💰 Financial Metrics', system: 'data' },
   { value: 'api_connector', label: '🔗 API Connector', system: 'data' },
-  { value: 'strategy_agent', label: '🎯 Strategy Agent', system: 'analyzer' },
-  { value: 'risk_manager', label: '⚖️ Risk Manager', system: 'analyzer' },
-  { value: 'custom_analyzer', label: '🤖 Custom Analyzer', system: 'analyzer' },
+  { value: 'strategy_agent', label: '🎯 Strategy Agent', system: 'team' },
+  { value: 'risk_manager', label: '⚖️ Risk Manager', system: 'team' },
+  { value: 'custom_analyzer', label: '🤖 Custom Analyzer', system: 'team' },
 ];
 
 const initialNodes = [];
