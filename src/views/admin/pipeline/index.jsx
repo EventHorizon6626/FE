@@ -1,5 +1,11 @@
 /* eslint-disable */
 import {
+  AlertDialog,
+  AlertDialogBody,
+  AlertDialogContent,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogOverlay,
   Badge,
   Box,
   Button,
@@ -7,10 +13,11 @@ import {
   Icon,
   IconButton,
   Text,
+  useDisclosure,
   useToast,
   VStack
 } from '@chakra-ui/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   MdAdd,
@@ -22,6 +29,9 @@ import { request } from 'lib/api';
 export default function PipelineList() {
   const [savedHorizons, setSavedHorizons] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [horizonToDelete, setHorizonToDelete] = useState(null);
+  const { isOpen: isDeleteOpen, onOpen: onDeleteOpen, onClose: onDeleteClose } = useDisclosure();
+  const cancelRef = useRef();
   const navigate = useNavigate();
   const toast = useToast();
 
@@ -106,29 +116,39 @@ export default function PipelineList() {
     navigate(`/pipeline/${horizonId}`);
   };
 
-  const handleDeleteHorizon = async (e, horizonId) => {
+  const handleDeleteClick = (e, horizon) => {
     e.stopPropagation();
-    try {
-      await request.delete(`/horizons/${horizonId}`);
+    setHorizonToDelete(horizon);
+    onDeleteOpen();
+  };
 
-      setSavedHorizons(savedHorizons.filter(h => h.id !== horizonId));
+  const handleConfirmDelete = async () => {
+    if (!horizonToDelete) return;
+
+    try {
+      await request.delete(`/horizons/${horizonToDelete.id}`);
+
+      setSavedHorizons(savedHorizons.filter(h => h.id !== horizonToDelete.id));
 
       toast({
-        title: 'Horizon disabled',
-        description: 'The horizon has been marked as inactive',
+        title: 'Horizon deleted',
+        description: `"${horizonToDelete.name}" has been deleted`,
         status: 'info',
         duration: 2000,
         isClosable: true,
       });
     } catch (error) {
-      console.error('Failed to disable horizon:', error);
+      console.error('Failed to delete horizon:', error);
       toast({
-        title: 'Failed to disable horizon',
+        title: 'Failed to delete horizon',
         description: error.message,
         status: 'error',
         duration: 5000,
         isClosable: true,
       });
+    } finally {
+      setHorizonToDelete(null);
+      onDeleteClose();
     }
   };
 
@@ -226,8 +246,8 @@ export default function PipelineList() {
                     size="sm"
                     variant="ghost"
                     colorScheme="red"
-                    onClick={(e) => handleDeleteHorizon(e, horizon.id)}
-                    aria-label="Disable horizon"
+                    onClick={(e) => handleDeleteClick(e, horizon)}
+                    aria-label="Delete horizon"
                   />
                 </HStack>
                 <Text fontSize="sm" color="gray.600" mb="12px">
@@ -246,6 +266,35 @@ export default function PipelineList() {
           </Box>
         )}
       </VStack>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog
+        isOpen={isDeleteOpen}
+        leastDestructiveRef={cancelRef}
+        onClose={onDeleteClose}
+        isCentered
+      >
+        <AlertDialogOverlay>
+          <AlertDialogContent>
+            <AlertDialogHeader fontSize="lg" fontWeight="bold">
+              Delete Horizon
+            </AlertDialogHeader>
+
+            <AlertDialogBody>
+              Are you sure you want to delete "{horizonToDelete?.name}"? This action cannot be undone.
+            </AlertDialogBody>
+
+            <AlertDialogFooter>
+              <Button ref={cancelRef} onClick={onDeleteClose}>
+                Cancel
+              </Button>
+              <Button colorScheme="red" onClick={handleConfirmDelete} ml={3}>
+                Delete
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialogOverlay>
+      </AlertDialog>
     </Box>
   );
 }
