@@ -564,12 +564,23 @@ function PipelineBuilderInner() {
 
   useEffect(() => {
     const handleKeyDown = (event) => {
+      // Escape closes any open config panel
+      if (event.key === 'Escape') {
+        const hasSelectedNode = nodes.some((n) => n.selected);
+        if (hasSelectedNode) {
+          setNodes((nds) =>
+            nds.map((n) => ({ ...n, selected: false }))
+          );
+          return;
+        }
+      }
+
       const target = event.target;
-      const isInputField = target.tagName === 'INPUT' || 
-                          target.tagName === 'TEXTAREA' || 
+      const isInputField = target.tagName === 'INPUT' ||
+                          target.tagName === 'TEXTAREA' ||
                           target.isContentEditable ||
                           target.closest('[contenteditable="true"]');
-      
+
       if (isInputField) {
         return;
       }
@@ -1233,13 +1244,14 @@ function PipelineBuilderInner() {
         if (node.id === selectedNode.id) {
           return {
             ...node,
+            selected: false,
             data: {
               ...node.data,
               config: nodeConfig,
             },
           };
         }
-        return node;
+        return { ...node, selected: false };
       })
     );
 
