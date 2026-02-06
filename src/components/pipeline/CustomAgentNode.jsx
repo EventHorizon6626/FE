@@ -4,14 +4,19 @@ import {
   Icon,
   IconButton,
   Text,
+  Tooltip,
+  useClipboard,
+  VStack,
 } from '@chakra-ui/react';
-import { MdPlayArrow } from 'react-icons/md';
+import { MdPlayArrow, MdContentCopy } from 'react-icons/md';
 import { Handle, Position, useReactFlow } from 'reactflow';
 import { useRunAgent } from '../../hooks/useRunAgent';
 import { RobotHead } from './RobotHead';
+import { IDshorten } from '../../utils';
 
 export const CustomAgentNode = ({ data, id, selected }) => {
   const { setNodes, setEdges, getNodes, getEdges } = useReactFlow();
+  const { onCopy } = useClipboard(id);
 
   const runAgentMutation = useRunAgent({
     setNodes,
@@ -89,21 +94,60 @@ export const CustomAgentNode = ({ data, id, selected }) => {
         transition="all 0.2s"
         opacity={runAgentMutation.isPending ? 0.7 : 1}
       >
-        <HStack spacing="12px">
-          <RobotHead
-            description={data.agent?.description || data.agent?.name || 'agent'}
-            size={28}
-          />
-          <Text fontSize="md" fontWeight="700">
-            {data.agent?.name || 'Agent'}
-          </Text>
-        </HStack>
+        <VStack spacing="8px" align="stretch">
+          <HStack spacing="12px">
+            <RobotHead
+              description={data.agent?.description || data.agent?.name || 'agent'}
+              size={28}
+            />
+            <Text fontSize="md" fontWeight="700">
+              {data.agent?.name || 'Agent'}
+            </Text>
+          </HStack>
 
-        {runAgentMutation.isPending && (
-          <Text fontSize="xs" color="gray.500" mt="8px">
-            Running...
-          </Text>
-        )}
+          {/* ID Section with Tooltip and Copy Button */}
+          <Tooltip 
+            label={id} 
+            placement="bottom"
+            hasArrow
+            bg="gray.700"
+            color="white"
+            fontSize="xs"
+            p="8px"
+          >
+            <HStack 
+              spacing="6px" 
+              bg="gray.50" 
+              p="6px 8px" 
+              borderRadius="6px"
+              _hover={{ bg: 'gray.100' }}
+              transition="all 0.2s"
+              justify="space-between"
+            >
+              <Text fontSize="xs" color="gray.600" fontFamily="monospace">
+                {IDshorten(id)}
+              </Text>
+              <IconButton
+                icon={<Icon as={MdContentCopy} />}
+                size="xs"
+                variant="ghost"
+                colorScheme="gray"
+                aria-label="Copy ID"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onCopy();
+                }}
+                _hover={{ bg: 'gray.200' }}
+              />
+            </HStack>
+          </Tooltip>
+
+          {runAgentMutation.isPending && (
+            <Text fontSize="xs" color="gray.500">
+              Running...
+            </Text>
+          )}
+        </VStack>
       </Box>
     </Box>
   );

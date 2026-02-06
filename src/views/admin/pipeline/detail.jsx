@@ -28,6 +28,7 @@ import {
   Text,
   Textarea,
   Tooltip,
+  useClipboard,
   useDisclosure,
   useToast,
   VStack
@@ -41,6 +42,7 @@ import {
   MdAdd,
   MdArticle,
   MdClose,
+  MdContentCopy,
   MdDelete,
   MdEdit,
   MdGroups,
@@ -86,6 +88,7 @@ import { CustomAgentNode } from 'components/pipeline/CustomAgentNode';
 import { RobotHead } from 'components/pipeline/RobotHead';
 import Chart from 'react-apexcharts';
 import StockAnalysisCard from 'views/admin/portfolio/components/StockAnalysisCard';
+import { IDshorten } from 'utils';
 
 // Sidebar view modes
 const SIDEBAR_VIEW = {
@@ -213,6 +216,8 @@ const initialEdges = [];
 // This component now uses useMutation hook for better loading state management
 
 function CustomPortfolioNode({ data, id, selected }) {
+  const { hasCopied, onCopy } = useClipboard(id);
+
   return (
     <Box position="relative" className="custom-portfolio-node">
       <Handle
@@ -239,6 +244,44 @@ function CustomPortfolioNode({ data, id, selected }) {
               {data.portfolio?.name || 'Portfolio'}
             </Text>
           </HStack>
+
+          {/* ID Section with Tooltip and Copy Button */}
+          <Tooltip 
+            label={id} 
+            placement="bottom"
+            hasArrow
+            bg="gray.700"
+            color="white"
+            fontSize="xs"
+            p="8px"
+          >
+            <HStack 
+              spacing="6px" 
+              bg="gray.50" 
+              p="6px 8px" 
+              borderRadius="6px"
+              _hover={{ bg: 'gray.100' }}
+              transition="all 0.2s"
+              w="full"
+              justify="space-between"
+            >
+              <Text fontSize="xs" color="gray.600" fontFamily="monospace">
+                {IDshorten(id)}
+              </Text>
+              <IconButton
+                icon={<Icon as={MdContentCopy} />}
+                size="xs"
+                variant="ghost"
+                colorScheme="gray"
+                aria-label="Copy ID"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onCopy();
+                }}
+                _hover={{ bg: 'gray.200' }}
+              />
+            </HStack>
+          </Tooltip>
 
           {data.portfolio?.description && (
             <Text fontSize="xs" color="gray.600" noOfLines={2}>
@@ -363,6 +406,7 @@ function CustomEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, ta
 
 function CustomOutputNode({ data, id, selected }) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const { hasCopied, onCopy } = useClipboard(id);
 
   return (
     <Box position="relative" className="custom-output-node">
@@ -391,14 +435,52 @@ function CustomOutputNode({ data, id, selected }) {
                 {data.agentName} Output
               </Text>
             </HStack>
-            <IconButton
+            {/* <IconButton
               icon={<Icon as={isExpanded ? MdClose : MdWarning} />}
               size="xs"
               variant="ghost"
               onClick={() => setIsExpanded(!isExpanded)}
               aria-label={isExpanded ? "Collapse" : "Expand"}
-            />
+            /> */}
           </HStack>
+
+          {/* ID Section with Tooltip and Copy Button */}
+          <Tooltip 
+            label={id} 
+            placement="bottom"
+            hasArrow
+            bg="gray.700"
+            color="white"
+            fontSize="xs"
+            p="8px"
+          >
+            <HStack 
+              spacing="6px" 
+              bg="gray.50" 
+              p="6px 8px" 
+              borderRadius="6px"
+              _hover={{ bg: 'gray.100' }}
+              transition="all 0.2s"
+              w="full"
+              justify="space-between"
+            >
+              <Text fontSize="xs" color="gray.600" fontFamily="monospace">
+                {IDshorten(id)}
+              </Text>
+              <IconButton
+                icon={<Icon as={MdContentCopy} />}
+                size="xs"
+                variant="ghost"
+                colorScheme="gray"
+                aria-label="Copy ID"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onCopy();
+                }}
+                _hover={{ bg: 'gray.200' }}
+              />
+            </HStack>
+          </Tooltip>
 
           <HStack spacing="6px">
             <Badge colorScheme="teal" fontSize="xs">
@@ -3263,14 +3345,57 @@ function PipelineBuilderInner() {
                     </Text>
                   </VStack>
                 </HStack>
-                <IconButton
-                  icon={<Icon as={MdClose} />}
-                  size="sm"
-                  variant="ghost"
-                  colorScheme="gray"
-                  aria-label="Close sidebar"
-                  onClick={() => setSelectedOutputNode(null)}
-                />
+                <HStack spacing="8px">
+                  {/* Add to Workflow button - only show in DETAIL view */}
+                  {sidebarView === SIDEBAR_VIEW.DETAIL && revisions[selectedRevisionIndex] && (
+                    <Button
+                      size="sm"
+                      colorScheme="teal"
+                      leftIcon={<Icon as={MdAdd} />}
+                      onClick={async () => {
+                        const currentOutput = revisions[selectedRevisionIndex];
+                        const outputNodeId = currentOutput._id;
+                        
+                        try {
+                          await nodeApi.reactivate(outputNodeId);
+                          
+                          toast({
+                            title: 'Added to workflow',
+                            description: 'This revision is now active in the pipeline',
+                            status: 'success',
+                            duration: 3000,
+                            isClosable: true,
+                          });
+
+                          // Refetch horizon data to update the canvas
+                          refetchHorizon();
+
+                          // Close the sidebar
+                          setSelectedOutputNode(null);
+                        } catch (error) {
+                          console.error('[Add to Workflow] Failed:', error);
+                          toast({
+                            title: 'Failed to add to workflow',
+                            description: error.message,
+                            status: 'error',
+                            duration: 3000,
+                            isClosable: true,
+                          });
+                        }
+                      }}
+                    >
+                      Add to Workflow
+                    </Button>
+                  )}
+                  <IconButton
+                    icon={<Icon as={MdClose} />}
+                    size="sm"
+                    variant="ghost"
+                    colorScheme="gray"
+                    aria-label="Close sidebar"
+                    onClick={() => setSelectedOutputNode(null)}
+                  />
+                </HStack>
               </HStack>
             </Box>
 

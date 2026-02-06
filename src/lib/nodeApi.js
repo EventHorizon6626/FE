@@ -31,6 +31,10 @@ const nodeApi = {
   getByAgent: async (agentNodeId, horizonId) => {
     return request.get(`/nodes/by-agent/${agentNodeId}?horizonId=${horizonId}`);
   },
+
+  reactivate: async (nodeId) => {
+    return request.patch(`/nodes/${nodeId}/reactivate`);
+  },
 };
 
 export default nodeApi;
