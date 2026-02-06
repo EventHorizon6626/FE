@@ -498,6 +498,7 @@ function PipelineBuilderInner() {
     model: 'gpt-4',
     temperature: 0.7,
     maxTokens: 2000,
+    systemPrompt: '',
   });
 
   const [draggingAgent, setDraggingAgent] = useState(null);
@@ -615,6 +616,7 @@ function PipelineBuilderInner() {
         model: node.data?.config?.model || 'gpt-4',
         temperature: node.data?.config?.temperature || 0.7,
         maxTokens: node.data?.config?.maxTokens || 2000,
+        systemPrompt: node.data?.agent?.systemPrompt || '',
       });
     } else if (node.type === 'portfolioNode') {
       setSelectedNode(node);
@@ -1238,6 +1240,7 @@ function PipelineBuilderInner() {
             data: {
               ...node.data,
               config: nodeConfig,
+              agent: { ...node.data.agent, systemPrompt: nodeConfig.systemPrompt },
             },
           };
         }
@@ -2060,6 +2063,27 @@ function PipelineBuilderInner() {
                     Maximum length of the response (100-8000)
                   </Text>
                 </FormControl>
+
+                {/* System Prompt - only for custom (non-builtin) agents */}
+                {selectedNode?.data?.agent && !selectedNode.data.agent.isBuiltin && (
+                  <FormControl>
+                    <FormLabel fontSize="sm" fontWeight="600">
+                      System Prompt
+                    </FormLabel>
+                    <Textarea
+                      value={nodeConfig.systemPrompt}
+                      onChange={(e) =>
+                        setNodeConfig({ ...nodeConfig, systemPrompt: e.target.value })
+                      }
+                      rows={6}
+                      fontSize="sm"
+                      placeholder="Define the agent's behavior..."
+                    />
+                    <Text fontSize="xs" color="gray.500" mt="4px">
+                      The core instruction that defines this agent's behavior
+                    </Text>
+                  </FormControl>
+                )}
               </VStack>
             </Box>
 

@@ -52,7 +52,6 @@ import {
   MdTrendingUp,
   MdWarning,
   MdApi,
-  MdSettings,
   MdCheckCircle,
   MdAccountBalance,
   MdSentimentSatisfied,
@@ -61,7 +60,6 @@ import {
   MdShield,
   MdSwapHoriz,
   MdBalance,
-  MdAssessment,
   MdAutoAwesome,
   MdEdit,
   MdExpandMore,
@@ -293,18 +291,15 @@ export default function AgentsPage() {
     status: 'active',
   });
 
-  // Fetch custom agents on mount
-  useEffect(() => {
-    fetchCustomAgents();
-  }, []);
-
-  const fetchCustomAgents = async () => {
+  const fetchCustomAgents = useCallback(async () => {
     try {
       setIsLoading(true);
       const response = await getAgents();
       if (response.success) {
+        const reverseSystemMap = { data: 'System 1', team: 'System 2' };
         const agents = response.data.map((agent) => ({
           ...agent,
+          system: reverseSystemMap[agent.system] || 'System 2',
           icon: MdSmartToy,
           isBuiltin: false,
         }));
@@ -322,7 +317,12 @@ export default function AgentsPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [toast]);
+
+  // Fetch custom agents on mount
+  useEffect(() => {
+    fetchCustomAgents();
+  }, [fetchCustomAgents]);
 
   // Generate system prompt when name or description changes
   const handleGeneratePrompt = useCallback(async () => {
@@ -458,6 +458,9 @@ export default function AgentsPage() {
       }
     }
 
+    const systemMap = { 'System 1': 'data', 'System 2': 'team' };
+    const systemValue = systemMap[newAgent.system] || 'data';
+
     try {
       setIsLoading(true);
 
@@ -468,7 +471,7 @@ export default function AgentsPage() {
           description: newAgent.description,
           type: 'custom_agent',
           category: newAgent.category,
-          system: newAgent.system,
+          system: systemValue,
           stage: newAgent.stage,
           systemPrompt: systemPrompt,
           enableThinking: newAgent.enableThinking,
@@ -494,7 +497,7 @@ export default function AgentsPage() {
           description: newAgent.description,
           type: 'custom_agent',
           category: newAgent.category,
-          system: newAgent.system,
+          system: systemValue,
           stage: newAgent.stage,
           systemPrompt: systemPrompt,
           enableThinking: newAgent.enableThinking,
@@ -582,7 +585,7 @@ export default function AgentsPage() {
       name: agent.name,
       description: agent.description || '',
       category: agent.category || 'strategy_agent',
-      system: agent.system || 'System 2',
+      system: agent.system === 'data' ? 'System 1' : 'System 2',
       stage: agent.stage || 'Team 1',
       systemPrompt: agent.systemPrompt || '',
       enableThinking: agent.enableThinking !== false,
