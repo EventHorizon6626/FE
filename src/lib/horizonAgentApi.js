@@ -3,7 +3,7 @@ import { request } from './api';
 export const horizonAgentApi = {
   async create(horizonId, data) {
     try {
-      const response = await request.post('/horizon-agents', {
+      const response = await request.post('/agents', {
         horizonId,
         ...data,
       });

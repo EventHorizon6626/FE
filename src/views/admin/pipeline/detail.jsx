@@ -1057,7 +1057,7 @@ function PipelineBuilderInner() {
       console.error('[Agent] Save error:', error);
       toast({
         title: 'Failed to save agent',
-        description: error.message || 'An error occurred',
+        description: error.raw?.details || error.message || 'An error occurred',
         status: 'error',
         duration: 3000,
         isClosable: true,
