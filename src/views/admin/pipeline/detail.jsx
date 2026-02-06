@@ -3416,6 +3416,7 @@ function PipelineBuilderInner() {
                     const timestamp = output.createdAt || output.data?.timestamp;
                     const symbols = output.data?.metadata?.symbols || output.data?.result?.symbols || [];
                     const period = output.data?.metadata?.period || output.data?.result?.period || 'N/A';
+                    const isActive = output.isActive === true;
                     
                     return (
                       <Box
@@ -3424,18 +3425,9 @@ function PipelineBuilderInner() {
                         bg="white"
                         borderRadius="12px"
                         border="2px solid"
-                        borderColor="gray.200"
-                        cursor="pointer"
-                        onClick={() => {
-                          setSelectedRevisionIndex(index);
-                          setSidebarView(SIDEBAR_VIEW.DETAIL);
-                        }}
+                        borderColor={isActive ? "teal.400" : "gray.200"}
                         transition="all 0.2s"
-                        _hover={{ 
-                          bg: 'teal.50',
-                          borderColor: 'teal.400',
-                          transform: 'translateX(4px)',
-                        }}
+                        position="relative"
                       >
                         <HStack justify="space-between" mb="8px">
                           <HStack spacing="8px">
@@ -3448,12 +3440,76 @@ function PipelineBuilderInner() {
                                 Latest
                               </Badge>
                             )}
+                            {isActive && (
+                              <Badge colorScheme="teal" fontSize="2xs">
+                                Active
+                              </Badge>
+                            )}
                           </HStack>
-                          <Badge colorScheme="green" fontSize="xs">
-                            success
-                          </Badge>
+                          <HStack spacing="6px">
+                            <IconButton
+                              icon={<Icon as={MdAdd} />}
+                              size="xs"
+                              colorScheme="teal"
+                              variant="solid"
+                              aria-label="Add to workflow"
+                              isDisabled={isActive}
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                const outputNodeId = output._id;
+                                
+                                try {
+                                  await nodeApi.reactivate(outputNodeId);
+                                  
+                                  toast({
+                                    title: 'Added to workflow',
+                                    description: 'This revision is now active in the pipeline',
+                                    status: 'success',
+                                    duration: 3000,
+                                    isClosable: true,
+                                  });
+
+                                  // Refetch horizon data to update the canvas
+                                  refetchHorizon();
+
+                                  // Refetch revisions to update active status
+                                  const agentNodeId = output.parentId;
+                                  const response = await nodeApi.getByAgent(agentNodeId, currentHorizonId);
+                                  setRevisions(response.data.outputs || []);
+                                } catch (error) {
+                                  console.error('[Add to Workflow] Failed:', error);
+                                  toast({
+                                    title: 'Failed to add to workflow',
+                                    description: error.message,
+                                    status: 'error',
+                                    duration: 3000,
+                                    isClosable: true,
+                                  });
+                                }
+                              }}
+                              _disabled={{
+                                opacity: 0.4,
+                                cursor: 'not-allowed',
+                                bg: 'gray.300',
+                              }}
+                            />
+                            <Badge colorScheme="green" fontSize="xs">
+                              success
+                            </Badge>
+                          </HStack>
                         </HStack>
-                        <VStack align="start" spacing="4px">
+                        <VStack 
+                          align="start" 
+                          spacing="4px"
+                          cursor="pointer"
+                          onClick={() => {
+                            setSelectedRevisionIndex(index);
+                            setSidebarView(SIDEBAR_VIEW.DETAIL);
+                          }}
+                          _hover={{ 
+                            opacity: 0.8,
+                          }}
+                        >
                           <Text fontSize="xs" color="gray.600">
                             📅 {new Date(timestamp).toLocaleString()}
                           </Text>
