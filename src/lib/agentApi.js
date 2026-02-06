@@ -228,7 +228,10 @@ export const runAgent = async (agentType, inputData, customAgentConfig = null, e
       if (data?.systemPrompt) {
         return await runCustomAgentApi(stocks, data.systemPrompt, data.userPrompt, context);
       }
-      throw new Error('Custom agent requires a system prompt');
+      throw new Error(
+        'Custom agent requires a system prompt. ' +
+        'Please edit this agent and add a system prompt before running it.'
+      );
 
     // ===== System 1: Data Pipeline Agents =====
     case 'candlestick':

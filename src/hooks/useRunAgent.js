@@ -28,6 +28,14 @@ export const useRunAgent = ({
       const agentType = node?.data?.agent?.type;
       const agent = node?.data?.agent;
 
+      // Check if custom agent has empty system prompt
+      if (agentType === 'custom_agent' && (!agent?.systemPrompt || !agent.systemPrompt.trim())) {
+        throw new Error(
+          `Cannot execute agent "${agentName}": This agent is missing a system prompt. ` +
+          `Please edit the agent and ensure it has a valid system prompt before running it.`
+        );
+      }
+
       // Build customAgentConfig for agents that have their own systemPrompt
       const customAgentConfig = agent?.systemPrompt
         ? {

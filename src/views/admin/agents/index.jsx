@@ -416,37 +416,31 @@ export default function AgentsPage() {
       return;
     }
 
-    // Generate prompt if not already generated
+    // Always auto-generate prompt if not already generated
     let systemPrompt = newAgent.systemPrompt;
     if (!systemPrompt.trim()) {
-      if (!newAgent.description.trim()) {
-        toast({
-          title: 'Description required',
-          description: 'Please enter a description to generate the system prompt.',
-          status: 'warning',
-          duration: 3000,
-          isClosable: true,
-        });
-        return;
-      }
-
       try {
         setIsGenerating(true);
         const response = await generateAgentPrompt(
           newAgent.name,
-          newAgent.description,
+          newAgent.description || "",
           newAgent.stage,
           newAgent.category
         );
         if (response.success && response.data?.systemPrompt) {
           systemPrompt = response.data.systemPrompt;
+
+          // Verify system prompt is not empty
+          if (!systemPrompt.trim()) {
+            throw new Error('Generated system prompt is empty');
+          }
         } else {
           throw new Error('Failed to generate system prompt');
         }
       } catch (error) {
         toast({
           title: 'Generation failed',
-          description: error.message,
+          description: error.message || 'Unable to generate system prompt. Please try again.',
           status: 'error',
           duration: 3000,
           isClosable: true,
@@ -1241,7 +1235,7 @@ export default function AgentsPage() {
 
                 {!showSystemPrompt && !newAgent.systemPrompt && (
                   <Text fontSize="xs" color="gray.500">
-                    Click "Generate" to create a system prompt based on your name and description
+                    System prompt will be auto-generated from your agent name when you create the agent
                   </Text>
                 )}
               </Box>
@@ -1253,7 +1247,7 @@ export default function AgentsPage() {
                   leftIcon={<Icon as={MdAutoAwesome} />}
                   onClick={handleGeneratePrompt}
                   isLoading={isGenerating}
-                  isDisabled={!newAgent.name.trim() || !newAgent.description.trim()}
+                  isDisabled={!newAgent.name.trim()}
                 >
                   Save Config
                 </Button>

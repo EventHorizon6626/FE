@@ -17,6 +17,7 @@ import {
   MdPerson,
   MdFileDownload,
   MdMenu,
+  MdShowChart,
 } from 'react-icons/md';
 import { useLocation, useNavigate } from 'react-router-dom';
 
@@ -60,6 +61,12 @@ const SidebarContent = ({ navigate, currentPath }) => {
           label="Horizon"
           onClick={() => navigate('/pipeline')}
           isActive={currentPath === '/pipeline'}
+        />
+        <SidebarItem
+          icon={MdShowChart}
+          label="Dashboard"
+          onClick={() => navigate('/dashboard')}
+          isActive={currentPath === '/dashboard'}
         />
       </VStack>
 

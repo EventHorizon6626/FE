@@ -12,6 +12,10 @@ import {
   HStack,
   Icon,
   IconButton,
+  Input,
+  InputGroup,
+  InputLeftElement,
+  Select,
   Text,
   useDisclosure,
   useToast,
@@ -23,8 +27,10 @@ import {
   MdAdd,
   MdDelete,
   MdHub,
+  MdSearch,
 } from 'react-icons/md';
 import { request } from 'lib/api';
+import { formatRelativeTime } from 'utils/formatTime';
 
 export default function PipelineList() {
   const [savedHorizons, setSavedHorizons] = useState([]);
@@ -34,6 +40,8 @@ export default function PipelineList() {
   const cancelRef = useRef();
   const navigate = useNavigate();
   const toast = useToast();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState('updated'); // 'updated', 'created', 'name'
 
   useEffect(() => {
     const loadHorizons = async () => {
@@ -67,6 +75,7 @@ export default function PipelineList() {
     try {
       const horizonData = {
         name: newHorizonName,
+        description: '', // Add empty description
         edges: [],
         viewport: { x: 0, y: 0, zoom: 0.9 },
       };
@@ -152,6 +161,28 @@ export default function PipelineList() {
     }
   };
 
+  // Filter and sort horizons
+  const filteredAndSortedHorizons = savedHorizons
+    .filter((horizon) => {
+      if (!searchQuery) return true;
+      const query = searchQuery.toLowerCase();
+      return (
+        horizon.name.toLowerCase().includes(query) ||
+        (horizon.description && horizon.description.toLowerCase().includes(query))
+      );
+    })
+    .sort((a, b) => {
+      switch (sortBy) {
+        case 'name':
+          return a.name.localeCompare(b.name);
+        case 'created':
+          return new Date(b.createdAt) - new Date(a.createdAt);
+        case 'updated':
+        default:
+          return new Date(b.updatedAt) - new Date(a.updatedAt);
+      }
+    });
+
   if (isLoading) {
     return (
       <Box h="100vh" display="flex" alignItems="center" justifyContent="center" bg="gray.50">
@@ -164,31 +195,64 @@ export default function PipelineList() {
   }
 
   return (
-    <Box h="100vh" bg="gray.50" p="40px">
+    <Box h="100vh" bg="#FAFAFA" p="40px">
       <VStack spacing="30px" maxW="1200px" mx="auto">
-        <HStack justify="space-between" w="full">
-          <VStack align="start" spacing="5px">
-            <HStack spacing="12px">
-              <Icon as={MdHub} color="teal.600" boxSize="32px" />
-              <Text fontSize="3xl" fontWeight="bold" color="gray.800">
-                Horizons
-              </Text>
-            </HStack>
-            <Text fontSize="md" color="gray.600">
-              Select a horizon to work on or create a new one
-            </Text>
-          </VStack>
+        <HStack justify="space-between" w="full" mb="20px">
+          <Text fontSize="3xl" fontWeight="bold" color="gray.800">
+            Projects
+          </Text>
           <Button
             leftIcon={<Icon as={MdAdd} />}
             colorScheme="teal"
-            size="lg"
+            size="md"
             onClick={handleNewHorizon}
           >
-            New Horizon
+            New project
           </Button>
         </HStack>
 
-        {savedHorizons.length === 0 ? (
+        <HStack spacing="15px" w="full" mb="25px">
+          <InputGroup flex="1">
+            <InputLeftElement pointerEvents="none">
+              <Icon as={MdSearch} color="gray.400" />
+            </InputLeftElement>
+            <Input
+              placeholder="Search projects..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              bg="white"
+              borderColor="gray.200"
+              _focus={{
+                borderColor: 'teal.600',
+                boxShadow: '0 0 0 1px teal.600',
+              }}
+            />
+          </InputGroup>
+
+          <HStack spacing="8px">
+            <Text fontSize="sm" color="gray.600" whiteSpace="nowrap">
+              Sort by
+            </Text>
+            <Select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              size="md"
+              width="140px"
+              bg="white"
+              borderColor="gray.200"
+              _focus={{
+                borderColor: 'teal.600',
+                boxShadow: '0 0 0 1px teal.600',
+              }}
+            >
+              <option value="updated">Updated</option>
+              <option value="created">Created</option>
+              <option value="name">Name</option>
+            </Select>
+          </HStack>
+        </HStack>
+
+        {filteredAndSortedHorizons.length === 0 ? (
           <Box
             w="full"
             py="80px"
@@ -198,69 +262,111 @@ export default function PipelineList() {
             border="2px dashed"
             borderColor="gray.300"
           >
-            <Icon as={MdHub} boxSize="64px" color="gray.300" mb="20px" />
-            <Text fontSize="xl" fontWeight="600" color="gray.600" mb="10px">
-              No horizons yet
-            </Text>
-            <Text fontSize="md" color="gray.500" mb="20px">
-              Create your first horizon to get started
-            </Text>
-            <Button
-              leftIcon={<Icon as={MdAdd} />}
-              colorScheme="teal"
-              size="lg"
-              onClick={handleNewHorizon}
-            >
-              Create First Horizon
-            </Button>
+            {searchQuery ? (
+              <>
+                <Icon as={MdSearch} boxSize="64px" color="gray.300" mb="20px" />
+                <Text fontSize="xl" fontWeight="600" color="gray.600" mb="10px">
+                  No projects found
+                </Text>
+                <Text fontSize="md" color="gray.500" mb="20px">
+                  No projects match "{searchQuery}"
+                </Text>
+                <Button
+                  variant="outline"
+                  colorScheme="teal"
+                  onClick={() => setSearchQuery('')}
+                >
+                  Clear search
+                </Button>
+              </>
+            ) : (
+              <>
+                <Icon as={MdHub} boxSize="64px" color="gray.300" mb="20px" />
+                <Text fontSize="xl" fontWeight="600" color="gray.600" mb="10px">
+                  No projects yet
+                </Text>
+                <Text fontSize="md" color="gray.500" mb="20px">
+                  Create your first project to get started
+                </Text>
+                <Button
+                  leftIcon={<Icon as={MdAdd} />}
+                  colorScheme="teal"
+                  size="lg"
+                  onClick={handleNewHorizon}
+                >
+                  Create First Project
+                </Button>
+              </>
+            )}
           </Box>
         ) : (
           <Box
             display="grid"
-            gridTemplateColumns="repeat(auto-fill, minmax(300px, 1fr))"
+            gridTemplateColumns="repeat(auto-fill, minmax(350px, 1fr))"
             gap="20px"
             w="full"
           >
-            {savedHorizons.map((horizon) => (
+            {filteredAndSortedHorizons.map((horizon) => (
               <Box
                 key={horizon.id}
-                p="20px"
+                p="24px"
                 bg="white"
                 borderRadius="12px"
-                border="2px solid"
+                border="1px solid"
                 borderColor="gray.200"
                 cursor="pointer"
-                _hover={{ borderColor: 'teal.400', boxShadow: 'lg', transform: 'translateY(-2px)' }}
+                _hover={{
+                  borderColor: 'gray.300',
+                  boxShadow: 'md',
+                  transform: 'translateY(-2px)'
+                }}
                 transition="all 0.2s"
                 onClick={() => handleLoadHorizon(horizon)}
+                position="relative"
+                role="group"
               >
-                <HStack justify="space-between" mb="12px">
-                  <HStack spacing="10px">
-                    <Icon as={MdHub} color="teal.600" boxSize="24px" />
-                    <Text fontSize="lg" fontWeight="bold" color="gray.800" noOfLines={1}>
-                      {horizon.name}
-                    </Text>
-                  </HStack>
-                  <IconButton
-                    icon={<Icon as={MdDelete} />}
-                    size="sm"
-                    variant="ghost"
-                    colorScheme="red"
-                    onClick={(e) => handleDeleteClick(e, horizon)}
-                    aria-label="Delete horizon"
-                  />
-                </HStack>
-                <Text fontSize="sm" color="gray.600" mb="12px">
-                  Last modified: {new Date(horizon.updatedAt || horizon.savedAt).toLocaleDateString()}
+                {/* Delete button - shows on hover */}
+                <IconButton
+                  icon={<Icon as={MdDelete} />}
+                  size="sm"
+                  variant="ghost"
+                  colorScheme="red"
+                  onClick={(e) => handleDeleteClick(e, horizon)}
+                  aria-label="Delete project"
+                  position="absolute"
+                  top="16px"
+                  right="16px"
+                  opacity={0}
+                  _groupHover={{ opacity: 1 }}
+                />
+
+                {/* Project Title */}
+                <Text
+                  fontSize="lg"
+                  fontWeight="bold"
+                  color="gray.800"
+                  mb="12px"
+                  noOfLines={1}
+                  pr="40px"
+                >
+                  {horizon.name}
                 </Text>
-                <HStack spacing="8px">
-                  <Badge colorScheme="blue" fontSize="xs">
-                    {horizon.nodes?.length || 0} nodes
-                  </Badge>
-                  <Badge colorScheme="purple" fontSize="xs">
-                    {horizon.edges?.length || 0} connections
-                  </Badge>
-                </HStack>
+
+                {/* Description */}
+                <Text
+                  fontSize="sm"
+                  color="gray.600"
+                  mb="16px"
+                  noOfLines={3}
+                  minHeight="60px"
+                >
+                  {horizon.description || 'No description'}
+                </Text>
+
+                {/* Updated timestamp */}
+                <Text fontSize="sm" color="gray.500">
+                  Updated {formatRelativeTime(horizon.updatedAt)}
+                </Text>
               </Box>
             ))}
           </Box>

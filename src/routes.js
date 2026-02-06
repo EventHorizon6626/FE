@@ -3,9 +3,11 @@ import {
   MdPerson,
   MdHome,
   MdLock,
+  MdShowChart,
 } from 'react-icons/md';
 
 import LandingPage from 'views/admin/landing';
+import Dashboard from 'views/admin/dashboard';
 import PipelineList from 'views/admin/pipeline';
 import PipelineDetail from 'views/admin/pipeline/detail';
 import Profile from 'views/admin/profile';
@@ -27,6 +29,14 @@ const routes = [
     path: '/pipeline',
     icon: <Icon as={MdHome} width="20px" height="20px" color="inherit" />,
     component: <PipelineList />,
+    requiresAuth: true,
+  },
+  {
+    name: 'Dashboard',
+    layout: '/',
+    path: '/dashboard',
+    icon: <Icon as={MdShowChart} width="20px" height="20px" color="inherit" />,
+    component: <Dashboard />,
     requiresAuth: true,
   },
   {
