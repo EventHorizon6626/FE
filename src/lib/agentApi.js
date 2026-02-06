@@ -243,6 +243,10 @@ export const runAgent = async (agentType, inputData, customAgentConfig = null) =
       return await runTraderAgent(stocks, data);
 
     default:
+      // Fallback: if the agent has a systemPrompt in data, treat as custom agent
+      if (data?.systemPrompt) {
+        return await runCustomAgentApi(stocks, data.systemPrompt, data.userPrompt);
+      }
       throw new Error(`Unknown agent type: ${agentType}`);
   }
 };
@@ -280,7 +284,7 @@ export const getAgentInputData = (node, edges, nodes) => {
     } else if (sourceNode.type === 'agentNode') {
       inputData.data = {
         ...inputData.data,
-        [sourceNode.data.agent?.type]: sourceNode.data.output,
+        [sourceNode.data.agent?.name || sourceNode.id]: sourceNode.data.output,
       };
     }
   });

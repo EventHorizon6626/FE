@@ -24,13 +24,23 @@ export const useRunAgent = ({
 
       const agentName = node?.data?.agent?.name || 'agent';
       const agentType = node?.data?.agent?.type;
+      const agent = node?.data?.agent;
+
+      // Build customAgentConfig for agents that have their own systemPrompt
+      const customAgentConfig = agent?.systemPrompt
+        ? {
+            systemPrompt: agent.systemPrompt,
+            enableThinking: agent.enableThinking ?? false,
+            maxIterations: agent.maxIterations ?? 5,
+          }
+        : null;
 
       console.log('[useRunAgent] Starting execution for node:', nodeId);
       console.log('[useRunAgent] Total nodes:', currentNodes.length);
       console.log('[useRunAgent] Total edges:', currentEdges.length);
 
       const inputData = getAgentInputData(node, currentEdges, currentNodes);
-      const result = await runAgent(agentType, inputData);
+      const result = await runAgent(agentType, inputData, customAgentConfig);
 
       return {
         nodeId,

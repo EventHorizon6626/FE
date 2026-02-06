@@ -87,7 +87,7 @@ const BUILTIN_AGENTS = [
   {
     id: 'candlestick',
     name: 'Candlestick',
-    type: 'data_retriever',
+    type: 'candlestick',
     system: 'data',
     icon: MdShowChart,
     color: 'blue',
@@ -96,7 +96,7 @@ const BUILTIN_AGENTS = [
   {
     id: 'earnings',
     name: 'Earnings',
-    type: 'data_retriever',
+    type: 'earnings',
     system: 'data',
     icon: MdAccountBalance,
     color: 'green',
@@ -105,7 +105,7 @@ const BUILTIN_AGENTS = [
   {
     id: 'news',
     name: 'News',
-    type: 'news_agent',
+    type: 'news',
     system: 'data',
     icon: MdArticle,
     color: 'orange',
@@ -114,7 +114,7 @@ const BUILTIN_AGENTS = [
   {
     id: 'technical',
     name: 'Technical',
-    type: 'technical_agent',
+    type: 'technical',
     system: 'data',
     icon: MdSpeed,
     color: 'purple',
@@ -123,7 +123,7 @@ const BUILTIN_AGENTS = [
   {
     id: 'fundamentals',
     name: 'Fundamentals',
-    type: 'financial_metrics',
+    type: 'fundamentals',
     system: 'data',
     icon: MdAccountBalance,
     color: 'teal',
@@ -146,7 +146,7 @@ const DEFAULT_TEAMS = [
       {
         id: 'bull_researcher',
         name: 'Bull Researcher',
-        type: 'researcher',
+        type: 'bull_researcher',
         system: 'team',
         teamId: 'team2',
         icon: MdTrendingUp,
@@ -156,7 +156,7 @@ const DEFAULT_TEAMS = [
       {
         id: 'bear_researcher',
         name: 'Bear Researcher',
-        type: 'researcher',
+        type: 'bear_researcher',
         system: 'team',
         teamId: 'team2',
         icon: MdWarning,
@@ -166,7 +166,7 @@ const DEFAULT_TEAMS = [
       {
         id: 'research_manager',
         name: 'Research Manager',
-        type: 'manager',
+        type: 'research_manager',
         system: 'team',
         teamId: 'team2',
         icon: MdSmartToy,
@@ -190,11 +190,6 @@ const DEFAULT_TEAMS = [
 ];
 
 const AGENT_CATEGORIES = [
-  { value: 'data_retriever', label: '📊 Data Retriever', system: 'data' },
-  { value: 'news_agent', label: '📰 News Agent', system: 'data' },
-  { value: 'technical_agent', label: '📈 Technical Agent', system: 'data' },
-  { value: 'financial_metrics', label: '💰 Financial Metrics', system: 'data' },
-  { value: 'api_connector', label: '🔗 API Connector', system: 'data' },
   { value: 'strategy_agent', label: '🎯 Strategy Agent', system: 'team' },
   { value: 'risk_manager', label: '⚖️ Risk Manager', system: 'team' },
   { value: 'custom_analyzer', label: '🤖 Custom Analyzer', system: 'team' },
@@ -965,7 +960,7 @@ function PipelineBuilderInner() {
       const agentData = {
         name: newAgent.name.trim(),
         description: (newAgent.description || '').trim(),
-        type: newAgent.category,
+        type: 'custom_agent',
         system: newAgent.system,
         teamId: newAgent.teamId,
         model: newAgent.model,
@@ -1069,10 +1064,11 @@ function PipelineBuilderInner() {
     setNewAgent({
       name: '',
       description: '',
-      category: 'researcher',
+      category: 'custom_analyzer',
       system: 'team',
       teamId: teamId,
       model: 'gpt-4',
+      systemPrompt: '',
     });
     onAgentOpen();
   };
@@ -1166,7 +1162,7 @@ function PipelineBuilderInner() {
       
       // Remove any nodes using this agent
       setNodes((nds) => nds.filter(node => {
-        if ((node.type === 'agent' || node.type === 'teamAgent') && node.data?.agentId === agentId) {
+        if (node.type === 'agentNode' && node.data?.agent?.id === agentId) {
           return false;
         }
         return true;
@@ -1199,11 +1195,7 @@ function PipelineBuilderInner() {
       
       // Remove any nodes using this team
       setNodes((nds) => nds.filter(node => {
-        if (node.type === 'team' && node.data?.teamId === teamId) {
-          return false;
-        }
-        // Also remove team agents from this team
-        if (node.type === 'teamAgent' && node.data?.teamId === teamId) {
+        if (node.type === 'agentNode' && node.data?.agent?.teamId === teamId) {
           return false;
         }
         return true;
@@ -1592,7 +1584,7 @@ function PipelineBuilderInner() {
                 aria-label="Add data agent"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setNewAgent({ name: '', description: '', category: 'data_retriever', system: 'data', teamId: null, model: 'gpt-4' });
+                  setNewAgent({ name: '', description: '', system: 'data', teamId: null, model: 'gpt-4', systemPrompt: '' });
                   onAgentOpen();
                 }}
               />
@@ -2439,24 +2431,6 @@ function PipelineBuilderInner() {
                 />
               </FormControl>
 
-              {newAgent.system === 'data' && (
-                <FormControl>
-                  <FormLabel fontSize="sm" fontWeight="600">
-                    Category
-                  </FormLabel>
-                  <Select
-                    value={newAgent.category}
-                    onChange={(e) => setNewAgent({ ...newAgent, category: e.target.value })}
-                  >
-                    {AGENT_CATEGORIES.filter(c => c.system === 'data').map((cat) => (
-                      <option key={cat.value} value={cat.value}>
-                        {cat.label}
-                      </option>
-                    ))}
-                  </Select>
-                </FormControl>
-              )}
-
               <FormControl>
                 <FormLabel fontSize="sm" fontWeight="600">
                   System Prompt
@@ -2928,7 +2902,7 @@ function PipelineBuilderInner() {
                       id: `custom-data-${Date.now()}`,
                       name: suggestedAgent.name,
                       description: suggestedAgent.description,
-                      type: 'data_retriever',
+                      type: 'custom_agent',
                       system: 'data',
                       icon: MdSmartToy,
                       color: 'purple',
