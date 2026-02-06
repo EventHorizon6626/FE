@@ -573,34 +573,6 @@ export const createAgentConfig = (agentType, provider = 'openai') => {
 };
 
 /**
- * Validate agent configuration
- */
-export const validateAgentConfig = (agent) => {
-  const errors = [];
-
-  if (!agent.name || agent.name.trim() === '') {
-    errors.push('Agent name is required');
-  }
-
-  if (!agent.systemPrompt || agent.systemPrompt.trim() === '') {
-    errors.push('System prompt is required');
-  }
-
-  if (!agent.llm?.provider) {
-    errors.push('LLM provider is required');
-  }
-
-  if (!agent.llm?.deepThinkModel && !agent.llm?.quickThinkModel) {
-    errors.push('At least one LLM model is required');
-  }
-
-  return {
-    isValid: errors.length === 0,
-    errors,
-  };
-};
-
-/**
  * Get cost estimate for agent execution
  * (Approximate costs per 1M tokens - updated for 2024/2025 pricing)
  */
