@@ -87,6 +87,12 @@ import { RobotHead } from 'components/pipeline/RobotHead';
 import Chart from 'react-apexcharts';
 import StockAnalysisCard from 'views/admin/portfolio/components/StockAnalysisCard';
 
+// Sidebar view modes
+const SIDEBAR_VIEW = {
+  LIST: 0,
+  DETAIL: 1,
+};
+
 const BUILTIN_AGENTS = [
   // System 1: Data Pipeline Agents
   {
@@ -551,6 +557,7 @@ function PipelineBuilderInner() {
   const [revisions, setRevisions] = useState([]);
   const [selectedRevisionIndex, setSelectedRevisionIndex] = useState(0);
   const [isLoadingRevisions, setIsLoadingRevisions] = useState(false);
+  const [sidebarView, setSidebarView] = useState(SIDEBAR_VIEW.LIST);
   
   useEffect(() => {
     if (editingPortfolio) {
@@ -729,15 +736,13 @@ function PipelineBuilderInner() {
   }, []);
 
   const handleNodeClick = useCallback(async (event, node) => {
-    // When clicking on an outputNode, show sidebar with its data
     if (node.type === 'outputNode') {
-      console.log('[OutputNode Click] Full node:', node);
-      console.log('[OutputNode Click] Node data:', node.data);
-      console.log('[OutputNode Click] Result:', node.data?.result);
       setSelectedOutputNode(node);
+      setSidebarView(SIDEBAR_VIEW.LIST); // Always show list view first
 
       // Get the agentNodeId from this outputNode
-      const agentNodeId = node.data?.sourceAgentNodeId;
+      const agentNodeId = node.parentId;
+      console.log(agentNodeId)
       if (!agentNodeId) {
         console.error('[OutputNode Click] No sourceAgentNodeId found');
         setRevisions([]);
@@ -747,7 +752,9 @@ function PipelineBuilderInner() {
       // Load ALL outputNodes (revisions) for this agent
       setIsLoadingRevisions(true);
       try {
+        console.log('[OutputNode Click] Fetching revisions for agent:', agentNodeId, 'horizon:', currentHorizonId);
         const response = await nodeApi.getByAgent(agentNodeId, currentHorizonId);
+        console.log('[Revisions] API Response:', response);
         console.log('[Revisions] Loaded outputs:', response.data);
         const loadedOutputs = response.data.outputs || [];
         setRevisions(loadedOutputs);
@@ -3230,18 +3237,28 @@ function PipelineBuilderInner() {
             >
               <HStack justify="space-between" mb="12px">
                 <HStack spacing="10px">
+                  {sidebarView === SIDEBAR_VIEW.DETAIL && (
+                    <IconButton
+                      icon={<Icon as={MdClose} transform="rotate(180deg)" />}
+                      size="sm"
+                      variant="ghost"
+                      colorScheme="teal"
+                      aria-label="Back to list"
+                      onClick={() => setSidebarView(SIDEBAR_VIEW.LIST)}
+                    />
+                  )}
                   <Icon as={MdArticle} color="teal.600" boxSize="24px" />
                   <VStack align="start" spacing="0">
                     <Text fontSize="lg" fontWeight="700" color="teal.900">
-                      {selectedOutputNode?.data?.agentName} Output
+                      {sidebarView === SIDEBAR_VIEW.LIST ? 'Revision History' : 'Revision Detail'}
                     </Text>
                     <Text fontSize="xs" color="gray.600">
                       {isLoadingRevisions ? (
                         'Loading revisions...'
                       ) : revisions.length > 0 ? (
-                        `${revisions.length} run${revisions.length > 1 ? 's' : ''} • Latest: ${new Date(revisions[0]?.createdAt || revisions[0]?.data?.timestamp).toLocaleString()}`
+                        `${revisions.length} run${revisions.length > 1 ? 's' : ''} for ${selectedOutputNode?.data?.agentName}`
                       ) : (
-                        new Date(selectedOutputNode?.data?.timestamp).toLocaleString()
+                        selectedOutputNode?.data?.agentName
                       )}
                     </Text>
                   </VStack>
@@ -3255,148 +3272,162 @@ function PipelineBuilderInner() {
                   onClick={() => setSelectedOutputNode(null)}
                 />
               </HStack>
-
-              {/* Revision History Selector */}
-              {!isLoadingRevisions && revisions.length > 0 && (
-                <Box>
-                  <Text fontSize="xs" fontWeight="600" color="gray.700" mb="8px">
-                    Revision History ({revisions.length} total):
-                  </Text>
-                  <VStack spacing="6px" align="stretch" maxH="200px" overflowY="auto">
-                    {revisions.map((output, index) => {
-                      const isSelected = index === selectedRevisionIndex;
-                      const timestamp = output.createdAt || output.data?.timestamp;
-                      const symbols = output.data?.metadata?.symbols || output.data?.result?.symbols || [];
-                      const period = output.data?.metadata?.period || output.data?.result?.period || 'N/A';
-                      
-                      return (
-                        <Box
-                          key={output._id || output.id}
-                          p="10px"
-                          bg={isSelected ? 'teal.100' : 'white'}
-                          borderRadius="8px"
-                          border="1px solid"
-                          borderColor={isSelected ? 'teal.400' : 'gray.200'}
-                          cursor="pointer"
-                          onClick={() => setSelectedRevisionIndex(index)}
-                          transition="all 0.2s"
-                          _hover={{ bg: isSelected ? 'teal.100' : 'gray.50' }}
-                        >
-                          <HStack justify="space-between">
-                            <VStack align="start" spacing="2px">
-                              <HStack spacing="6px">
-                                <Text fontSize="xs" fontWeight="600" color="gray.800">
-                                  {new Date(timestamp).toLocaleString()}
-                                </Text>
-                                {index === 0 && (
-                                  <Badge colorScheme="purple" fontSize="2xs">
-                                    Latest
-                                  </Badge>
-                                )}
-                              </HStack>
-                              <Text fontSize="2xs" color="gray.600">
-                                {Array.isArray(symbols) && symbols.length > 0 ? symbols.join(', ') : 'No symbols'} • {period}
-                              </Text>
-                            </VStack>
-                            <Badge colorScheme="green" fontSize="2xs">
-                              success
-                            </Badge>
-                          </HStack>
-                        </Box>
-                      );
-                    })}
-                  </VStack>
-                </Box>
-              )}
-
-              {isLoadingRevisions && (
-                <HStack justify="center" p="20px">
-                  <Spinner size="sm" color="teal.600" />
-                  <Text fontSize="sm" color="gray.600">Loading revisions...</Text>
-                </HStack>
-              )}
             </Box>
 
             {/* Sidebar Content */}
             <Box p="20px">
-              <VStack spacing="20px" align="stretch">
-                {(() => {
-                  // Get the current output node (revision) data to display
-                  const currentOutput = revisions.length > 0 ? revisions[selectedRevisionIndex] : null;
-                  const displayResult = currentOutput ? currentOutput.data?.result : selectedOutputNode?.data?.result;
-                  
-                  return (
-                    <>
-                      {/* Summary Info */}
+              {isLoadingRevisions ? (
+                <HStack justify="center" p="40px">
+                  <Spinner size="md" color="teal.600" />
+                  <Text fontSize="sm" color="gray.600">Loading revisions...</Text>
+                </HStack>
+              ) : sidebarView === SIDEBAR_VIEW.LIST ? (
+                /* LIST VIEW - Show all revisions */
+                <VStack spacing="10px" align="stretch">
+                  <Text fontSize="md" fontWeight="700" color="gray.800" mb="8px">
+                    Select a revision to view details:
+                  </Text>
+                  {revisions.map((output, index) => {
+                    const timestamp = output.createdAt || output.data?.timestamp;
+                    const symbols = output.data?.metadata?.symbols || output.data?.result?.symbols || [];
+                    const period = output.data?.metadata?.period || output.data?.result?.period || 'N/A';
+                    
+                    return (
                       <Box
+                        key={output._id || output.id}
                         p="16px"
-                        bg="gray.50"
+                        bg="white"
                         borderRadius="12px"
-                        border="1px solid"
+                        border="2px solid"
                         borderColor="gray.200"
+                        cursor="pointer"
+                        onClick={() => {
+                          setSelectedRevisionIndex(index);
+                          setSidebarView(SIDEBAR_VIEW.DETAIL);
+                        }}
+                        transition="all 0.2s"
+                        _hover={{ 
+                          bg: 'teal.50',
+                          borderColor: 'teal.400',
+                          transform: 'translateX(4px)',
+                        }}
                       >
-                        <VStack align="start" spacing="8px">
-                          <HStack justify="space-between" w="full">
-                            <Text fontSize="sm" fontWeight="600" color="gray.700">
-                              Status:
+                        <HStack justify="space-between" mb="8px">
+                          <HStack spacing="8px">
+                            <Icon as={MdArticle} color="teal.600" boxSize="18px" />
+                            <Text fontSize="sm" fontWeight="700" color="gray.800">
+                              Run #{revisions.length - index}
                             </Text>
-                            <Badge colorScheme="green" fontSize="sm">
-                              {displayResult?.status || 'success'}
-                            </Badge>
+                            {index === 0 && (
+                              <Badge colorScheme="purple" fontSize="2xs">
+                                Latest
+                              </Badge>
+                            )}
                           </HStack>
-                          <HStack justify="space-between" w="full">
-                            <Text fontSize="sm" fontWeight="600" color="gray.700">
-                              Symbols:
-                            </Text>
-                            <Text fontSize="sm" color="gray.800">
-                              {displayResult?.total_symbols || 0}
-                            </Text>
-                          </HStack>
-                          {currentOutput?.createdAt && (
-                            <HStack justify="space-between" w="full">
-                              <Text fontSize="sm" fontWeight="600" color="gray.700">
-                                Executed:
-                              </Text>
-                              <Text fontSize="sm" color="gray.800">
-                                {new Date(currentOutput.createdAt).toLocaleString()}
-                              </Text>
-                            </HStack>
-                          )}
+                          <Badge colorScheme="green" fontSize="xs">
+                            success
+                          </Badge>
+                        </HStack>
+                        <VStack align="start" spacing="4px">
+                          <Text fontSize="xs" color="gray.600">
+                            📅 {new Date(timestamp).toLocaleString()}
+                          </Text>
+                          <Text fontSize="xs" color="gray.600">
+                            📊 {Array.isArray(symbols) && symbols.length > 0 ? symbols.join(', ') : 'No symbols'} • {period}
+                          </Text>
                         </VStack>
                       </Box>
+                    );
+                  })}
+                </VStack>
+              ) : (
+                /* DETAIL VIEW - Show selected revision detail */
+                <VStack spacing="20px" align="stretch">
+                  {(() => {
+                    // Get the current output node (revision) data to display
+                    const currentOutput = revisions[selectedRevisionIndex];
+                    const displayResult = currentOutput?.data?.result;
+                    
+                    return (
+                      <>
+                        {/* Summary Info */}
+                        <Box
+                          p="16px"
+                          bg="gray.50"
+                          borderRadius="12px"
+                          border="1px solid"
+                          borderColor="gray.200"
+                        >
+                          <VStack align="start" spacing="8px">
+                            <HStack justify="space-between" w="full">
+                              <Text fontSize="sm" fontWeight="600" color="gray.700">
+                                Run:
+                              </Text>
+                              <Text fontSize="sm" color="gray.800" fontWeight="600">
+                                #{revisions.length - selectedRevisionIndex}
+                              </Text>
+                            </HStack>
+                            <HStack justify="space-between" w="full">
+                              <Text fontSize="sm" fontWeight="600" color="gray.700">
+                                Status:
+                              </Text>
+                              <Badge colorScheme="green" fontSize="sm">
+                                {displayResult?.status || 'success'}
+                              </Badge>
+                            </HStack>
+                            <HStack justify="space-between" w="full">
+                              <Text fontSize="sm" fontWeight="600" color="gray.700">
+                                Symbols:
+                              </Text>
+                              <Text fontSize="sm" color="gray.800">
+                                {displayResult?.total_symbols || 0}
+                              </Text>
+                            </HStack>
+                            {currentOutput?.createdAt && (
+                              <HStack justify="space-between" w="full">
+                                <Text fontSize="sm" fontWeight="600" color="gray.700">
+                                  Executed:
+                                </Text>
+                                <Text fontSize="sm" color="gray.800">
+                                  {new Date(currentOutput.createdAt).toLocaleString()}
+                                </Text>
+                              </HStack>
+                            )}
+                          </VStack>
+                        </Box>
 
-                      {/* Render Charts for each symbol */}
-                      {(() => {
-                        console.log('[Sidebar Render] Full result:', displayResult);
-                        console.log('[Sidebar Render] result keys:', displayResult ? Object.keys(displayResult) : 'no result');
-                        
-                        // Try to find chart data in various possible locations
-                        let chartData = displayResult?.chart_data_by_symbol || displayResult?.chart_data;
-                        
-                        // If chart_data doesn't exist, try to find it in result.data
-                        if (!chartData && displayResult?.data) {
-                          chartData = displayResult.data.chart_data_by_symbol || displayResult.data.chart_data;
-                        }
-                        
-                        // If still no chart data, try result.result (nested)
-                        if (!chartData && displayResult?.result) {
-                          chartData = displayResult.result.chart_data_by_symbol || displayResult.result.chart_data;
-                        }
-                        
-                        console.log('[Sidebar Render] Final chartData:', chartData);
-                        
-                        if (!chartData || Object.keys(chartData).length === 0) {
-                          return (
-                            <Box
-                              p="16px"
-                              bg="yellow.50"
-                              borderRadius="12px"
-                              border="1px solid"
-                              borderColor="yellow.200"
-                            >
-                              <VStack align="start" spacing="8px">
-                                <HStack>
-                                  <Icon as={MdWarning} color="yellow.600" />
+                        {/* Render Charts for each symbol */}
+                        {(() => {
+                          console.log('[Sidebar Render] Full result:', displayResult);
+                          console.log('[Sidebar Render] result keys:', displayResult ? Object.keys(displayResult) : 'no result');
+                          
+                          // Try to find chart data in various possible locations
+                          let chartData = displayResult?.chart_data_by_symbol || displayResult?.chart_data;
+                          
+                          // If chart_data doesn't exist, try to find it in result.data
+                          if (!chartData && displayResult?.data) {
+                            chartData = displayResult.data.chart_data_by_symbol || displayResult.data.chart_data;
+                          }
+                          
+                          // If still no chart data, try result.result (nested)
+                          if (!chartData && displayResult?.result) {
+                            chartData = displayResult.result.chart_data_by_symbol || displayResult.result.chart_data;
+                          }
+                          
+                          console.log('[Sidebar Render] Final chartData:', chartData);
+                          
+                          if (!chartData || Object.keys(chartData).length === 0) {
+                            return (
+                              <Box
+                                p="16px"
+                                bg="yellow.50"
+                                borderRadius="12px"
+                                border="1px solid"
+                                borderColor="yellow.200"
+                              >
+                                <VStack align="start" spacing="8px">
+                                  <HStack>
+                                    <Icon as={MdWarning} color="yellow.600" />
                                   <Text fontSize="sm" fontWeight="600" color="yellow.800">
                                     No Chart Data Available
                                   </Text>
@@ -3515,7 +3546,7 @@ function PipelineBuilderInner() {
                         );
                       })()}
 
-                      {/* Raw JSON Data (Collapsible) */}
+                      {/* Raw JSON Data - Only show chart_data_by_symbol */}
                       <Box>
                         <Text fontSize="md" fontWeight="700" color="gray.800" mb="12px">
                           Raw Output Data
@@ -3532,7 +3563,15 @@ function PipelineBuilderInner() {
                           fontFamily="monospace"
                         >
                           <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                            {JSON.stringify(displayResult, null, 2)}
+                            {JSON.stringify(
+                              displayResult?.chart_data_by_symbol || 
+                              displayResult?.chart_data || 
+                              displayResult?.data?.chart_data_by_symbol ||
+                              displayResult?.result?.chart_data_by_symbol ||
+                              { error: 'No chart data available' },
+                              null,
+                              2
+                            )}
                           </pre>
                         </Box>
                       </Box>
@@ -3540,6 +3579,7 @@ function PipelineBuilderInner() {
                   );
                 })()}
               </VStack>
+              )}
             </Box>
           </Box>
         </>
