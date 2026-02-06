@@ -81,6 +81,7 @@ import portfolioApi from 'lib/portfolioApi';
 import horizonAgentApi from 'lib/horizonAgentApi';
 import teamApi from 'lib/teamApi';
 import { CustomAgentNode } from 'components/pipeline/CustomAgentNode';
+import { RobotHead } from 'components/pipeline/RobotHead';
 
 const BUILTIN_AGENTS = [
   // System 1: Data Pipeline Agents
@@ -1634,7 +1635,11 @@ function PipelineBuilderInner() {
                     _active={{ cursor: 'grabbing' }}
                     onMouseDown={(e) => handleAgentMouseDown(e, agent)}
                   >
-                    <Icon as={agent.icon} color={`${agent.color}.600`} boxSize="20px" />
+                    {agent.isBuiltin ? (
+                      <Icon as={agent.icon} color={`${agent.color}.600`} boxSize="20px" />
+                    ) : (
+                      <RobotHead description={agent.description || agent.name} size={24} />
+                    )}
                     <Text fontSize="sm" fontWeight="600" flex="1">
                       {agent.name}
                     </Text>
@@ -1807,7 +1812,11 @@ function PipelineBuilderInner() {
                           _active={{ cursor: 'grabbing' }}
                           onMouseDown={(e) => handleAgentMouseDown(e, agent)}
                         >
-                          <Icon as={agent.icon} color={`${agent.color}.600`} boxSize="20px" />
+                          {agent.isBuiltin ? (
+                            <Icon as={agent.icon} color={`${agent.color}.600`} boxSize="20px" />
+                          ) : (
+                            <RobotHead description={agent.description || agent.name} size={24} />
+                          )}
                           <Text fontSize="sm" fontWeight="600" flex="1">
                             {agent.name}
                           </Text>

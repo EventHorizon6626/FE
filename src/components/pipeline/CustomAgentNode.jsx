@@ -9,6 +9,7 @@ import {
 import { MdPlayArrow, MdSmartToy } from 'react-icons/md';
 import { Handle, Position, useReactFlow } from 'reactflow';
 import { useRunAgent } from '../../hooks/useRunAgent';
+import { RobotHead } from './RobotHead';
 
 export const CustomAgentNode = ({ data, id, selected }) => {
   const { setNodes, setEdges, getNodes, getEdges } = useReactFlow();
@@ -109,7 +110,14 @@ export const CustomAgentNode = ({ data, id, selected }) => {
         opacity={runAgentMutation.isPending ? 0.7 : 1}
       >
         <HStack spacing="12px">
-          <Icon as={data.agent?.icon || MdSmartToy} color={`${data.agent?.color || 'blue'}.600`} boxSize="24px" />
+          {data.agent?.isBuiltin === false ? (
+            <RobotHead
+              description={data.agent?.description || data.agent?.name || 'agent'}
+              size={28}
+            />
+          ) : (
+            <Icon as={data.agent?.icon || MdSmartToy} color={`${data.agent?.color || 'blue'}.600`} boxSize="24px" />
+          )}
           <Text fontSize="md" fontWeight="700">
             {data.agent?.name || 'Agent'}
           </Text>
