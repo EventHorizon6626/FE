@@ -56,6 +56,7 @@ import {
   MdLightbulb,
   MdPlayArrow,
   MdPsychology,
+  MdRefresh,
   MdSave,
   MdShowChart,
   MdSmartToy,
@@ -2303,79 +2304,79 @@ function PipelineBuilderInner() {
                   />
                 </FormControl>
 
-                {/* Temperature */}
+                {/* System Prompt - show for all agents */}
                 <FormControl>
-                  <FormLabel fontSize="sm" fontWeight="600">
-                    Temperature: {nodeConfig.temperature}
-                  </FormLabel>
-                  <HStack spacing="10px">
-                    <Input
-                      type="range"
-                      min="0"
-                      max="2"
-                      step="0.1"
-                      value={nodeConfig.temperature}
-                      onChange={(e) =>
-                        setNodeConfig({
-                          ...nodeConfig,
-                          temperature: parseFloat(e.target.value),
-                        })
-                      }
-                    />
-                    <Text fontSize="xs" color="gray.600" minW="40px">
-                      {nodeConfig.temperature}
-                    </Text>
-                  </HStack>
-                  <Text fontSize="xs" color="gray.500" mt="4px">
-                    Controls randomness. Lower = more focused, Higher = more creative
-                  </Text>
-                </FormControl>
-
-                {/* Max Tokens */}
-                <FormControl>
-                  <FormLabel fontSize="sm" fontWeight="600">
-                    Max Tokens
-                  </FormLabel>
-                  <Input
-                    type="number"
-                    placeholder="2000"
-                    value={nodeConfig.maxTokens}
-                    onChange={(e) =>
-                      setNodeConfig({
-                        ...nodeConfig,
-                        maxTokens: parseInt(e.target.value) || 2000,
-                      })
-                    }
-                    size="sm"
-                    min="100"
-                    max="8000"
-                    step="100"
-                  />
-                  <Text fontSize="xs" color="gray.500" mt="4px">
-                    Maximum length of the response (100-8000)
-                  </Text>
-                </FormControl>
-
-                {/* System Prompt - only for custom (non-builtin) agents */}
-                {selectedNode?.data?.agent && !selectedNode.data.agent.isBuiltin && (
-                  <FormControl>
-                    <FormLabel fontSize="sm" fontWeight="600">
+                  <HStack justify="space-between" mb="8px">
+                    <FormLabel fontSize="sm" fontWeight="600" mb="0">
                       System Prompt
                     </FormLabel>
-                    <Textarea
-                      value={nodeConfig.systemPrompt}
-                      onChange={(e) =>
-                        setNodeConfig({ ...nodeConfig, systemPrompt: e.target.value })
-                      }
-                      rows={6}
-                      fontSize="sm"
-                      placeholder="Define the agent's behavior..."
-                    />
-                    <Text fontSize="xs" color="gray.500" mt="4px">
-                      The core instruction that defines this agent's behavior
-                    </Text>
-                  </FormControl>
-                )}
+                    {selectedNode?.data?.agent && !selectedNode.data.agent.isBuiltin && (
+                      <Button
+                        size="xs"
+                        leftIcon={<Icon as={MdRefresh} />}
+                        variant="outline"
+                        colorScheme="purple"
+                        onClick={async () => {
+                          if (!nodeConfig.name || !nodeConfig.description) {
+                            toast({
+                              title: 'Missing information',
+                              description: 'Please enter name and description first',
+                              status: 'warning',
+                              duration: 3000,
+                              isClosable: true,
+                            });
+                            return;
+                          }
+                          try {
+                            const response = await generateAgentSystemPrompt(
+                              nodeConfig.name,
+                              nodeConfig.description,
+                              selectedNode.data.agent.stage || selectedNode.data.agent.category
+                            );
+                            if (response.success && response.data?.systemPrompt) {
+                              setNodeConfig({
+                                ...nodeConfig,
+                                systemPrompt: response.data.systemPrompt,
+                              });
+                              toast({
+                                title: 'System prompt regenerated',
+                                status: 'success',
+                                duration: 2000,
+                                isClosable: true,
+                              });
+                            }
+                          } catch (error) {
+                            toast({
+                              title: 'Failed to regenerate',
+                              description: error.message,
+                              status: 'error',
+                              duration: 3000,
+                              isClosable: true,
+                            });
+                          }
+                        }}
+                      >
+                        Regenerate
+                      </Button>
+                    )}
+                  </HStack>
+                  <Textarea
+                    value={nodeConfig.systemPrompt}
+                    onChange={(e) =>
+                      setNodeConfig({ ...nodeConfig, systemPrompt: e.target.value })
+                    }
+                    rows={6}
+                    fontSize="sm"
+                    placeholder="Define the agent's behavior..."
+                    isReadOnly={selectedNode?.data?.agent?.isBuiltin}
+                    bg={selectedNode?.data?.agent?.isBuiltin ? 'gray.50' : 'white'}
+                  />
+                  <Text fontSize="xs" color="gray.500" mt="4px">
+                    {selectedNode?.data?.agent?.isBuiltin
+                      ? 'Built-in agents have pre-configured system prompts (read-only)'
+                      : 'The core instruction that defines this agent\'s behavior. Click "Regenerate" after changing the description.'}
+                  </Text>
+                </FormControl>
               </VStack>
             </Box>
 
