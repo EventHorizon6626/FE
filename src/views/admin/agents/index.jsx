@@ -32,6 +32,10 @@ import {
   Spinner,
   Collapse,
   IconButton,
+  Progress,
+  Alert,
+  AlertIcon,
+  AlertDescription,
 } from '@chakra-ui/react';
 import { useState, useEffect, useCallback } from 'react';
 import {
@@ -1323,6 +1327,28 @@ export default function AgentsPage() {
                 )}
               </Box>
 
+              {/* Progress Indicator */}
+              {(isGenerating || isLoading) && (
+                <Box>
+                  <Alert status="info" borderRadius="8px" mb="12px">
+                    <AlertIcon>
+                      <Spinner size="sm" />
+                    </AlertIcon>
+                    <AlertDescription fontSize="sm" fontWeight="500">
+                      {isGenerating && 'Generating system prompt...'}
+                      {isLoading && !isGenerating && (editingAgent ? 'Updating agent...' : 'Creating agent...')}
+                    </AlertDescription>
+                  </Alert>
+                  <Progress
+                    size="xs"
+                    isIndeterminate
+                    colorScheme="teal"
+                    borderRadius="full"
+                    mb="12px"
+                  />
+                </Box>
+              )}
+
               {/* Action Buttons */}
               <HStack justify="space-between" pt="10px">
                 <Button
@@ -1330,12 +1356,16 @@ export default function AgentsPage() {
                   leftIcon={<Icon as={MdAutoAwesome} />}
                   onClick={handleGeneratePrompt}
                   isLoading={isGenerating}
-                  isDisabled={!newAgent.name.trim()}
+                  isDisabled={!newAgent.name.trim() || isLoading}
                 >
                   Save Config
                 </Button>
                 <HStack spacing="10px">
-                  <Button variant="ghost" onClick={handleCloseModal}>
+                  <Button
+                    variant="ghost"
+                    onClick={handleCloseModal}
+                    isDisabled={isGenerating || isLoading}
+                  >
                     Cancel
                   </Button>
                   <Button
@@ -1343,8 +1373,9 @@ export default function AgentsPage() {
                     color="white"
                     onClick={handleCreateAgent}
                     _hover={{ bg: 'teal.700' }}
-                    isLoading={isLoading}
-                    loadingText={editingAgent ? 'Updating...' : 'Creating...'}
+                    isLoading={isLoading || isGenerating}
+                    loadingText={isGenerating ? 'Generating...' : (editingAgent ? 'Updating...' : 'Creating...')}
+                    isDisabled={isGenerating}
                   >
                     {editingAgent ? 'Update Agent' : 'Create Agent'}
                   </Button>
