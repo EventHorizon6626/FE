@@ -1022,13 +1022,47 @@ function PipelineBuilderInner() {
 
         // Add NEW outputNode to canvas (use id from backend)
         const agentNodePosition = currentNodes.find(n => n.id === nodeId)?.position || { x: 0, y: 0 };
+
+        // Find a good position for the output node (close to source, avoiding collisions)
+        const outputNodeWidth = 280; // Approximate width of output node
+        const outputNodeHeight = 150; // Approximate height of output node
+        const spacing = 20; // Minimum spacing between nodes
+        const preferredDistance = 250; // Preferred distance from source node
+
+        // Try positions in order: right, below, above, left
+        const tryPositions = [
+          { x: agentNodePosition.x + preferredDistance, y: agentNodePosition.y }, // Right
+          { x: agentNodePosition.x, y: agentNodePosition.y + 200 }, // Below
+          { x: agentNodePosition.x, y: agentNodePosition.y - 200 }, // Above
+          { x: agentNodePosition.x - preferredDistance, y: agentNodePosition.y }, // Left
+        ];
+
+        // Check if a position collides with existing nodes
+        const hasCollision = (pos) => {
+          return currentNodes.some(n => {
+            if (n.id === nodeId) return false; // Skip source node
+            const nodeWidth = 280;
+            const nodeHeight = 150;
+            const dx = Math.abs((pos.x + outputNodeWidth / 2) - (n.position.x + nodeWidth / 2));
+            const dy = Math.abs((pos.y + outputNodeHeight / 2) - (n.position.y + nodeHeight / 2));
+            return dx < (outputNodeWidth + nodeWidth) / 2 + spacing &&
+                   dy < (outputNodeHeight + nodeHeight) / 2 + spacing;
+          });
+        };
+
+        // Find first non-colliding position, or use preferred if none found
+        let outputPosition = tryPositions[0];
+        for (const pos of tryPositions) {
+          if (!hasCollision(pos)) {
+            outputPosition = pos;
+            break;
+          }
+        }
+
         const newOutputNode = {
           id: savedOutputNode.id, // Use _id from backend
           type: 'outputNode',
-          position: {
-            x: agentNodePosition.x + 350,
-            y: agentNodePosition.y,
-          },
+          position: outputPosition,
           data: {
             result: result,
             agentName: agentName,
@@ -1039,6 +1073,15 @@ function PipelineBuilderInner() {
         };
 
         setNodes((nds) => [...nds, newOutputNode]);
+
+        // Save the output node position to backend
+        try {
+          await nodeApi.update(savedOutputNode.id, {
+            position: outputPosition,
+          });
+        } catch (error) {
+          console.error('Failed to save output node position:', error);
+        }
 
         // Create edge from agent to new output
         const newOutputEdge = {
