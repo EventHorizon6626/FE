@@ -200,16 +200,25 @@ const SidebarContent = ({ navigate, currentPath, isCollapsed, onToggleCollapse }
       <VStack spacing="4px" w="full" px="8px">
         {/* Logo and Toggle */}
         {isCollapsed ? (
-          // Collapsed: Just logo icon centered
-          <Flex justify="center" w="full" mb="12px">
+          // Collapsed: Sidebar toggle icon on top of logo
+          <VStack spacing="8px" w="full" mb="12px">
+            <IconButton
+              icon={<SidebarToggleIcon />}
+              size="sm"
+              variant="ghost"
+              onClick={handleExpand}
+              aria-label="Expand sidebar"
+              color="gray.600"
+              _hover={{ bg: 'gray.100' }}
+            />
             <Box
               cursor="pointer"
               onClick={handleExpand}
-              p="8px"
+              p="4px"
             >
               <Image src="/logo.svg" alt="Event Horizon" h="24px" w="24px" />
             </Box>
-          </Flex>
+          </VStack>
         ) : (
           // Expanded: "Event Horizon" text + toggle icon
           <HStack justify="space-between" w="full" mb="16px" px="12px">
