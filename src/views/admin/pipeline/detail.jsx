@@ -1091,7 +1091,8 @@ function PipelineBuilderInner() {
 
   const handleAgentMouseDown = useCallback(async (event, agent) => {
     event.preventDefault();
-    
+    event.stopPropagation();
+
     const position = screenToFlowPosition({
       x: event.clientX,
       y: event.clientY,
@@ -1116,7 +1117,7 @@ function PipelineBuilderInner() {
       });
 
       const savedNode = response.data;
-      
+
       const newNode = {
         id: savedNode.id, // Use backend-generated ID
         type: 'agentNode',
@@ -1128,12 +1129,13 @@ function PipelineBuilderInner() {
           refetchHorizon: refetchHorizon,
           config: savedNode.data.config,
         },
+        draggable: false, // Disable ReactFlow's built-in dragging during custom drag
       };
 
       setNodes((nds) => nds.concat(newNode));
-      setDraggingAgent(agent);
+      setDraggingAgent({ agent, initialPosition: position });
       setTempNodeId(savedNode.id);
-      
+
       toast({
         title: 'Agent added',
         description: `${agent.name} added to pipeline`,
@@ -1152,10 +1154,11 @@ function PipelineBuilderInner() {
       });
     }
 
-  }, [screenToFlowPosition, setNodes, toast, handleNodeDelete, currentHorizonId]);
+  }, [screenToFlowPosition, setNodes, toast, handleNodeDelete, currentHorizonId, refetchHorizon]);
 
   const handlePortfolioMouseDown = useCallback(async (event, portfolio) => {
     event.preventDefault();
+    event.stopPropagation();
 
     const position = screenToFlowPosition({
       x: event.clientX,
@@ -1184,10 +1187,11 @@ function PipelineBuilderInner() {
           onDelete: handleNodeDelete,
           refetchHorizon: refetchHorizon,
         },
+        draggable: false, // Disable ReactFlow's built-in dragging during custom drag
       };
 
       setNodes((nds) => nds.concat(newNode));
-      setDraggingAgent(portfolio);
+      setDraggingAgent({ portfolio, initialPosition: position });
       setTempNodeId(savedNode.id);
 
       toast({
@@ -1207,12 +1211,13 @@ function PipelineBuilderInner() {
         isClosable: true,
       });
     }
-  }, [screenToFlowPosition, setNodes, toast, handleNodeDelete, currentHorizonId]);
+  }, [screenToFlowPosition, setNodes, toast, handleNodeDelete, currentHorizonId, refetchHorizon]);
 
   useEffect(() => {
     if (!draggingAgent || !tempNodeId) return;
 
-    let finalPosition = null;
+    const initialPosition = draggingAgent.initialPosition;
+    let finalPosition = initialPosition; // Default to initial position
 
     const handleMouseMove = (event) => {
       const position = screenToFlowPosition({
@@ -1232,6 +1237,15 @@ function PipelineBuilderInner() {
     };
 
     const handleMouseUp = async () => {
+      // Re-enable ReactFlow's built-in dragging
+      setNodes((nds) =>
+        nds.map((node) =>
+          node.id === tempNodeId
+            ? { ...node, draggable: true }
+            : node
+        )
+      );
+
       // Save the final position to the backend
       if (finalPosition && tempNodeId) {
         try {
