@@ -39,7 +39,8 @@ export const generateAgentSystemPrompt = async (name, description, category) => 
 // ===== Custom Agent Execution =====
 
 export const runCustomAgentApi = async (stocks, systemPrompt, userPrompt = null, context = {}) => {
-  const response = await request.post('/ai/agents/custom', {
+  // Use 30 second timeout for custom AI agent execution (AI processing can be slow)
+  const response = await request.withTimeout(30000).post('/ai/agents/custom', {
     stocks,
     system_prompt: systemPrompt,
     user_prompt: userPrompt,
@@ -97,7 +98,8 @@ export const runFundamentalsAgent = async (stocks, context = {}) => {
 // ===== System 2 Team 1: Analyst Agents =====
 
 export const runFundamentalsAnalystAgent = async (stocks, context = {}) => {
-  const response = await request.post('/ai/agents/fundamentals-analyst', {
+  // Use 30 second timeout for analyst agents (AI analysis can be slow)
+  const response = await request.withTimeout(30000).post('/ai/agents/fundamentals-analyst', {
     stocks,
     ...context,
   });
@@ -105,7 +107,8 @@ export const runFundamentalsAnalystAgent = async (stocks, context = {}) => {
 };
 
 export const runSentimentAnalystAgent = async (stocks, context = {}) => {
-  const response = await request.post('/ai/agents/sentiment-analyst', {
+  // Use 30 second timeout for analyst agents (AI analysis can be slow)
+  const response = await request.withTimeout(30000).post('/ai/agents/sentiment-analyst', {
     stocks,
     ...context,
   });
@@ -113,7 +116,8 @@ export const runSentimentAnalystAgent = async (stocks, context = {}) => {
 };
 
 export const runNewsAnalystAgent = async (stocks, context = {}) => {
-  const response = await request.post('/ai/agents/news-analyst', {
+  // Use 30 second timeout for analyst agents (AI analysis can be slow)
+  const response = await request.withTimeout(30000).post('/ai/agents/news-analyst', {
     stocks,
     ...context,
   });
@@ -121,7 +125,8 @@ export const runNewsAnalystAgent = async (stocks, context = {}) => {
 };
 
 export const runTechnicalAnalystAgent = async (stocks, context = {}) => {
-  const response = await request.post('/ai/agents/technical-analyst', {
+  // Use 30 second timeout for analyst agents (AI analysis can be slow)
+  const response = await request.withTimeout(30000).post('/ai/agents/technical-analyst', {
     stocks,
     ...context,
   });
@@ -131,7 +136,8 @@ export const runTechnicalAnalystAgent = async (stocks, context = {}) => {
 // ===== System 2 Team 2: Researcher Agents =====
 
 export const runBullResearcherAgent = async (data, context = {}) => {
-  const response = await request.post('/ai/agents/bull-researcher', {
+  // Use 30 second timeout for researcher agents (AI research can be slow)
+  const response = await request.withTimeout(30000).post('/ai/agents/bull-researcher', {
     data,
     ...context,
   });
@@ -139,7 +145,8 @@ export const runBullResearcherAgent = async (data, context = {}) => {
 };
 
 export const runBearResearcherAgent = async (data, context = {}) => {
-  const response = await request.post('/ai/agents/bear-researcher', {
+  // Use 30 second timeout for researcher agents (AI research can be slow)
+  const response = await request.withTimeout(30000).post('/ai/agents/bear-researcher', {
     data,
     ...context,
   });
@@ -147,7 +154,8 @@ export const runBearResearcherAgent = async (data, context = {}) => {
 };
 
 export const runResearchManagerAgent = async (bullThesis, bearThesis, context = {}) => {
-  const response = await request.post('/ai/agents/research-manager', {
+  // Use 30 second timeout for research manager (AI synthesis can be slow)
+  const response = await request.withTimeout(30000).post('/ai/agents/research-manager', {
     bull_thesis: bullThesis,
     bear_thesis: bearThesis,
     ...context,
@@ -158,7 +166,8 @@ export const runResearchManagerAgent = async (bullThesis, bearThesis, context = 
 // ===== System 2 Team 3: Portfolio =====
 
 export const runPortfolioManagerAgent = async (stocks, data, context = {}) => {
-  const response = await request.post('/ai/agents/portfolio-manager', {
+  // Use 30 second timeout for portfolio manager (AI portfolio construction can be slow)
+  const response = await request.withTimeout(30000).post('/ai/agents/portfolio-manager', {
     stocks,
     data,
     ...context,
@@ -169,7 +178,8 @@ export const runPortfolioManagerAgent = async (stocks, data, context = {}) => {
 // ===== System 2 Team 4: Risk & Execution =====
 
 export const runRiskManagerAgent = async (stocks, data, context = {}) => {
-  const response = await request.post('/ai/agents/risk-manager', {
+  // Use 30 second timeout for risk manager (AI risk analysis can be slow)
+  const response = await request.withTimeout(30000).post('/ai/agents/risk-manager', {
     stocks,
     data,
     ...context,
@@ -178,7 +188,8 @@ export const runRiskManagerAgent = async (stocks, data, context = {}) => {
 };
 
 export const runTraderAgent = async (stocks, data, context = {}) => {
-  const response = await request.post('/ai/agents/trader', {
+  // Use 30 second timeout for trader agent (AI trade execution can be slow)
+  const response = await request.withTimeout(30000).post('/ai/agents/trader', {
     stocks,
     data,
     ...context,
@@ -189,7 +200,8 @@ export const runTraderAgent = async (stocks, data, context = {}) => {
 // ===== Thinking Agent (ReAct-style iterative reasoning) =====
 
 export const runThinkingAgent = async (stocks, systemPrompt, inputData = null, maxIterations = 5) => {
-  const response = await request.post('/ai/agents/think', {
+  // Use 60 second timeout for thinking agent (iterative reasoning with multiple tool calls can take longer)
+  const response = await request.withTimeout(60000).post('/ai/agents/think', {
     stocks,
     system_prompt: systemPrompt,
     input_data: inputData,

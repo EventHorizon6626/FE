@@ -43,6 +43,9 @@ export function clearToken() {
 
 api.interceptors.request.use(
   (config) => {
+    // Start timer for this request
+    config.metadata = { startTime: Date.now() };
+
     if (process.env.NODE_ENV !== 'production') {
       const method = config.method?.toUpperCase() || 'REQUEST';
       const url = `${config.baseURL}${config.url}`;
@@ -63,22 +66,51 @@ api.interceptors.request.use(
 );
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Log response timing
+    const duration = Date.now() - response.config.metadata.startTime;
+    const url = response.config.url;
+
+    if (process.env.NODE_ENV !== 'production') {
+      // Warn if request took > 5 seconds
+      if (duration > 5000) {
+        console.warn(`[API] Slow request (${duration}ms): ${url}`);
+      }
+      console.debug(`[API] Response (${duration}ms): ${url}`);
+    }
+
+    return response;
+  },
   (error) => {
     const status = error?.response?.status;
     const dataMsg = error?.response?.data?.message || error?.response?.data?.error;
     const message = dataMsg || error?.message || 'Network error';
 
+    // Calculate request duration
+    const duration = error.config?.metadata?.startTime
+      ? Date.now() - error.config.metadata.startTime
+      : null;
+    const url = error.config?.url || 'unknown';
+    const method = error.config?.method?.toUpperCase() || 'REQUEST';
+
     if (typeof window !== 'undefined' && status === 401) {
       handleUnauthorized();
+    }
+
+    // Enhanced timeout error logging
+    if (error.code === 'ECONNABORTED') {
+      console.error(`[API] TIMEOUT after ${duration}ms: ${method} ${url}`);
     }
 
     if (process.env.NODE_ENV !== 'production') {
       console.error('[API] Response error:', {
         status,
         message,
-        url: error?.config?.url,
+        url,
+        method,
+        duration: duration ? `${duration}ms` : 'unknown',
         code: error?.code,
+        isTimeout: error.code === 'ECONNABORTED',
         hasResponse: !!error?.response,
         request: error?.request ? 'exists' : 'missing',
       });
@@ -88,7 +120,11 @@ api.interceptors.response.use(
     const wrappedError = new Error(message);
     wrappedError.status = status;
     wrappedError.raw = error?.response?.data;
-    
+    wrappedError.url = url;
+    wrappedError.method = method;
+    wrappedError.duration = duration;
+    wrappedError.isTimeout = error.code === 'ECONNABORTED';
+
     return Promise.reject(wrappedError);
   },
 );
@@ -138,6 +174,15 @@ export const request = {
   put,
   patch,
   delete: del,
+
+  // Helper for long-running operations with custom timeout
+  withTimeout: (timeoutMs) => ({
+    get: (url, config = {}) => get(url, { ...config, timeout: timeoutMs }),
+    post: (url, data = {}, config = {}) => post(url, data, { ...config, timeout: timeoutMs }),
+    put: (url, data = {}, config = {}) => put(url, data, { ...config, timeout: timeoutMs }),
+    patch: (url, data = {}, config = {}) => patch(url, data, { ...config, timeout: timeoutMs }),
+    delete: (url, config = {}) => del(url, { ...config, timeout: timeoutMs }),
+  }),
 };
 
 export default api;

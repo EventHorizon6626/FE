@@ -29,7 +29,8 @@ const nodeApi = {
    * @returns {Promise} Response with outputs array
    */
   getByAgent: async (agentNodeId, horizonId) => {
-    return request.get(`/nodes/by-agent/${agentNodeId}?horizonId=${horizonId}`);
+    // Use 30 second timeout for loading revision history (can be slow for agents with many outputs)
+    return request.withTimeout(30000).get(`/nodes/by-agent/${agentNodeId}?horizonId=${horizonId}`);
   },
 
   reactivate: async (nodeId) => {

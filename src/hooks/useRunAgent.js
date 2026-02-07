@@ -220,15 +220,31 @@ export const useRunAgent = ({
         toast.close(context.loadingToastId);
       }
 
+      // Enhanced error message with endpoint info
+      let errorDescription = error.message || `Failed to execute ${agentName}`;
+
+      if (error.isTimeout) {
+        const durationText = error.duration ? `${error.duration}ms` : 'timeout limit';
+        const urlText = error.url ? ` on ${error.url}` : '';
+        errorDescription = `Timeout after ${durationText}${urlText}`;
+      }
+
       toast({
         title: 'Agent failed',
-        description: error.message || `Failed to execute ${agentName}`,
+        description: errorDescription,
         status: 'error',
         duration: 5000,
         isClosable: true,
       });
 
-      console.error(`[${agentName}] Error:`, error);
+      console.error(`[${agentName}] Error:`, {
+        message: error.message,
+        url: error.url,
+        method: error.method,
+        duration: error.duration ? `${error.duration}ms` : 'unknown',
+        isTimeout: error.isTimeout,
+        fullError: error,
+      });
 
       if (onError) {
         onError(error, { nodeId, agentName });
