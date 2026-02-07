@@ -1042,24 +1042,26 @@ function PipelineBuilderInner() {
         // Add NEW outputNode to canvas (use id from backend)
         const agentNodePosition = currentNodes.find(n => n.id === nodeId)?.position || { x: 0, y: 0 };
 
-        // Find a good position for the output node (close to source, avoiding collisions)
+        // Find a good position for the output node (close to source, right-aligned)
         const outputNodeWidth = 280; // Approximate width of output node
         const outputNodeHeight = 150; // Approximate height of output node
-        const spacing = 20; // Minimum spacing between nodes
-        const preferredDistance = 250; // Preferred distance from source node
+        const spacing = 30; // Minimum spacing between nodes
+        const horizontalDistance = 200; // Distance from source node (closer now)
 
-        // Try positions in order: right, below, above, left
+        // Try positions: right-aligned first (same Y), then slight vertical offsets
         const tryPositions = [
-          { x: agentNodePosition.x + preferredDistance, y: agentNodePosition.y }, // Right
-          { x: agentNodePosition.x, y: agentNodePosition.y + 200 }, // Below
-          { x: agentNodePosition.x, y: agentNodePosition.y - 200 }, // Above
-          { x: agentNodePosition.x - preferredDistance, y: agentNodePosition.y }, // Left
+          { x: agentNodePosition.x + horizontalDistance, y: agentNodePosition.y }, // Right, same Y
+          { x: agentNodePosition.x + horizontalDistance, y: agentNodePosition.y + 50 }, // Right, slightly below
+          { x: agentNodePosition.x + horizontalDistance, y: agentNodePosition.y - 50 }, // Right, slightly above
+          { x: agentNodePosition.x + horizontalDistance, y: agentNodePosition.y + 100 }, // Right, more below
+          { x: agentNodePosition.x + horizontalDistance, y: agentNodePosition.y - 100 }, // Right, more above
         ];
 
-        // Check if a position collides with existing nodes
+        // Check if a position collides with existing nodes (excluding old output node)
         const hasCollision = (pos) => {
           return currentNodes.some(n => {
             if (n.id === nodeId) return false; // Skip source node
+            if (n.type === 'outputNode' && n.data?.sourceAgentNodeId === nodeId) return false; // Skip old output
             const nodeWidth = 280;
             const nodeHeight = 150;
             const dx = Math.abs((pos.x + outputNodeWidth / 2) - (n.position.x + nodeWidth / 2));
@@ -1069,8 +1071,8 @@ function PipelineBuilderInner() {
           });
         };
 
-        // Find first non-colliding position, or use preferred if none found
-        let outputPosition = tryPositions[0];
+        // Find first non-colliding position (always to the right)
+        let outputPosition = tryPositions[0]; // Default: right-aligned
         for (const pos of tryPositions) {
           if (!hasCollision(pos)) {
             outputPosition = pos;
