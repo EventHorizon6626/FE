@@ -27,6 +27,7 @@ import {
   ModalOverlay,
   Progress,
   Select,
+  SimpleGrid,
   Spinner,
   Switch,
   Text,
@@ -180,6 +181,33 @@ const AGENT_CATEGORIES = [
   { value: 'risk_manager', label: '⚖️ Risk Manager', system: 'team' },
   { value: 'custom_analyzer', label: '🤖 Custom Analyzer', system: 'team' },
 ];
+
+// Helper to extract data_by_symbol regardless of field name (used across components)
+const extractDataBySymbol = (result) => {
+  if (!result) return {};
+
+  // Try known agent-specific fields first
+  const knownField = result.chart_data_by_symbol ||
+         result.earnings_data_by_symbol ||
+         result.news_data_by_symbol ||
+         result.technical_data_by_symbol ||
+         result.fundamentals_data_by_symbol ||
+         result.chart_data ||
+         result.data?.chart_data_by_symbol ||
+         result.result?.chart_data_by_symbol;
+
+  if (knownField) return knownField;
+
+  // For custom agents: look for any field ending in _by_symbol or _data
+  const symbolField = Object.keys(result).find(key =>
+    key.endsWith('_by_symbol') || key.endsWith('_data')
+  );
+  if (symbolField) return result[symbolField];
+
+  // If no structured field found, return the entire result for custom rendering
+  // This handles arbitrary JSON from custom agents
+  return result;
+};
 
 const initialNodes = [];
 const initialEdges = [];
@@ -470,7 +498,11 @@ function CustomOutputNode({ data, id, selected }) {
               Status: <Text as="span" color="green.600" fontWeight="600">{data.result?.status || 'success'}</Text>
             </Text>
             <Text fontSize="xs" color="gray.600">
-              Symbols: {data.result?.total_symbols || 0}
+              Symbols: {(() => {
+                if (!data.result) return 0;
+                const dataBySymbol = extractDataBySymbol(data.result);
+                return Object.keys(dataBySymbol).length || data.result?.total_symbols || 0;
+              })()}
             </Text>
             <Text fontSize="xs" color="gray.500">
               {new Date(data.timestamp).toLocaleString()}
@@ -3592,152 +3624,474 @@ function PipelineBuilderInner() {
 
                         {/* Render Charts for each symbol */}
                         {(() => {
-                          console.log('[Sidebar Render] Full result:', displayResult);
-                          console.log('[Sidebar Render] result keys:', displayResult ? Object.keys(displayResult) : 'no result');
-                          
-                          // Try to find chart data in various possible locations
-                          let chartData = displayResult?.chart_data_by_symbol || displayResult?.chart_data;
-                          
-                          // If chart_data doesn't exist, try to find it in result.data
-                          if (!chartData && displayResult?.data) {
-                            chartData = displayResult.data.chart_data_by_symbol || displayResult.data.chart_data;
-                          }
-                          
-                          // If still no chart data, try result.result (nested)
-                          if (!chartData && displayResult?.result) {
-                            chartData = displayResult.result.chart_data_by_symbol || displayResult.result.chart_data;
-                          }
-                          
-                          console.log('[Sidebar Render] Final chartData:', chartData);
-                          
-                          if (!chartData || Object.keys(chartData).length === 0) {
-                            return (
-                              <Box
-                                p="16px"
-                                bg="yellow.50"
-                                borderRadius="12px"
-                                border="1px solid"
-                                borderColor="yellow.200"
-                              >
-                                <VStack align="start" spacing="8px">
-                                  <HStack>
-                                    <Icon as={MdWarning} color="yellow.600" />
-                                  <Text fontSize="sm" fontWeight="600" color="yellow.800">
-                                    No Chart Data Available
-                                  </Text>
+                          // Helper to detect what type of agent data is present
+                          const detectDataType = (result) => {
+                            if (!result) return null;
+
+                            if (result.chart_data_by_symbol || result.chart_data) return 'candlestick';
+                            if (result.earnings_data_by_symbol) return 'earnings';
+                            if (result.news_data_by_symbol) return 'news';
+                            if (result.technical_data_by_symbol) return 'technical';
+                            if (result.fundamentals_data_by_symbol) return 'fundamentals';
+
+                            // Custom agents - check if result has any data-like structure
+                            // If it's an object with keys, treat as custom JSON
+                            if (result && typeof result === 'object' && Object.keys(result).length > 0) {
+                              return 'custom';
+                            }
+
+                            return null;
+                          };
+
+                          // Helper to extract data_by_symbol regardless of field name
+                          const extractDataBySymbol = (result) => {
+                            if (!result) return {};
+
+                            // Try known agent-specific fields first
+                            const knownField = result.chart_data_by_symbol ||
+                                   result.earnings_data_by_symbol ||
+                                   result.news_data_by_symbol ||
+                                   result.technical_data_by_symbol ||
+                                   result.fundamentals_data_by_symbol ||
+                                   result.chart_data ||
+                                   result.data?.chart_data_by_symbol ||
+                                   result.result?.chart_data_by_symbol;
+
+                            if (knownField) return knownField;
+
+                            // For custom agents: look for any field ending in _by_symbol or _data
+                            const symbolField = Object.keys(result).find(key =>
+                              key.endsWith('_by_symbol') || key.endsWith('_data')
+                            );
+                            if (symbolField) return result[symbolField];
+
+                            // If no structured field found, return the entire result for custom rendering
+                            // This handles arbitrary JSON from custom agents
+                            return result;
+                          };
+
+                          // Earnings Data Renderer
+                          const EarningsDataRenderer = ({ symbol, data }) => (
+                            <Box p="16px" bg="white" borderRadius="12px" border="1px solid" borderColor="gray.200" mb="12px">
+                              <VStack align="start" spacing="8px">
+                                <HStack justify="space-between" w="full">
+                                  <Text fontWeight="700" fontSize="md">{symbol}</Text>
+                                  {data.security_type && (
+                                    <Badge colorScheme="blue">{data.security_type}</Badge>
+                                  )}
                                 </HStack>
-                                <Text fontSize="xs" color="gray.600">
-                                  The output doesn't contain chart data. This might be from a non-candlestick agent.
-                                </Text>
-                                <Text fontSize="xs" color="gray.500" fontFamily="monospace">
-                                  Expected: result.chart_data
-                                </Text>
+
+                                {data.name && (
+                                  <Text fontSize="sm" color="gray.600">{data.name}</Text>
+                                )}
+
+                                {/* Financial Statements */}
+                                {data.financial_statements && (
+                                  <Box w="full">
+                                    <Text fontWeight="600" fontSize="sm" mb="8px" color="teal.700">
+                                      Financial Statements
+                                    </Text>
+                                    <SimpleGrid columns={3} spacing="8px" w="full">
+                                      {data.financial_statements.income_statement && (
+                                        <Box bg="gray.50" p="8px" borderRadius="6px">
+                                          <Text fontSize="xs" fontWeight="600" mb="4px">Income Statement</Text>
+                                          <VStack align="start" spacing="2px" fontSize="xs">
+                                            <Text>Revenue: ${(data.financial_statements.income_statement.total_revenue / 1e9).toFixed(2)}B</Text>
+                                            <Text>Net Income: ${(data.financial_statements.income_statement.net_income / 1e9).toFixed(2)}B</Text>
+                                          </VStack>
+                                        </Box>
+                                      )}
+                                      {data.financial_statements.balance_sheet && (
+                                        <Box bg="gray.50" p="8px" borderRadius="6px">
+                                          <Text fontSize="xs" fontWeight="600" mb="4px">Balance Sheet</Text>
+                                          <VStack align="start" spacing="2px" fontSize="xs">
+                                            <Text>Assets: ${(data.financial_statements.balance_sheet.total_assets / 1e9).toFixed(2)}B</Text>
+                                            <Text>Cash: ${(data.financial_statements.balance_sheet.cash / 1e9).toFixed(2)}B</Text>
+                                          </VStack>
+                                        </Box>
+                                      )}
+                                      {data.financial_statements.cash_flow && (
+                                        <Box bg="gray.50" p="8px" borderRadius="6px">
+                                          <Text fontSize="xs" fontWeight="600" mb="4px">Cash Flow</Text>
+                                          <VStack align="start" spacing="2px" fontSize="xs">
+                                            <Text>Operating CF: ${(data.financial_statements.cash_flow.operating_cash_flow / 1e9).toFixed(2)}B</Text>
+                                            <Text>Free CF: ${(data.financial_statements.cash_flow.free_cash_flow / 1e9).toFixed(2)}B</Text>
+                                          </VStack>
+                                        </Box>
+                                      )}
+                                    </SimpleGrid>
+                                  </Box>
+                                )}
+
+                                {/* Key Metrics */}
+                                {data.metrics && (
+                                  <Box w="full">
+                                    <Text fontWeight="600" fontSize="sm" mb="8px" color="teal.700">
+                                      Key Metrics
+                                    </Text>
+                                    <SimpleGrid columns={2} spacing="6px">
+                                      {Object.entries(data.metrics).slice(0, 8).map(([key, value]) => (
+                                        <HStack key={key} justify="space-between" fontSize="xs" bg="gray.50" p="6px" borderRadius="4px">
+                                          <Text color="gray.600">{key.replace(/_/g, ' ')}:</Text>
+                                          <Text fontWeight="600">
+                                            {typeof value === 'number'
+                                              ? (value > 1e9 ? `$${(value / 1e9).toFixed(2)}B` : value.toLocaleString())
+                                              : value}
+                                          </Text>
+                                        </HStack>
+                                      ))}
+                                    </SimpleGrid>
+                                  </Box>
+                                )}
+
+                                {data.error && (
+                                  <Alert status="error" fontSize="xs">
+                                    <AlertIcon />
+                                    {data.error}
+                                  </Alert>
+                                )}
                               </VStack>
                             </Box>
                           );
-                        }
 
-                        return (
-                          <VStack spacing="20px" align="stretch">
-                            <Text fontSize="md" fontWeight="700" color="gray.800">
-                              Candlestick Charts ({Object.keys(chartData).length} symbols)
-                            </Text>
-                            {Object.keys(chartData).map((symbol) => {
-                              const symbolData = chartData[symbol];
-                              console.log(`[Chart Render] ${symbol} data:`, symbolData);
-                              
-                              // Format data for candlestick chart
-                              if (!symbolData?.candles || symbolData.candles.length === 0) {
-                                return (
-                                  <Box key={symbol} p="16px" bg="gray.50" borderRadius="12px">
-                                    <Text fontSize="sm" color="gray.600">
-                                      No chart data available for {symbol}
+                          // News Data Renderer
+                          const NewsDataRenderer = ({ symbol, data }) => (
+                            <Box p="16px" bg="white" borderRadius="12px" border="1px solid" borderColor="gray.200" mb="12px">
+                              <VStack align="start" spacing="8px">
+                                <HStack justify="space-between" w="full">
+                                  <Text fontWeight="700" fontSize="md">{symbol}</Text>
+                                  <Badge colorScheme="purple">{data.total_articles || 0} articles</Badge>
+                                </HStack>
+
+                                {data.articles?.slice(0, 5).map((article, idx) => (
+                                  <Box key={idx} p="12px" bg="gray.50" borderRadius="8px" w="full">
+                                    <Text fontSize="sm" fontWeight="600" mb="4px" color="gray.800">
+                                      {article.title}
+                                    </Text>
+                                    <Text fontSize="xs" color="gray.600" noOfLines={2} mb="6px">
+                                      {article.description || article.summary}
+                                    </Text>
+                                    <HStack justify="space-between" fontSize="xs">
+                                      <Text color="gray.500">{article.source}</Text>
+                                      <Text color="gray.500">
+                                        {new Date(article.publishedAt || article.date).toLocaleDateString()}
+                                      </Text>
+                                    </HStack>
+                                  </Box>
+                                ))}
+
+                                {data.error && (
+                                  <Alert status="error" fontSize="xs">
+                                    <AlertIcon />
+                                    {data.error}
+                                  </Alert>
+                                )}
+                              </VStack>
+                            </Box>
+                          );
+
+                          // Technical Indicators Renderer
+                          const TechnicalDataRenderer = ({ symbol, data }) => (
+                            <Box p="16px" bg="white" borderRadius="12px" border="1px solid" borderColor="gray.200" mb="12px">
+                              <VStack align="start" spacing="8px">
+                                <Text fontWeight="700" fontSize="md">{symbol}</Text>
+
+                                {data.indicators && (
+                                  <SimpleGrid columns={2} spacing="8px" w="full">
+                                    {Object.entries(data.indicators).map(([indicator, value]) => (
+                                      <Box key={indicator} p="10px" bg="teal.50" borderRadius="8px" border="1px solid" borderColor="teal.200">
+                                        <Text fontSize="sm" fontWeight="600" color="teal.700" mb="2px">
+                                          {indicator}
+                                        </Text>
+                                        <Text fontSize="xs" color="gray.700" fontFamily="monospace">
+                                          {typeof value === 'object' ? JSON.stringify(value) : value}
+                                        </Text>
+                                      </Box>
+                                    ))}
+                                  </SimpleGrid>
+                                )}
+
+                                {data.error && (
+                                  <Alert status="error" fontSize="xs">
+                                    <AlertIcon />
+                                    {data.error}
+                                  </Alert>
+                                )}
+                              </VStack>
+                            </Box>
+                          );
+
+                          // Fundamentals Renderer
+                          const FundamentalsDataRenderer = ({ symbol, data }) => (
+                            <Box p="16px" bg="white" borderRadius="12px" border="1px solid" borderColor="gray.200" mb="12px">
+                              <VStack align="start" spacing="8px">
+                                <Text fontWeight="700" fontSize="md">{symbol}</Text>
+
+                                {data.fundamentals_text && (
+                                  <Box bg="blue.50" p="12px" borderRadius="8px" w="full" border="1px solid" borderColor="blue.200">
+                                    <Text fontSize="sm" whiteSpace="pre-wrap" color="gray.800">
+                                      {data.fundamentals_text}
                                     </Text>
                                   </Box>
+                                )}
+
+                                {data.error && (
+                                  <Alert status="error" fontSize="xs">
+                                    <AlertIcon />
+                                    {data.error}
+                                  </Alert>
+                                )}
+                              </VStack>
+                            </Box>
+                          );
+
+                          // Generic renderer for custom agents with arbitrary JSON output
+                          const CustomAgentRenderer = ({ data, symbol = null }) => {
+                            const renderValue = (value, depth = 0) => {
+                              // Prevent infinite recursion
+                              if (depth > 5) return <Text fontSize="xs" color="gray.500">[Max depth reached]</Text>;
+
+                              // Handle null/undefined
+                              if (value === null || value === undefined) {
+                                return <Text fontSize="xs" color="gray.500">null</Text>;
+                              }
+
+                              // Handle primitives
+                              if (typeof value !== 'object') {
+                                return (
+                                  <Text fontSize="xs" color="gray.800" fontFamily="monospace">
+                                    {String(value)}
+                                  </Text>
                                 );
                               }
 
-                              const chartSeries = [
-                                {
-                                  name: symbol,
-                                  data: symbolData.candles.map((candle) => ({
-                                    x: new Date(candle.date),
-                                    y: [candle.open, candle.high, candle.low, candle.close],
-                                  })),
-                                },
-                              ];
+                              // Handle arrays
+                              if (Array.isArray(value)) {
+                                if (value.length === 0) return <Text fontSize="xs" color="gray.500">[]</Text>;
 
-                              const chartOptions = {
-                                chart: {
-                                  type: 'candlestick',
-                                  height: 350,
-                                  toolbar: {
-                                    show: true,
-                                  },
-                                },
-                                title: {
-                                  text: `${symbol} - ${symbolData.period || '1mo'}`,
-                                  align: 'left',
-                                  style: {
-                                    color: '#1F2937',
-                                  },
-                                },
-                                xaxis: {
-                                  type: 'datetime',
-                                  labels: {
-                                    style: {
-                                      colors: '#6B7280',
-                                    },
-                                  },
-                                },
-                                yaxis: {
-                                  tooltip: {
-                                    enabled: true,
-                                  },
-                                  labels: {
-                                    formatter: (value) => `$${value.toFixed(2)}`,
-                                    style: {
-                                      colors: '#6B7280',
-                                    },
-                                  },
-                                },
-                                plotOptions: {
-                                  candlestick: {
-                                    colors: {
-                                      upward: '#26A69A',
-                                      downward: '#EF5350',
-                                    },
-                                  },
-                                },
-                                tooltip: {
-                                  theme: 'dark',
-                                },
-                                grid: {
-                                  borderColor: '#E5E7EB',
-                                },
-                              };
+                                return (
+                                  <VStack align="start" spacing="4px" pl="16px">
+                                    {value.slice(0, 10).map((item, idx) => (
+                                      <HStack key={idx} align="start" spacing="8px">
+                                        <Badge colorScheme="gray" fontSize="9px">{idx}</Badge>
+                                        {renderValue(item, depth + 1)}
+                                      </HStack>
+                                    ))}
+                                    {value.length > 10 && (
+                                      <Text fontSize="xs" color="gray.500" fontStyle="italic">
+                                        ... and {value.length - 10} more items
+                                      </Text>
+                                    )}
+                                  </VStack>
+                                );
+                              }
+
+                              // Handle objects
+                              const entries = Object.entries(value);
+                              if (entries.length === 0) return <Text fontSize="xs" color="gray.500">{'{}'}</Text>;
 
                               return (
-                                <Box
-                                  key={symbol}
-                                  p="16px"
-                                  bg="white"
-                                  borderRadius="12px"
-                                  border="1px solid"
-                                  borderColor="gray.200"
-                                  boxShadow="sm"
-                                >
-                                  <Chart
-                                    options={chartOptions}
-                                    series={chartSeries}
-                                    type="candlestick"
-                                    height={300}
-                                  />
-                                </Box>
+                                <VStack align="start" spacing="4px" pl="16px" w="full">
+                                  {entries.slice(0, 20).map(([key, val]) => (
+                                    <Box key={key} w="full">
+                                      <HStack align="start" spacing="8px">
+                                        <Text fontSize="xs" fontWeight="600" color="purple.600" minW="120px">
+                                          {key}:
+                                        </Text>
+                                        <Box flex="1">{renderValue(val, depth + 1)}</Box>
+                                      </HStack>
+                                    </Box>
+                                  ))}
+                                  {entries.length > 20 && (
+                                    <Text fontSize="xs" color="gray.500" fontStyle="italic">
+                                      ... and {entries.length - 20} more fields
+                                    </Text>
+                                  )}
+                                </VStack>
                               );
-                            })}
-                          </VStack>
-                        );
+                            };
+
+                            return (
+                              <Box p="16px" bg="white" borderRadius="12px" border="1px solid" borderColor="purple.200" mb="12px">
+                                <VStack align="start" spacing="12px" w="full">
+                                  <HStack justify="space-between" w="full">
+                                    <Text fontWeight="700" fontSize="md" color="purple.700">
+                                      {symbol || 'Custom Agent Output'}
+                                    </Text>
+                                    <Badge colorScheme="purple">Custom JSON</Badge>
+                                  </HStack>
+
+                                  <Box
+                                    w="full"
+                                    bg="purple.50"
+                                    p="12px"
+                                    borderRadius="8px"
+                                    border="1px solid"
+                                    borderColor="purple.200"
+                                    maxH="600px"
+                                    overflowY="auto"
+                                  >
+                                    {renderValue(data)}
+                                  </Box>
+
+                                  {/* Collapsible raw JSON view for debugging */}
+                                  <details style={{ width: '100%' }}>
+                                    <summary style={{ cursor: 'pointer', fontSize: '12px', color: '#718096' }}>
+                                      Show Raw JSON
+                                    </summary>
+                                    <Box
+                                      mt="8px"
+                                      bg="gray.100"
+                                      p="12px"
+                                      borderRadius="6px"
+                                      maxH="300px"
+                                      overflowY="auto"
+                                      w="full"
+                                    >
+                                      <pre style={{ fontSize: '10px', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                                        {JSON.stringify(data, null, 2)}
+                                      </pre>
+                                    </Box>
+                                  </details>
+                                </VStack>
+                              </Box>
+                            );
+                          };
+
+                          console.log('[Sidebar Render] Full result:', displayResult);
+                          console.log('[Sidebar Render] result keys:', displayResult ? Object.keys(displayResult) : 'no result');
+
+                          const dataType = detectDataType(displayResult);
+                          const dataBySymbol = extractDataBySymbol(displayResult);
+
+                          console.log('[Sidebar Render] Detected type:', dataType);
+                          console.log('[Sidebar Render] Data by symbol keys:', Object.keys(dataBySymbol));
+
+                          if (!dataBySymbol || Object.keys(dataBySymbol).length === 0) {
+                            return (
+                              <Box p="16px" bg="yellow.50" borderRadius="12px" border="1px solid" borderColor="yellow.200">
+                                <VStack align="start" spacing="8px">
+                                  <HStack>
+                                    <Icon as={MdWarning} color="yellow.600" />
+                                    <Text fontSize="sm" fontWeight="600" color="yellow.800">
+                                      No Data Available
+                                    </Text>
+                                  </HStack>
+                                  <Text fontSize="xs" color="gray.600">
+                                    The agent output doesn't contain expected data structure.
+                                  </Text>
+                                  <Text fontSize="xs" color="gray.500" fontFamily="monospace">
+                                    Looking for: *_data_by_symbol or chart_data
+                                  </Text>
+                                  <Divider />
+                                  <Text fontSize="xs" fontWeight="600" color="gray.700">
+                                    Raw Output (for debugging):
+                                  </Text>
+                                  <Box bg="gray.100" p="12px" borderRadius="8px" maxH="300px" overflowY="auto" w="full">
+                                    <pre style={{ fontSize: '10px', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                                      {JSON.stringify(displayResult, null, 2)}
+                                    </pre>
+                                  </Box>
+                                </VStack>
+                              </Box>
+                            );
+                          }
+
+                          return (
+                            <VStack spacing="20px" align="stretch">
+                              <HStack justify="space-between">
+                                <Text fontSize="md" fontWeight="700" color="gray.800">
+                                  {dataType === 'candlestick' && `Candlestick Charts (${Object.keys(dataBySymbol).length} symbols)`}
+                                  {dataType === 'earnings' && `Earnings Data (${Object.keys(dataBySymbol).length} symbols)`}
+                                  {dataType === 'news' && `News Articles (${Object.keys(dataBySymbol).length} symbols)`}
+                                  {dataType === 'technical' && `Technical Analysis (${Object.keys(dataBySymbol).length} symbols)`}
+                                  {dataType === 'fundamentals' && `Fundamentals (${Object.keys(dataBySymbol).length} symbols)`}
+                                  {dataType === 'custom' && `Custom Agent Output`}
+                                  {!dataType && `Agent Output`}
+                                </Text>
+                                <Badge colorScheme="purple" textTransform="capitalize">{dataType || 'unknown'}</Badge>
+                              </HStack>
+
+                              {Object.keys(dataBySymbol).map((symbol) => {
+                                const symbolData = dataBySymbol[symbol];
+
+                                // Render based on detected agent type
+                                if (dataType === 'candlestick') {
+                                  // Keep existing candlestick chart rendering logic
+                                  if (!symbolData?.candles || symbolData.candles.length === 0) {
+                                    return (
+                                      <Box key={symbol} p="16px" bg="gray.50" borderRadius="12px">
+                                        <Text fontSize="sm" color="gray.600">
+                                          No chart data available for {symbol}
+                                        </Text>
+                                      </Box>
+                                    );
+                                  }
+
+                                  const candlestickSeries = [{
+                                    data: symbolData.candles.map((candle) => ({
+                                      x: new Date(candle.date),
+                                      y: [candle.open, candle.high, candle.low, candle.close],
+                                    })),
+                                  }];
+
+                                  const candlestickOptions = {
+                                    chart: { type: 'candlestick', height: 350 },
+                                    title: { text: `${symbol} - ${symbolData.timeframe || ''}`, align: 'left' },
+                                    xaxis: { type: 'datetime' },
+                                    yaxis: { tooltip: { enabled: true } },
+                                  };
+
+                                  return (
+                                    <Box key={symbol} p="16px" bg="white" borderRadius="12px" border="1px solid" borderColor="gray.200">
+                                      <Chart options={candlestickOptions} series={candlestickSeries} type="candlestick" height={350} />
+                                    </Box>
+                                  );
+                                } else if (dataType === 'earnings') {
+                                  return <EarningsDataRenderer key={symbol} symbol={symbol} data={symbolData} />;
+                                } else if (dataType === 'news') {
+                                  return <NewsDataRenderer key={symbol} symbol={symbol} data={symbolData} />;
+                                } else if (dataType === 'technical') {
+                                  return <TechnicalDataRenderer key={symbol} symbol={symbol} data={symbolData} />;
+                                } else if (dataType === 'fundamentals') {
+                                  return <FundamentalsDataRenderer key={symbol} symbol={symbol} data={symbolData} />;
+                                } else if (dataType === 'custom') {
+                                  // Custom agents - use generic JSON renderer
+                                  // If dataBySymbol has multiple keys, render each separately
+                                  // Otherwise render the whole result
+                                  const isMultiSymbol = typeof symbolData === 'object' &&
+                                                        !Array.isArray(symbolData) &&
+                                                        Object.keys(symbolData).length > 1;
+
+                                  if (isMultiSymbol) {
+                                    return <CustomAgentRenderer key={symbol} symbol={symbol} data={symbolData} />;
+                                  } else {
+                                    // Single output - render without symbol prefix
+                                    return <CustomAgentRenderer key={symbol} data={symbolData} />;
+                                  }
+                                } else {
+                                  // Fallback for truly unknown formats - show raw JSON
+                                  return (
+                                    <Box key={symbol} p="16px" bg="gray.100" borderRadius="12px" border="1px solid" borderColor="gray.300">
+                                      <VStack align="start" spacing="8px">
+                                        <HStack>
+                                          <Icon as={MdWarning} color="orange.500" />
+                                          <Text fontWeight="700" fontSize="md" color="gray.700">
+                                            {symbol || 'Unknown Format'}
+                                          </Text>
+                                        </HStack>
+                                        <Box bg="white" p="12px" borderRadius="8px" maxH="400px" overflowY="auto" w="full">
+                                          <pre style={{ fontSize: '11px', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                                            {JSON.stringify(symbolData, null, 2)}
+                                          </pre>
+                                        </Box>
+                                      </VStack>
+                                    </Box>
+                                  );
+                                }
+                              })}
+                            </VStack>
+                          );
                       })()}
 
                       {/* Raw JSON Data - Only show chart_data_by_symbol */}
