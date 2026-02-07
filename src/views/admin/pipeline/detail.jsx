@@ -596,8 +596,6 @@ function PipelineBuilderInner() {
     systemPrompt: '',
   });
 
-  const [draggingAgent, setDraggingAgent] = useState(null);
-
   // State for right sidebar to show output node data
   const [selectedOutputNode, setSelectedOutputNode] = useState(null);
   const [revisions, setRevisions] = useState([]);
@@ -614,7 +612,6 @@ function PipelineBuilderInner() {
       });
     }
   }, [editingPortfolio]);
-  const [tempNodeId, setTempNodeId] = useState(null);
 
   const toast = useToast();
   const { screenToFlowPosition } = useReactFlow();
@@ -865,6 +862,18 @@ function PipelineBuilderInner() {
   }, [setNodes, setEdges, toast]);
 
   const { getNodes, getEdges } = useReactFlow();
+
+  // Save node position to backend when drag stops
+  const handleNodeDragStop = useCallback(async (event, node) => {
+    try {
+      await nodeApi.update(node.id, {
+        position: node.position,
+      });
+      console.log(`[NodeDrag] Saved position for node ${node.id}:`, node.position);
+    } catch (error) {
+      console.error('Failed to save node position:', error);
+    }
+  }, []);
 
   const handleNodePlay = useCallback(async (nodeId) => {
     const currentNodes = getNodes();
@@ -1134,7 +1143,6 @@ function PipelineBuilderInner() {
 
   const handleAgentMouseDown = useCallback(async (event, agent) => {
     event.preventDefault();
-    event.stopPropagation();
 
     const position = screenToFlowPosition({
       x: event.clientX,
@@ -1172,12 +1180,9 @@ function PipelineBuilderInner() {
           refetchHorizon: refetchHorizon,
           config: savedNode.data.config,
         },
-        draggable: false, // Disable ReactFlow's built-in dragging during custom drag
       };
 
       setNodes((nds) => nds.concat(newNode));
-      setDraggingAgent({ agent, initialPosition: position });
-      setTempNodeId(savedNode.id);
 
       toast({
         title: 'Agent added',
@@ -1201,7 +1206,6 @@ function PipelineBuilderInner() {
 
   const handlePortfolioMouseDown = useCallback(async (event, portfolio) => {
     event.preventDefault();
-    event.stopPropagation();
 
     const position = screenToFlowPosition({
       x: event.clientX,
@@ -1230,12 +1234,9 @@ function PipelineBuilderInner() {
           onDelete: handleNodeDelete,
           refetchHorizon: refetchHorizon,
         },
-        draggable: false, // Disable ReactFlow's built-in dragging during custom drag
       };
 
       setNodes((nds) => nds.concat(newNode));
-      setDraggingAgent({ portfolio, initialPosition: position });
-      setTempNodeId(savedNode.id);
 
       toast({
         title: 'Portfolio added',
@@ -1256,62 +1257,6 @@ function PipelineBuilderInner() {
     }
   }, [screenToFlowPosition, setNodes, toast, handleNodeDelete, currentHorizonId, refetchHorizon]);
 
-  useEffect(() => {
-    if (!draggingAgent || !tempNodeId) return;
-
-    const initialPosition = draggingAgent.initialPosition;
-    let finalPosition = initialPosition; // Default to initial position
-
-    const handleMouseMove = (event) => {
-      const position = screenToFlowPosition({
-        x: event.clientX,
-        y: event.clientY,
-      });
-
-      finalPosition = position;
-
-      setNodes((nds) =>
-        nds.map((node) =>
-          node.id === tempNodeId
-            ? { ...node, position }
-            : node
-        )
-      );
-    };
-
-    const handleMouseUp = async () => {
-      // Re-enable ReactFlow's built-in dragging
-      setNodes((nds) =>
-        nds.map((node) =>
-          node.id === tempNodeId
-            ? { ...node, draggable: true }
-            : node
-        )
-      );
-
-      // Save the final position to the backend
-      if (finalPosition && tempNodeId) {
-        try {
-          await nodeApi.update(tempNodeId, {
-            position: finalPosition,
-          });
-        } catch (error) {
-          console.error('Failed to update node position:', error);
-        }
-      }
-
-      setDraggingAgent(null);
-      setTempNodeId(null);
-    };
-
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [draggingAgent, tempNodeId, screenToFlowPosition, setNodes]);
 
   // Create custom agent
   const handleCreateAgent = async () => {
@@ -2101,6 +2046,7 @@ function PipelineBuilderInner() {
           onConnect={onConnect}
           onNodeClick={handleNodeClick}
           onNodeDoubleClick={handleNodeDoubleClick}
+          onNodeDragStop={handleNodeDragStop}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           defaultViewport={{ x: 0, y: 0, zoom: 0.9 }}
