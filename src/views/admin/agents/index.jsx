@@ -259,11 +259,14 @@ const SYSTEM1_STAGES = [
   { value: 'Stage 3', label: 'Stage 3 - LLM Features' },
 ];
 
-const SYSTEM2_TEAMS = [
-  { value: 'Team 1', label: 'Team 1 - Market Analysis', description: 'Analyst role: analyze market data and provide insights' },
-  { value: 'Team 2', label: 'Team 2 - Bull/Bear Debate', description: 'Researcher role: build investment cases and debate' },
-  { value: 'Team 3', label: 'Team 3 - Portfolio', description: 'Manager role: portfolio allocation and position sizing' },
-  { value: 'Team 4', label: 'Team 4 - Risk', description: 'Risk/Execution role: evaluate risk and execute trades' },
+const ANALYZER_CATEGORIES = [
+  { value: 'bull_bear_analyzer', label: 'Bull-Bear Analyzer', description: 'Debates bullish and bearish perspectives' },
+  { value: 'risk_analyzer', label: 'Risk Analyzer', description: 'Evaluates portfolio risk and position sizing' },
+  { value: 'market_analyzer', label: 'Market Analyzer', description: 'Analyzes market trends and patterns' },
+  { value: 'sentiment_analyzer', label: 'Sentiment Analyzer', description: 'Analyzes market sentiment from news and social media' },
+  { value: 'technical_analyzer', label: 'Technical Analyzer', description: 'Performs technical analysis on price charts' },
+  { value: 'fundamental_analyzer', label: 'Fundamental Analyzer', description: 'Analyzes company fundamentals and financials' },
+  { value: 'custom_analyzer', label: 'Custom Analyzer', description: 'Custom analysis based on your unique needs' },
 ];
 
 
@@ -342,8 +345,7 @@ export default function AgentsPage() {
       const response = await generateAgentPrompt(
         newAgent.name,
         newAgent.description,
-        newAgent.stage,
-        newAgent.category
+        newAgent.system === 'System 2' ? newAgent.stage : newAgent.category
       );
 
       if (response.success && response.data?.systemPrompt) {
@@ -372,7 +374,7 @@ export default function AgentsPage() {
     } finally {
       setIsGenerating(false);
     }
-  }, [newAgent.name, newAgent.description, newAgent.stage, newAgent.category, toast]);
+  }, [newAgent.name, newAgent.description, newAgent.stage, newAgent.category, newAgent.system, toast]);
 
   const resetForm = () => {
     setNewAgent({
@@ -424,8 +426,7 @@ export default function AgentsPage() {
         const response = await generateAgentPrompt(
           newAgent.name,
           newAgent.description || "",
-          newAgent.stage,
-          newAgent.category
+          newAgent.system === 'System 2' ? newAgent.stage : newAgent.category
         );
         if (response.success && response.data?.systemPrompt) {
           systemPrompt = response.data.systemPrompt;
@@ -1085,7 +1086,7 @@ export default function AgentsPage() {
 
                 <FormControl isRequired>
                   <FormLabel fontSize="sm" fontWeight="600">
-                    Team
+                    {newAgent.system === 'System 1' ? 'Stage' : 'Category'}
                   </FormLabel>
                   <Select
                     value={newAgent.stage}
@@ -1100,15 +1101,15 @@ export default function AgentsPage() {
                             {stage.label}
                           </option>
                         ))
-                      : SYSTEM2_TEAMS.map((team) => (
-                          <option key={team.value} value={team.value}>
-                            {team.label}
+                      : ANALYZER_CATEGORIES.map((category) => (
+                          <option key={category.value} value={category.value}>
+                            {category.label}
                           </option>
                         ))}
                   </Select>
                   {newAgent.system === 'System 2' && (
                     <Text fontSize="xs" color="gray.500" mt="4px">
-                      {SYSTEM2_TEAMS.find((t) => t.value === newAgent.stage)?.description}
+                      {ANALYZER_CATEGORIES.find((c) => c.value === newAgent.stage)?.description}
                     </Text>
                   )}
                 </FormControl>
