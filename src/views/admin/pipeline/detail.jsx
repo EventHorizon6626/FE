@@ -596,6 +596,11 @@ function PipelineBuilderInner() {
     systemPrompt: '',
   });
 
+  // State for drag and drop
+  const [isDragging, setIsDragging] = useState(false);
+  const [draggedItem, setDraggedItem] = useState(null);
+  const [dragPreviewNodeId, setDragPreviewNodeId] = useState(null);
+
   // State for right sidebar to show output node data
   const [selectedOutputNode, setSelectedOutputNode] = useState(null);
   const [revisions, setRevisions] = useState([]);
@@ -1141,7 +1146,7 @@ function PipelineBuilderInner() {
     }
   }, [getNodes, getEdges, setNodes, setEdges, toast, onDataAgentOpen, handleNodeDelete]);
 
-  const handleAgentMouseDown = useCallback(async (event, agent) => {
+  const handleAgentMouseDown = useCallback((event, agent) => {
     event.preventDefault();
 
     const position = screenToFlowPosition({
@@ -1149,62 +1154,37 @@ function PipelineBuilderInner() {
       y: event.clientY,
     });
 
-    try {
-      // Create node in backend immediately
-      const response = await nodeApi.create({
+    // Start drag operation - create preview node
+    const previewNodeId = `preview-${Date.now()}`;
+    const previewNode = {
+      id: previewNodeId,
+      type: 'agentNode',
+      position,
+      data: {
+        agent: agent,
         horizonId: currentHorizonId,
-        type: 'agentNode',
-        position,
-        data: {
-          agent: agent,
-          config: {
-            name: agent.name,
-            description: agent.description || '',
-            model: 'gpt-4',
-            temperature: 0.7,
-            maxTokens: 2000,
-          },
+        onDelete: () => {},
+        refetchHorizon: refetchHorizon,
+        config: {
+          name: agent.name,
+          description: agent.description || '',
+          model: 'gpt-4',
+          temperature: 0.7,
+          maxTokens: 2000,
         },
-      });
+      },
+      draggable: false,
+      style: { opacity: 0.6 }, // Preview style
+    };
 
-      const savedNode = response.data;
+    setNodes((nds) => nds.concat(previewNode));
+    setDraggedItem({ type: 'agent', data: agent });
+    setDragPreviewNodeId(previewNodeId);
+    setIsDragging(true);
 
-      const newNode = {
-        id: savedNode.id, // Use backend-generated ID
-        type: 'agentNode',
-        position,
-        data: {
-          agent: agent,
-          horizonId: currentHorizonId, // Pass horizonId for useRunAgent
-          onDelete: handleNodeDelete,
-          refetchHorizon: refetchHorizon,
-          config: savedNode.data.config,
-        },
-      };
+  }, [screenToFlowPosition, setNodes, currentHorizonId, refetchHorizon]);
 
-      setNodes((nds) => nds.concat(newNode));
-
-      toast({
-        title: 'Agent added',
-        description: `${agent.name} added to pipeline`,
-        status: 'success',
-        duration: 2000,
-        isClosable: true,
-      });
-    } catch (error) {
-      console.error('Failed to create agent node:', error);
-      toast({
-        title: 'Failed to add agent',
-        description: error.message || 'Could not create agent node',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      });
-    }
-
-  }, [screenToFlowPosition, setNodes, toast, handleNodeDelete, currentHorizonId, refetchHorizon]);
-
-  const handlePortfolioMouseDown = useCallback(async (event, portfolio) => {
+  const handlePortfolioMouseDown = useCallback((event, portfolio) => {
     event.preventDefault();
 
     const position = screenToFlowPosition({
@@ -1212,51 +1192,157 @@ function PipelineBuilderInner() {
       y: event.clientY,
     });
 
-    try {
-      // Create node in backend immediately
-      const response = await nodeApi.create({
-        horizonId: currentHorizonId,
-        type: 'portfolioNode',
-        position,
-        data: {
-          portfolio: portfolio,
-        },
+    // Start drag operation - create preview node
+    const previewNodeId = `preview-${Date.now()}`;
+    const previewNode = {
+      id: previewNodeId,
+      type: 'portfolioNode',
+      position,
+      data: {
+        portfolio: portfolio,
+        onDelete: () => {},
+        refetchHorizon: refetchHorizon,
+      },
+      draggable: false,
+      style: { opacity: 0.6 }, // Preview style
+    };
+
+    setNodes((nds) => nds.concat(previewNode));
+    setDraggedItem({ type: 'portfolio', data: portfolio });
+    setDragPreviewNodeId(previewNodeId);
+    setIsDragging(true);
+
+  }, [screenToFlowPosition, setNodes, currentHorizonId, refetchHorizon]);
+
+  // Handle drag and drop
+  useEffect(() => {
+    if (!isDragging || !dragPreviewNodeId) return;
+
+    const handleMouseMove = (event) => {
+      const position = screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
       });
 
-      const savedNode = response.data;
+      // Update preview node position
+      setNodes((nds) =>
+        nds.map((node) =>
+          node.id === dragPreviewNodeId
+            ? { ...node, position }
+            : node
+        )
+      );
+    };
 
-      const newNode = {
-        id: savedNode.id, // Use backend-generated ID
-        type: 'portfolioNode',
-        position,
-        data: {
-          portfolio: portfolio,
-          onDelete: handleNodeDelete,
-          refetchHorizon: refetchHorizon,
-        },
-      };
+    const handleMouseUp = async () => {
+      // Get final position
+      const previewNode = getNodes().find(n => n.id === dragPreviewNodeId);
+      const finalPosition = previewNode?.position || { x: 0, y: 0 };
 
-      setNodes((nds) => nds.concat(newNode));
+      // Remove preview node
+      setNodes((nds) => nds.filter((n) => n.id !== dragPreviewNodeId));
 
-      toast({
-        title: 'Portfolio added',
-        description: `${portfolio.name} data source added`,
-        status: 'success',
-        duration: 2000,
-        isClosable: true,
-      });
-    } catch (error) {
-      console.error('Failed to create portfolio node:', error);
-      toast({
-        title: 'Failed to add portfolio',
-        description: error.message || 'Could not create portfolio node',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      });
-    }
-  }, [screenToFlowPosition, setNodes, toast, handleNodeDelete, currentHorizonId, refetchHorizon]);
+      // Create actual node in backend
+      if (draggedItem) {
+        try {
+          if (draggedItem.type === 'agent') {
+            const response = await nodeApi.create({
+              horizonId: currentHorizonId,
+              type: 'agentNode',
+              position: finalPosition,
+              data: {
+                agent: draggedItem.data,
+                config: {
+                  name: draggedItem.data.name,
+                  description: draggedItem.data.description || '',
+                  model: 'gpt-4',
+                  temperature: 0.7,
+                  maxTokens: 2000,
+                },
+              },
+            });
 
+            const savedNode = response.data;
+            const newNode = {
+              id: savedNode.id,
+              type: 'agentNode',
+              position: finalPosition,
+              data: {
+                agent: draggedItem.data,
+                horizonId: currentHorizonId,
+                onDelete: handleNodeDelete,
+                refetchHorizon: refetchHorizon,
+                config: savedNode.data.config,
+              },
+            };
+
+            setNodes((nds) => nds.concat(newNode));
+
+            toast({
+              title: 'Agent added',
+              description: `${draggedItem.data.name} added to pipeline`,
+              status: 'success',
+              duration: 2000,
+              isClosable: true,
+            });
+          } else if (draggedItem.type === 'portfolio') {
+            const response = await nodeApi.create({
+              horizonId: currentHorizonId,
+              type: 'portfolioNode',
+              position: finalPosition,
+              data: {
+                portfolio: draggedItem.data,
+              },
+            });
+
+            const savedNode = response.data;
+            const newNode = {
+              id: savedNode.id,
+              type: 'portfolioNode',
+              position: finalPosition,
+              data: {
+                portfolio: draggedItem.data,
+                onDelete: handleNodeDelete,
+                refetchHorizon: refetchHorizon,
+              },
+            };
+
+            setNodes((nds) => nds.concat(newNode));
+
+            toast({
+              title: 'Portfolio added',
+              description: `${draggedItem.data.name} data source added`,
+              status: 'success',
+              duration: 2000,
+              isClosable: true,
+            });
+          }
+        } catch (error) {
+          console.error('Failed to create node:', error);
+          toast({
+            title: 'Failed to add node',
+            description: error.message || 'Could not create node',
+            status: 'error',
+            duration: 3000,
+            isClosable: true,
+          });
+        }
+      }
+
+      // Clean up drag state
+      setIsDragging(false);
+      setDraggedItem(null);
+      setDragPreviewNodeId(null);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, dragPreviewNodeId, draggedItem, screenToFlowPosition, setNodes, getNodes, currentHorizonId, handleNodeDelete, refetchHorizon, toast]);
 
   // Create custom agent
   const handleCreateAgent = async () => {
