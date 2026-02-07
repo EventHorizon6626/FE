@@ -26,10 +26,10 @@ import {
   MdSettings,
   MdLanguage,
   MdLogout,
-  MdMenuOpen,
 } from 'react-icons/md';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
+import { SidebarToggleIcon } from './SidebarToggleIcon';
 
 const SidebarItem = ({ icon, label, onClick, isActive, isCollapsed, onExpand }) => {
   const handleClick = () => {
@@ -199,16 +199,25 @@ const SidebarContent = ({ navigate, currentPath, isCollapsed, onToggleCollapse }
       {/* Top Section */}
       <VStack spacing="4px" w="full" px="8px">
         {/* Logo and Toggle */}
-        <HStack justify="space-between" w="full" mb="12px">
-          <Box
-            cursor="pointer"
-            onClick={isCollapsed ? handleExpand : () => navigate('/')}
-          >
-            <Image src="/logo.svg" alt="Event Horizon" h="28px" w="28px" />
-          </Box>
-          {!isCollapsed && (
+        {isCollapsed ? (
+          // Collapsed: Just logo icon centered
+          <Flex justify="center" w="full" mb="12px">
+            <Box
+              cursor="pointer"
+              onClick={handleExpand}
+              p="8px"
+            >
+              <Image src="/logo.svg" alt="Event Horizon" h="24px" w="24px" />
+            </Box>
+          </Flex>
+        ) : (
+          // Expanded: "Event Horizon" text + toggle icon
+          <HStack justify="space-between" w="full" mb="16px" px="12px">
+            <Text fontSize="16px" fontWeight="700" color="gray.800">
+              Event Horizon
+            </Text>
             <IconButton
-              icon={<Icon as={MdMenuOpen} />}
+              icon={<SidebarToggleIcon />}
               size="sm"
               variant="ghost"
               onClick={onToggleCollapse}
@@ -216,8 +225,8 @@ const SidebarContent = ({ navigate, currentPath, isCollapsed, onToggleCollapse }
               color="gray.600"
               _hover={{ bg: 'gray.100' }}
             />
-          )}
-        </HStack>
+          </HStack>
+        )}
 
         <SidebarItem
           icon={MdAccountTree}
@@ -239,18 +248,6 @@ const SidebarContent = ({ navigate, currentPath, isCollapsed, onToggleCollapse }
 
       {/* Bottom Section */}
       <VStack spacing="8px" w="full" px="8px">
-        {isCollapsed && (
-          <IconButton
-            icon={<Icon as={MdMenu} />}
-            size="sm"
-            variant="ghost"
-            onClick={onToggleCollapse}
-            aria-label="Expand sidebar"
-            mb="8px"
-            color="gray.600"
-            _hover={{ bg: 'gray.100' }}
-          />
-        )}
         <Box
           cursor="pointer"
           onClick={isCollapsed ? handleExpand : undefined}
