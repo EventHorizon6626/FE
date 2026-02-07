@@ -31,7 +31,6 @@ import {
   Flex,
   Spinner,
   Collapse,
-  IconButton,
   Progress,
   Alert,
   AlertIcon,
@@ -68,7 +67,6 @@ import {
   MdEdit,
   MdExpandMore,
   MdExpandLess,
-  MdRefresh,
   MdPsychology,
 } from 'react-icons/md';
 import Card from 'components/card/Card.js';
@@ -280,9 +278,9 @@ export default function AgentsPage() {
   const [activeTab, setActiveTab] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [showSystemPrompt, setShowSystemPrompt] = useState(false);
   const [editingAgent, setEditingAgent] = useState(null);
   const [expandedAgents, setExpandedAgents] = useState({});
+  const [manualConfiguration, setManualConfiguration] = useState(false);
   const { isOpen, onOpen, onClose } = useDisclosure();
   const toast = useToast();
 
@@ -332,55 +330,6 @@ export default function AgentsPage() {
     fetchCustomAgents();
   }, [fetchCustomAgents]);
 
-  // Generate system prompt when name or description changes
-  const handleGeneratePrompt = useCallback(async () => {
-    if (!newAgent.name.trim() || !newAgent.description.trim()) {
-      toast({
-        title: 'Missing information',
-        description: 'Please enter both name and description first.',
-        status: 'warning',
-        duration: 3000,
-        isClosable: true,
-      });
-      return;
-    }
-
-    try {
-      setIsGenerating(true);
-      const response = await generateAgentSystemPrompt(
-        newAgent.name,
-        newAgent.description,
-        newAgent.system === 'System 2' ? newAgent.stage : newAgent.category
-      );
-
-      if (response.success && response.data?.systemPrompt) {
-        setNewAgent((prev) => ({
-          ...prev,
-          systemPrompt: response.data.systemPrompt,
-        }));
-        setShowSystemPrompt(true);
-        toast({
-          title: 'System prompt generated',
-          description: 'You can review and edit the prompt below.',
-          status: 'success',
-          duration: 3000,
-          isClosable: true,
-        });
-      }
-    } catch (error) {
-      console.error('Error generating prompt:', error);
-      toast({
-        title: 'Generation failed',
-        description: error.message,
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      });
-    } finally {
-      setIsGenerating(false);
-    }
-  }, [newAgent.name, newAgent.description, newAgent.stage, newAgent.category, newAgent.system, toast]);
-
   const resetForm = () => {
     setNewAgent({
       name: '',
@@ -393,8 +342,8 @@ export default function AgentsPage() {
       maxIterations: 5,
       status: 'active',
     });
-    setShowSystemPrompt(false);
     setEditingAgent(null);
+    setManualConfiguration(false);
   };
 
   const handleCloseModal = () => {
@@ -415,17 +364,42 @@ export default function AgentsPage() {
     if (!newAgent.name.trim()) {
       toast({
         title: 'Name required',
-        description: 'Please enter an agent name.',
         status: 'warning',
-        duration: 3000,
+        duration: 2000,
         isClosable: true,
       });
       return;
     }
 
-    // Always auto-generate prompt if not already generated
+    // Manual mode validation
+    if (manualConfiguration) {
+      if (!newAgent.systemPrompt.trim()) {
+        toast({
+          title: 'System prompt required',
+          description: 'Please write a system prompt in manual mode',
+          status: 'warning',
+          duration: 3000,
+          isClosable: true,
+        });
+        return;
+      }
+    } else {
+      // Auto mode validation
+      if (!newAgent.description.trim()) {
+        toast({
+          title: 'Description required',
+          description: 'Please provide a description for AI generation',
+          status: 'warning',
+          duration: 3000,
+          isClosable: true,
+        });
+        return;
+      }
+    }
+
+    // Auto-generate prompt if not already generated and in auto mode
     let systemPrompt = newAgent.systemPrompt;
-    if (!systemPrompt.trim()) {
+    if (!manualConfiguration && !systemPrompt.trim()) {
       try {
         setIsGenerating(true);
         const response = await generateAgentSystemPrompt(
@@ -446,7 +420,6 @@ export default function AgentsPage() {
             ...prev,
             systemPrompt: systemPrompt,
           }));
-          setShowSystemPrompt(true);
         } else {
           throw new Error('Failed to generate system prompt');
         }
@@ -459,6 +432,7 @@ export default function AgentsPage() {
           isClosable: true,
         });
         setIsGenerating(false);
+        setIsLoading(false);
         return;
       } finally {
         setIsGenerating(false);
@@ -621,7 +595,6 @@ export default function AgentsPage() {
       maxIterations: agent.maxIterations || 5,
       status: agent.status || 'active',
     });
-    setShowSystemPrompt(!!agent.systemPrompt);
     onOpen();
   };
 
@@ -1113,6 +1086,32 @@ export default function AgentsPage() {
           <ModalCloseButton />
           <ModalBody pb="20px">
             <VStack spacing="16px" align="stretch">
+              {/* Manual Configuration Toggle */}
+              <Box
+                border="1px solid"
+                borderColor="purple.200"
+                borderRadius="8px"
+                p="16px"
+                bg="purple.50"
+              >
+                <HStack justify="space-between">
+                  <VStack align="start" spacing="0">
+                    <Text fontSize="sm" fontWeight="600" color={textColor}>
+                      Manual Configuration
+                    </Text>
+                    <Text fontSize="xs" color="gray.500">
+                      Write system prompt directly without AI generation
+                    </Text>
+                  </VStack>
+                  <Switch
+                    colorScheme="purple"
+                    isChecked={manualConfiguration}
+                    onChange={(e) => setManualConfiguration(e.target.checked)}
+                    size="md"
+                  />
+                </HStack>
+              </Box>
+
               {/* Name */}
               <FormControl isRequired>
                 <FormLabel fontSize="sm" fontWeight="600">
@@ -1128,24 +1127,26 @@ export default function AgentsPage() {
                 />
               </FormControl>
 
-              {/* Description */}
-              <FormControl isRequired>
-                <FormLabel fontSize="sm" fontWeight="600">
-                  Description
-                </FormLabel>
-                <Textarea
-                  placeholder="Describe what this agent does, e.g., 'An agent that finds high-yield dividend stocks with sustainable payout ratios'"
-                  value={newAgent.description}
-                  onChange={(e) =>
-                    setNewAgent({ ...newAgent, description: e.target.value })
-                  }
-                  size="md"
-                  rows={3}
-                />
-                <Text fontSize="xs" color="gray.500" mt="4px">
-                  This description will be used to generate the system prompt
-                </Text>
-              </FormControl>
+              {/* Description - only in auto mode */}
+              {!manualConfiguration && (
+                <FormControl isRequired>
+                  <FormLabel fontSize="sm" fontWeight="600">
+                    Description
+                  </FormLabel>
+                  <Textarea
+                    placeholder="Describe what this agent does, e.g., 'An agent that finds high-yield dividend stocks with sustainable payout ratios'"
+                    value={newAgent.description}
+                    onChange={(e) =>
+                      setNewAgent({ ...newAgent, description: e.target.value })
+                    }
+                    size="md"
+                    rows={3}
+                  />
+                  <Text fontSize="xs" color="gray.500" mt="4px">
+                    This description will be used to generate the system prompt
+                  </Text>
+                </FormControl>
+              )}
 
               {/* Category and Team in a row */}
               <SimpleGrid columns={2} spacing="15px">
@@ -1263,51 +1264,34 @@ export default function AgentsPage() {
                 p="16px"
                 bg="gray.50"
               >
-                <HStack justify="space-between" mb={showSystemPrompt ? '12px' : '0'}>
+                <HStack justify="space-between" mb="12px">
                   <HStack spacing="8px">
                     <Icon as={MdAutoAwesome} color="purple.500" />
                     <Text fontSize="sm" fontWeight="600" color={textColor}>
                       System Prompt
                     </Text>
-                    {newAgent.systemPrompt && (
+                    {newAgent.systemPrompt && !manualConfiguration && (
                       <Badge colorScheme="green" fontSize="xs">
-                        Generated
+                        Will be generated
                       </Badge>
                     )}
-                  </HStack>
-                  <HStack spacing="8px">
-                    <Button
-                      size="sm"
-                      leftIcon={isGenerating ? <Spinner size="xs" /> : <Icon as={MdRefresh} />}
-                      onClick={handleGeneratePrompt}
-                      isLoading={isGenerating}
-                      loadingText="Generating..."
-                      variant="outline"
-                      colorScheme="purple"
-                      isDisabled={!newAgent.name.trim()}
-                    >
-                      {newAgent.systemPrompt ? 'Regenerate' : 'Generate'}
-                    </Button>
-                    {newAgent.systemPrompt && (
-                      <IconButton
-                        size="sm"
-                        icon={<Icon as={showSystemPrompt ? MdExpandLess : MdExpandMore} />}
-                        onClick={() => setShowSystemPrompt(!showSystemPrompt)}
-                        variant="ghost"
-                        aria-label="Toggle system prompt"
-                      />
+                    {manualConfiguration && (
+                      <Badge colorScheme="purple" fontSize="xs">
+                        Manual mode
+                      </Badge>
                     )}
                   </HStack>
                 </HStack>
 
-                <Collapse in={showSystemPrompt} animateOpacity>
-                  <FormControl>
+                {manualConfiguration ? (
+                  // Manual mode: always show textarea
+                  <FormControl isRequired>
                     <Textarea
                       value={newAgent.systemPrompt}
                       onChange={(e) =>
                         setNewAgent({ ...newAgent, systemPrompt: e.target.value })
                       }
-                      placeholder="Click 'Generate' to create a system prompt, or write your own..."
+                      placeholder="Write your custom system prompt here..."
                       size="md"
                       rows={8}
                       fontFamily="mono"
@@ -1315,14 +1299,13 @@ export default function AgentsPage() {
                       bg="white"
                     />
                     <Text fontSize="xs" color="gray.500" mt="4px">
-                      You can edit the generated prompt to customize the agent's behavior
+                      Define the agent's behavior with your custom instructions
                     </Text>
                   </FormControl>
-                </Collapse>
-
-                {!showSystemPrompt && !newAgent.systemPrompt && (
+                ) : (
+                  // Auto mode: show info text
                   <Text fontSize="xs" color="gray.500">
-                    Click 'Generate' to create a system prompt based on your agent's name and description, or it will be auto-generated when you create the agent
+                    System prompt will be automatically generated from your name and description when you create the agent
                   </Text>
                 )}
               </Box>
@@ -1350,36 +1333,20 @@ export default function AgentsPage() {
               )}
 
               {/* Action Buttons */}
-              <HStack justify="space-between" pt="10px">
-                <Button
-                  variant="outline"
-                  leftIcon={<Icon as={MdAutoAwesome} />}
-                  onClick={handleGeneratePrompt}
-                  isLoading={isGenerating}
-                  isDisabled={!newAgent.name.trim() || isLoading}
-                >
-                  Save Config
+              <HStack justify="flex-end" pt="10px">
+                <Button variant="ghost" onClick={handleCloseModal}>
+                  Cancel
                 </Button>
-                <HStack spacing="10px">
-                  <Button
-                    variant="ghost"
-                    onClick={handleCloseModal}
-                    isDisabled={isGenerating || isLoading}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    bg={brandColor}
-                    color="white"
-                    onClick={handleCreateAgent}
-                    _hover={{ bg: 'teal.700' }}
-                    isLoading={isLoading || isGenerating}
-                    loadingText={isGenerating ? 'Generating...' : (editingAgent ? 'Updating...' : 'Creating...')}
-                    isDisabled={isGenerating}
-                  >
-                    {editingAgent ? 'Update Agent' : 'Create Agent'}
-                  </Button>
-                </HStack>
+                <Button
+                  bg={brandColor}
+                  color="white"
+                  onClick={handleCreateAgent}
+                  _hover={{ bg: 'teal.700' }}
+                  isLoading={isLoading || isGenerating}
+                  loadingText={isGenerating ? 'Generating...' : editingAgent ? 'Updating...' : 'Creating...'}
+                >
+                  {editingAgent ? 'Update Agent' : 'Create Agent'}
+                </Button>
               </HStack>
             </VStack>
           </ModalBody>

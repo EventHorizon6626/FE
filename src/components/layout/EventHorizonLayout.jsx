@@ -5,7 +5,6 @@ import {
   HStack,
   Icon,
   Text,
-  Image,
   IconButton,
   useDisclosure,
   Drawer,
@@ -200,7 +199,7 @@ const SidebarContent = ({ navigate, currentPath, isCollapsed, onToggleCollapse }
       <VStack spacing="4px" w="full" px="8px">
         {/* Logo and Toggle */}
         {isCollapsed ? (
-          // Collapsed: Sidebar toggle icon on top of logo
+          // Collapsed: Sidebar toggle icon only
           <VStack spacing="8px" w="full" mb="12px">
             <IconButton
               icon={<SidebarToggleIcon />}
@@ -211,18 +210,19 @@ const SidebarContent = ({ navigate, currentPath, isCollapsed, onToggleCollapse }
               color="gray.600"
               _hover={{ bg: 'gray.100' }}
             />
-            <Box
-              cursor="pointer"
-              onClick={handleExpand}
-              p="4px"
-            >
-              <Image src="/logo.svg" alt="Event Horizon" h="24px" w="24px" />
-            </Box>
           </VStack>
         ) : (
           // Expanded: "Event Horizon" text + toggle icon
           <HStack justify="space-between" w="full" mb="16px" px="12px">
-            <Text fontSize="16px" fontWeight="700" color="gray.800">
+            <Text
+              fontSize="16px"
+              fontWeight="700"
+              color="gray.800"
+              cursor="pointer"
+              onClick={() => navigate('/')}
+              _hover={{ color: 'teal.600' }}
+              transition="color 0.2s"
+            >
               Event Horizon
             </Text>
             <IconButton
