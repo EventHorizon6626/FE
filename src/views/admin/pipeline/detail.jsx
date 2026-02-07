@@ -1212,11 +1212,15 @@ function PipelineBuilderInner() {
   useEffect(() => {
     if (!draggingAgent || !tempNodeId) return;
 
+    let finalPosition = null;
+
     const handleMouseMove = (event) => {
       const position = screenToFlowPosition({
         x: event.clientX,
         y: event.clientY,
       });
+
+      finalPosition = position;
 
       setNodes((nds) =>
         nds.map((node) =>
@@ -1227,7 +1231,18 @@ function PipelineBuilderInner() {
       );
     };
 
-    const handleMouseUp = () => {
+    const handleMouseUp = async () => {
+      // Save the final position to the backend
+      if (finalPosition && tempNodeId) {
+        try {
+          await nodeApi.update(tempNodeId, {
+            position: finalPosition,
+          });
+        } catch (error) {
+          console.error('Failed to update node position:', error);
+        }
+      }
+
       setDraggingAgent(null);
       setTempNodeId(null);
     };
