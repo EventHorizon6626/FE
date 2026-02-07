@@ -435,6 +435,13 @@ export default function AgentsPage() {
           if (!systemPrompt.trim()) {
             throw new Error('Generated system prompt is empty');
           }
+
+          // Update form state to show the generated prompt
+          setNewAgent((prev) => ({
+            ...prev,
+            systemPrompt: systemPrompt,
+          }));
+          setShowSystemPrompt(true);
         } else {
           throw new Error('Failed to generate system prompt');
         }
@@ -461,18 +468,29 @@ export default function AgentsPage() {
 
       if (editingAgent) {
         // Update existing agent
-        const response = await updateAgent(editingAgent.id, {
+        // For System 2, the category is stored in stage field (from dropdown)
+        // For System 1, the stage is the actual stage
+        const updateData = {
           name: newAgent.name.trim(),
           description: newAgent.description,
           type: 'custom_agent',
-          category: newAgent.category,
           system: systemValue,
-          stage: newAgent.stage,
           systemPrompt: systemPrompt,
           enableThinking: newAgent.enableThinking,
           maxIterations: newAgent.maxIterations,
           status: newAgent.status,
-        });
+        };
+
+        if (newAgent.system === 'System 1') {
+          updateData.stage = newAgent.stage;
+          updateData.category = 'data_retriever';
+        } else {
+          // System 2: stage field contains the category
+          updateData.category = newAgent.stage;
+          updateData.stage = '';
+        }
+
+        const response = await updateAgent(editingAgent.id, updateData);
 
         if (response.success) {
           await fetchCustomAgents();
@@ -487,17 +505,28 @@ export default function AgentsPage() {
         }
       } else {
         // Create new agent
-        const response = await createAgent({
+        // For System 2, the category is stored in stage field (from dropdown)
+        // For System 1, the stage is the actual stage
+        const agentData = {
           name: newAgent.name.trim(),
           description: newAgent.description,
           type: 'custom_agent',
-          category: newAgent.category,
           system: systemValue,
-          stage: newAgent.stage,
           systemPrompt: systemPrompt,
           enableThinking: newAgent.enableThinking,
           maxIterations: newAgent.maxIterations,
-        });
+        };
+
+        if (newAgent.system === 'System 1') {
+          agentData.stage = newAgent.stage;
+          agentData.category = 'data_retriever';
+        } else {
+          // System 2: stage field contains the category
+          agentData.category = newAgent.stage;
+          agentData.stage = '';
+        }
+
+        const response = await createAgent(agentData);
 
         if (response.success) {
           await fetchCustomAgents();
@@ -1198,7 +1227,7 @@ export default function AgentsPage() {
                       loadingText="Generating..."
                       variant="outline"
                       colorScheme="purple"
-                      isDisabled={!newAgent.name.trim() || !newAgent.description.trim()}
+                      isDisabled={!newAgent.name.trim()}
                     >
                       {newAgent.systemPrompt ? 'Regenerate' : 'Generate'}
                     </Button>
@@ -1221,7 +1250,7 @@ export default function AgentsPage() {
                       onChange={(e) =>
                         setNewAgent({ ...newAgent, systemPrompt: e.target.value })
                       }
-                      placeholder="System prompt will be generated based on name, description, and team..."
+                      placeholder="Click 'Generate' to create a system prompt, or write your own..."
                       size="md"
                       rows={8}
                       fontFamily="mono"
@@ -1236,7 +1265,7 @@ export default function AgentsPage() {
 
                 {!showSystemPrompt && !newAgent.systemPrompt && (
                   <Text fontSize="xs" color="gray.500">
-                    System prompt will be auto-generated from your agent name when you create the agent
+                    Click 'Generate' to create a system prompt based on your agent's name and description, or it will be auto-generated when you create the agent
                   </Text>
                 )}
               </Box>
