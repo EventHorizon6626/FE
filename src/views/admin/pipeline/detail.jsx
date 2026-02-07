@@ -82,7 +82,6 @@ import { runAgent, getAgentInputData } from 'lib/agentApi';
 import { request } from 'lib/api';
 import portfolioApi from 'lib/portfolioApi';
 import horizonAgentApi from 'lib/horizonAgentApi';
-import teamApi from 'lib/teamApi';
 import nodeApi from 'lib/nodeApi';
 import { CustomAgentNode } from 'components/pipeline/CustomAgentNode';
 import { RobotHead } from 'components/pipeline/RobotHead';
@@ -145,61 +144,29 @@ const BUILTIN_AGENTS = [
   },
 ];
 
-const DEFAULT_TEAMS = [
+// Default library of analyzer agents (System 2)
+const DEFAULT_ANALYZERS = [
   {
-    id: 'team1',
-    name: 'Team 1: Analysts',
-    description: 'Multi-perspective analysis team',
-    agents: [],
+    id: 'bull_bear_analyzer',
+    name: 'Bull-Bear Analyzer',
+    type: 'bull_bear_analyzer',
+    system: 'analyzer',
+    category: 'bull_bear_analyzer',
+    description: 'Debates bull and bear cases to form balanced investment thesis',
+    icon: MdSmartToy,
+    color: 'purple',
+    isBuiltin: true,
   },
   {
-    id: 'team2',
-    name: 'Team 2: Researchers',
-    description: 'Bull vs Bear debate team',
-    agents: [
-      {
-        id: 'bull_researcher',
-        name: 'Bull Researcher',
-        type: 'bull_researcher',
-        system: 'team',
-        teamId: 'team2',
-        icon: MdTrendingUp,
-        color: 'green',
-        isBuiltin: true,
-      },
-      {
-        id: 'bear_researcher',
-        name: 'Bear Researcher',
-        type: 'bear_researcher',
-        system: 'team',
-        teamId: 'team2',
-        icon: MdWarning,
-        color: 'red',
-        isBuiltin: true,
-      },
-      {
-        id: 'research_manager',
-        name: 'Research Manager',
-        type: 'research_manager',
-        system: 'team',
-        teamId: 'team2',
-        icon: MdSmartToy,
-        color: 'purple',
-        isBuiltin: true,
-      },
-    ],
-  },
-  {
-    id: 'team3',
-    name: 'Team 3: Risk Management',
-    description: 'Position sizing and risk analysis',
-    agents: [],
-  },
-  {
-    id: 'team4',
-    name: 'Team 4: Trader',
-    description: 'Final decision and execution',
-    agents: [],
+    id: 'risk_manager',
+    name: 'Risk Manager',
+    type: 'risk_manager',
+    system: 'analyzer',
+    category: 'risk_analyzer',
+    description: 'Evaluates portfolio risk and position sizing',
+    icon: MdWarning,
+    color: 'orange',
+    isBuiltin: true,
   },
 ];
 
@@ -575,14 +542,13 @@ function PipelineBuilderInner() {
     },
     [onEdgesChangeDefault, edges]
   );
-  const [availableAgents, setAvailableAgents] = useState([...BUILTIN_AGENTS]); // System 1 agents
-  const [availableTeams, setAvailableTeams] = useState([...DEFAULT_TEAMS]); // System 2 teams
+  const [availableAgents, setAvailableAgents] = useState([...BUILTIN_AGENTS]); // System 1: Data agents
+  const [analyzerAgents, setAnalyzerAgents] = useState([...DEFAULT_ANALYZERS]); // System 2: Analyzer agents
   const [customAgents, setCustomAgents] = useState([]);
   const [currentHorizonName, setCurrentHorizonName] = useState('');
   const [currentHorizonId, setCurrentHorizonId] = useState(null);
 
   const { isOpen: isAgentOpen, onOpen: onAgentOpen, onClose: onAgentClose } = useDisclosure();
-  const { isOpen: isTeamOpen, onOpen: onTeamOpen, onClose: onTeamClose } = useDisclosure();
   const { isOpen: isRenameOpen, onOpen: onRenameOpen, onClose: onRenameClose } = useDisclosure();
   const { isOpen: isPortfolioOpen, onOpen: onPortfolioOpen, onClose: onPortfolioClose } = useDisclosure();
   const { isOpen: isDataAgentOpen, onOpen: onDataAgentOpen, onClose: onDataAgentClose } = useDisclosure();
@@ -600,16 +566,14 @@ function PipelineBuilderInner() {
     description: '',
     category: 'data_retriever',
     system: 'data',
-    teamId: null,
     model: 'gpt-4',
     systemPrompt: '',
   });
 
-  const [newTeam, setNewTeam] = useState({ name: '', description: '' });
   const [editingAgent, setEditingAgent] = useState(null);
   const [tempHorizonName, setTempHorizonName] = useState('');
   const [showDataAgents, setShowDataAgents] = useState(false);
-  const [showTeams, setShowTeams] = useState(false);
+  const [showAnalyzers, setShowAnalyzers] = useState(false);
   const [showPortfolio, setShowPortfolio] = useState(false);
   const [portfolioSearch, setPortfolioSearch] = useState('');
   const [searchSuggestions, setSearchSuggestions] = useState([]);
@@ -1295,7 +1259,6 @@ function PipelineBuilderInner() {
         description: (newAgent.description || '').trim(),
         type: 'custom_agent',
         system: newAgent.system,
-        teamId: newAgent.teamId,
         model: newAgent.model,
         systemPrompt: (newAgent.systemPrompt || '').trim(),
         icon: 'MdSmartToy',
@@ -1312,21 +1275,15 @@ function PipelineBuilderInner() {
 
           // Update local state
           if (newAgent.system === 'data') {
-            setAvailableAgents(availableAgents.map(a => 
+            setAvailableAgents(availableAgents.map(a =>
               a.id === editingAgent.id ? updatedAgent : a
             ));
-          } else if (newAgent.system === 'team' && newAgent.teamId) {
-            setAvailableTeams(availableTeams.map(team => {
-              if (team.id === newAgent.teamId) {
-                return {
-                  ...team,
-                  agents: team.agents.map(a => a.id === editingAgent.id ? updatedAgent : a),
-                };
-              }
-              return team;
-            }));
+          } else if (newAgent.system === 'analyzer') {
+            setAnalyzerAgents(analyzerAgents.map(a =>
+              a.id === editingAgent.id ? updatedAgent : a
+            ));
           }
-          setCustomAgents(customAgents.map(a => 
+          setCustomAgents(customAgents.map(a =>
             a.id === editingAgent.id ? updatedAgent : a
           ));
 
@@ -1348,13 +1305,8 @@ function PipelineBuilderInner() {
           // Update local state
           if (newAgent.system === 'data') {
             setAvailableAgents([...availableAgents, createdAgent]);
-          } else if (newAgent.system === 'team' && newAgent.teamId) {
-            setAvailableTeams(availableTeams.map(team => {
-              if (team.id === newAgent.teamId) {
-                return { ...team, agents: [...team.agents, createdAgent] };
-              }
-              return team;
-            }));
+          } else if (newAgent.system === 'analyzer') {
+            setAnalyzerAgents([...analyzerAgents, createdAgent]);
           }
 
           setCustomAgents([...customAgents, createdAgent]);
@@ -1375,7 +1327,6 @@ function PipelineBuilderInner() {
         description: '',
         category: 'data_retriever',
         system: 'data',
-        teamId: null,
         model: 'gpt-4',
         systemPrompt: '',
       });
@@ -1393,59 +1344,6 @@ function PipelineBuilderInner() {
     }
   };
 
-  const handleAddAgentToTeam = (teamId) => {
-    setNewAgent({
-      name: '',
-      description: '',
-      category: 'custom_analyzer',
-      system: 'team',
-      teamId: teamId,
-      model: 'gpt-4',
-      systemPrompt: '',
-    });
-    onAgentOpen();
-  };
-
-  const handleCreateTeam = async () => {
-    if (!newTeam.name.trim()) {
-      toast({
-        title: 'Team name required',
-        status: 'warning',
-        duration: 2000,
-        isClosable: true,
-      });
-      return;
-    }
-
-    try {
-      const response = await teamApi.create(currentHorizonId, {
-        name: newTeam.name,
-        description: newTeam.description,
-      });
-
-      const team = response.data;
-      setAvailableTeams([...availableTeams, team]);
-      setNewTeam({ name: '', description: '' });
-      onTeamClose();
-
-      toast({
-        title: 'Team created',
-        description: `${team.name} added successfully`,
-        status: 'success',
-        duration: 2000,
-        isClosable: true,
-      });
-    } catch (error) {
-      console.error('[Team] Save error:', error);
-      toast({
-        title: 'Failed to create team',
-        description: error.message || 'An error occurred',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      });
-    }
-  };
 
   const handleDeletePortfolio = async (portfolioId) => {
     try {
@@ -1483,16 +1381,11 @@ function PipelineBuilderInner() {
   const handleDeleteAgent = async (agentId) => {
     try {
       await horizonAgentApi.delete(agentId);
-      
-      // Remove from teams in local state (use 'id' not '_id')
-      setAvailableTeams(availableTeams.map(team => ({
-        ...team,
-        agents: team.agents.filter(a => a.id !== agentId),
-      })));
 
-      // Also remove from availableAgents (data agents) if it's there
+      // Remove from local state (use 'id' not '_id')
       setAvailableAgents(availableAgents.filter(a => a.id !== agentId));
-      
+      setAnalyzerAgents(analyzerAgents.filter(a => a.id !== agentId));
+
       // Remove any nodes using this agent
       setNodes((nds) => nds.filter(node => {
         if (node.type === 'agentNode' && node.data?.agent?.id === agentId) {
@@ -1519,39 +1412,6 @@ function PipelineBuilderInner() {
     }
   };
 
-  const handleDeleteTeam = async (teamId) => {
-    try {
-      await teamApi.delete(teamId);
-      
-      // Remove from local state (use 'id' not '_id')
-      setAvailableTeams(availableTeams.filter(t => t.id !== teamId));
-      
-      // Remove any nodes using this team
-      setNodes((nds) => nds.filter(node => {
-        if (node.type === 'agentNode' && node.data?.agent?.teamId === teamId) {
-          return false;
-        }
-        return true;
-      }));
-
-      toast({
-        title: 'Team deleted',
-        description: 'Team and its agents have been removed',
-        status: 'success',
-        duration: 2000,
-        isClosable: true,
-      });
-    } catch (error) {
-      console.error('[Team] Delete error:', error);
-      toast({
-        title: 'Failed to delete team',
-        description: error.message || 'An error occurred',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      });
-    }
-  };
 
 
   const handleStartEditingName = () => {
@@ -1653,30 +1513,17 @@ function PipelineBuilderInner() {
       setNodes(nodesWithHorizonId);
       setEdges(horizonData.edges || []);
       
-      // Merge builtin data agents with custom agents from API
-      const loadedDataAgents = horizonData.agents || horizonData.availableAgents || [];
+      // System 1: Data Agents - Merge builtin with custom
+      const loadedDataAgents = horizonData.dataAgents || horizonData.availableAgents || [];
       const customDataAgents = loadedDataAgents.filter(a => !a.isBuiltin);
       const mergedDataAgents = [...BUILTIN_AGENTS, ...customDataAgents];
       setAvailableAgents(mergedDataAgents);
-      
-      // Merge builtin teams with custom teams from API
-      const loadedTeams = horizonData.teams || horizonData.availableTeams || [];
-      const customTeams = loadedTeams.filter(t => !t.id?.startsWith('team'));
-      
-      // Merge: keep builtin teams structure, add custom teams, populate agents
-      const mergedTeams = DEFAULT_TEAMS.map(builtinTeam => {
-        // Find if there are custom team agents for this builtin team
-        const customTeamAgents = loadedTeams
-          .find(t => t.id === builtinTeam.id)?.agents?.filter(a => !a.isBuiltin) || [];
-        
-        return {
-          ...builtinTeam,
-          agents: [...builtinTeam.agents, ...customTeamAgents],
-        };
-      });
-      
-      // Add fully custom teams
-      setAvailableTeams([...mergedTeams, ...customTeams]);
+
+      // System 2: Analyzer Agents - Merge builtin with custom
+      const loadedAnalyzerAgents = horizonData.analyzerAgents || [];
+      const customAnalyzerAgents = loadedAnalyzerAgents.filter(a => !a.isBuiltin);
+      const mergedAnalyzerAgents = [...DEFAULT_ANALYZERS, ...customAnalyzerAgents];
+      setAnalyzerAgents(mergedAnalyzerAgents);
       
       setCustomAgents(horizonData.customAgents || []);
       setCurrentHorizonName(horizonData.name);
@@ -1907,7 +1754,7 @@ function PipelineBuilderInner() {
                 aria-label="Add data agent"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setNewAgent({ name: '', description: '', system: 'data', teamId: null, model: 'gpt-4', systemPrompt: '' });
+                  setNewAgent({ name: '', description: '', system: 'data', model: 'gpt-4', systemPrompt: '' });
                   onAgentOpen();
                 }}
               />
@@ -1986,7 +1833,6 @@ function PipelineBuilderInner() {
                               description: agent.description,
                               category: agent.category,
                               system: agent.system,
-                              teamId: agent.teamId,
                               model: agent.model,
                               systemPrompt: agent.systemPrompt || '',
                             });
@@ -2017,11 +1863,11 @@ function PipelineBuilderInner() {
           )}
         </Box>
 
-        {/* 4. Teams - with Dropdown */}
+        {/* 4. System 2: Analyzer Agents - with Dropdown */}
         <Box
           position="relative"
-          onMouseEnter={() => setShowTeams(true)}
-          onMouseLeave={() => setShowTeams(false)}
+          onMouseEnter={() => setShowAnalyzers(true)}
+          onMouseLeave={() => setShowAnalyzers(false)}
         >
           <HStack
             bg="whiteAlpha.900"
@@ -2037,26 +1883,34 @@ function PipelineBuilderInner() {
             _hover={{ borderColor: 'purple.400', boxShadow: 'lg' }}
             transition="all 0.2s"
           >
-            <Tooltip label="Teams" placement="right" hasArrow>
-              <Icon as={MdGroups} color="purple.600" boxSize="24px" />
+            <Tooltip label="Analyzer Agents (System 2)" placement="right" hasArrow>
+              <Icon as={MdSmartToy} color="purple.600" boxSize="24px" />
             </Tooltip>
-            <Tooltip label="Add team" placement="right" hasArrow>
+            <Tooltip label="Create custom analyzer" placement="right" hasArrow>
               <IconButton
                 icon={<Icon as={MdAdd} />}
                 size="xs"
                 variant="ghost"
                 colorScheme="purple"
-                aria-label="Add team"
+                aria-label="Create analyzer"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onTeamOpen();
+                  setNewAgent({
+                    name: '',
+                    description: '',
+                    category: 'custom_analyzer',
+                    system: 'analyzer',
+                    model: 'gpt-4',
+                    systemPrompt: '',
+                  });
+                  onAgentOpen();
                 }}
               />
             </Tooltip>
           </HStack>
 
-          {/* Teams Dropdown - Positioned to the right */}
-          {showTeams && (
+          {/* Analyzers Dropdown - Positioned to the right */}
+          {showAnalyzers && (
             <Box
               position="absolute"
               top="0"
@@ -2076,123 +1930,89 @@ function PipelineBuilderInner() {
                 maxH="400px"
                 overflowY="auto"
               >
-              {availableTeams.map((team) => (
-                <VStack key={team.id} align="stretch" spacing="6px" w="full">
-                  <HStack justify="space-between" px="8px">
-                    <Text fontSize="xs" fontWeight="700" color="purple.700">
-                      {team.name}
-                    </Text>
-                    <HStack spacing="2px">
-                      <IconButton
-                        icon={<Icon as={MdAdd} />}
-                        size="xs"
-                        variant="ghost"
-                        colorScheme="purple"
-                        aria-label="Add agent to team"
-                        onClick={() => handleAddAgentToTeam(team.id)}
-                      />
-                      {/* Only show delete for custom teams (not builtin) */}
-                      {!team.id?.startsWith('team') && (
-                        <IconButton
-                          icon={<Icon as={MdDelete} />}
-                          size="xs"
-                          variant="ghost"
-                          colorScheme="red"
-                          aria-label="Delete team"
-                          onClick={() => {
-                            if (window.confirm(`Delete team "${team.name}" and all its agents?`)) {
-                              handleDeleteTeam(team.id);
-                            }
-                          }}
-                        />
+                {analyzerAgents.map((agent) => (
+                  <HStack
+                    key={agent.id}
+                    p="10px"
+                    bg="white"
+                    borderRadius="8px"
+                    border="1px solid"
+                    borderColor="gray.200"
+                    _hover={{ bg: 'purple.50', borderColor: 'purple.400', boxShadow: 'sm' }}
+                    spacing="8px"
+                    w="full"
+                  >
+                    <HStack
+                      flex="1"
+                      spacing="10px"
+                      cursor="grab"
+                      _active={{ cursor: 'grabbing' }}
+                      onMouseDown={(e) => handleAgentMouseDown(e, agent)}
+                    >
+                      <RobotHead description={agent.description || agent.name} size={24} />
+                      <VStack align="start" spacing="2px" flex="1">
+                        <Text fontSize="sm" fontWeight="600">
+                          {agent.name}
+                        </Text>
+                        {agent.description && (
+                          <Text fontSize="xs" color="gray.600" noOfLines={1}>
+                            {agent.description}
+                          </Text>
+                        )}
+                      </VStack>
+                      {agent.isBuiltin && (
+                        <Badge colorScheme="purple" fontSize="xs">
+                          Default
+                        </Badge>
                       )}
                     </HStack>
+
+                    {!agent.isBuiltin && (
+                      <Menu>
+                        <MenuButton
+                          as={IconButton}
+                          icon={<Icon as={MdMoreVert} />}
+                          size="sm"
+                          variant="ghost"
+                          aria-label="Agent options"
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                        <MenuList>
+                          <MenuItem
+                            icon={<Icon as={MdEdit} />}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingAgent(agent);
+                              setNewAgent({
+                                name: agent.name,
+                                description: agent.description,
+                                category: agent.category,
+                                system: agent.system,
+                                model: agent.model,
+                                systemPrompt: agent.systemPrompt || '',
+                              });
+                              onAgentOpen();
+                            }}
+                          >
+                            Edit
+                          </MenuItem>
+                          <MenuItem
+                            icon={<Icon as={MdDelete} />}
+                            color="red.600"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (window.confirm(`Delete agent "${agent.name}"?`)) {
+                                handleDeleteAgent(agent.id);
+                              }
+                            }}
+                          >
+                            Delete
+                          </MenuItem>
+                        </MenuList>
+                      </Menu>
+                    )}
                   </HStack>
-                  {team.agents.length > 0 ? (
-                    team.agents.map((agent) => (
-                      <HStack
-                        key={agent.id}
-                        p="10px"
-                        bg="white"
-                        borderRadius="8px"
-                        border="1px solid"
-                        borderColor="gray.200"
-                        _hover={{ bg: 'purple.50', borderColor: 'purple.400', boxShadow: 'sm' }}
-                        spacing="8px"
-                      >
-                        <HStack
-                          flex="1"
-                          spacing="10px"
-                          cursor="grab"
-                          _active={{ cursor: 'grabbing' }}
-                          onMouseDown={(e) => handleAgentMouseDown(e, agent)}
-                        >
-                          <RobotHead description={agent.description || agent.name} size={24} />
-                          <Text fontSize="sm" fontWeight="600" flex="1">
-                            {agent.name}
-                          </Text>
-                          {agent.isBuiltin && (
-                            <Badge colorScheme="purple" fontSize="xs">
-                              Built-in
-                            </Badge>
-                          )}
-                        </HStack>
-                        
-                        {!agent.isBuiltin && (
-                          <Menu>
-                            <MenuButton
-                              as={IconButton}
-                              icon={<Icon as={MdMoreVert} />}
-                              size="sm"
-                              variant="ghost"
-                              aria-label="Agent options"
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                            <MenuList>
-                              <MenuItem
-                                icon={<Icon as={MdEdit} />}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setEditingAgent(agent);
-                                  setNewAgent({
-                                    name: agent.name,
-                                    description: agent.description,
-                                    category: agent.category,
-                                    system: agent.system,
-                                    teamId: agent.teamId,
-                                    model: agent.model,
-                                    systemPrompt: agent.systemPrompt || '',
-                                  });
-                                  onAgentOpen();
-                                }}
-                              >
-                                Edit
-                              </MenuItem>
-                              <MenuItem
-                                icon={<Icon as={MdDelete} />}
-                                color="red.600"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (window.confirm(`Delete agent "${agent.name}"?`)) {
-                                    handleDeleteAgent(agent.id);
-                                  }
-                                }}
-                              >
-                                Delete
-                              </MenuItem>
-                            </MenuList>
-                          </Menu>
-                        )}
-                      </HStack>
-                    ))
-                  ) : (
-                    <Text fontSize="xs" color="gray.500" px="8px" py="4px">
-                      No agents yet
-                    </Text>
-                  )}
-                  <Divider />
-                </VStack>
-              ))}
+                ))}
               </VStack>
             </Box>
           )}
@@ -2791,47 +2611,6 @@ function PipelineBuilderInner() {
 
               <Button colorScheme="teal" onClick={handleCreateAgent} size="lg" w="full">
                 {editingAgent ? 'Update Agent' : 'Create Agent'}
-              </Button>
-            </VStack>
-          </ModalBody>
-        </ModalContent>
-      </Modal>
-
-      {/* Create Team Modal */}
-      <Modal isOpen={isTeamOpen} onClose={onTeamClose} isCentered size="md">
-        <ModalOverlay bg="blackAlpha.600" backdropFilter="blur(4px)" />
-        <ModalContent borderRadius="20px">
-          <ModalCloseButton />
-          <ModalHeader>Create Team</ModalHeader>
-
-          <ModalBody pb="20px">
-            <VStack spacing="15px" align="stretch">
-              <FormControl isRequired>
-                <FormLabel fontSize="sm" fontWeight="600">
-                  Team Name
-                </FormLabel>
-                <Input
-                  placeholder="e.g., Risk Analysts"
-                  value={newTeam.name}
-                  onChange={(e) => setNewTeam({ ...newTeam, name: e.target.value })}
-                  autoFocus
-                />
-              </FormControl>
-
-              <FormControl>
-                <FormLabel fontSize="sm" fontWeight="600">
-                  Description
-                </FormLabel>
-                <Textarea
-                  placeholder="What does this team do?"
-                  value={newTeam.description}
-                  onChange={(e) => setNewTeam({ ...newTeam, description: e.target.value })}
-                  rows={2}
-                />
-              </FormControl>
-
-              <Button colorScheme="purple" onClick={handleCreateTeam} size="md" w="full">
-                Create Team
               </Button>
             </VStack>
           </ModalBody>
