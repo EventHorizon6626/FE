@@ -1,18 +1,12 @@
 // Chakra imports
-import { Box } from '@chakra-ui/react';
 import ProtectedRoute from 'auth/ProtectedRoute';
 import EventHorizonLayout from 'components/layout/EventHorizonLayout';
 import React from 'react';
-import { Route, Routes, useLocation } from 'react-router-dom';
+import { Route, Routes } from 'react-router-dom';
 import routes from 'routes.js';
 
 // Custom Chakra theme
 export default function Dashboard(props) {
-  const { pathname } = useLocation();
-
-  // Check if current route is landing page
-  const isLandingPage = pathname === '/';
-
   const getRoutes = (rs) =>
     rs.flatMap((r, idx) => {
       if (r.collapse) return getRoutes(r.items);
@@ -30,16 +24,7 @@ export default function Dashboard(props) {
 
   document.documentElement.dir = 'ltr';
 
-  // Render landing page without layout wrapper
-  if (isLandingPage) {
-    return (
-      <Box>
-        <Routes>{getRoutes(routes)}</Routes>
-      </Box>
-    );
-  }
-
-  // Render all other pages with Event Horizon layout
+  // All pages use Event Horizon layout (including landing)
   return (
     <EventHorizonLayout>
       <Routes>{getRoutes(routes)}</Routes>
