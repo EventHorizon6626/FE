@@ -278,6 +278,7 @@ export default function AgentsPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [showSystemPrompt, setShowSystemPrompt] = useState(false);
   const [editingAgent, setEditingAgent] = useState(null);
+  const [expandedAgents, setExpandedAgents] = useState({});
   const { isOpen, onOpen, onClose } = useDisclosure();
   const toast = useToast();
 
@@ -629,91 +630,143 @@ export default function AgentsPage() {
     );
   };
 
-  const AgentCard = ({ agent, showToggle = false }) => (
-    <Card
-      bg={cardBg}
-      p="20px"
-      borderRadius="12px"
-      border="1px solid"
-      borderColor={agent.status === 'active' ? 'teal.200' : borderColor}
-      _hover={{ boxShadow: 'md' }}
-      transition="all 0.2s"
-    >
-      <Flex justify="space-between" align="start">
-        <HStack spacing="12px" align="start" flex="1">
-          <Icon
-            as={agent.icon}
-            boxSize="24px"
-            color={agent.status === 'active' ? brandColor : 'gray.400'}
-          />
-          <VStack align="start" spacing="4px" flex="1">
-            <HStack>
-              <Text color={textColor} fontSize="md" fontWeight="600">
-                {agent.name}
-              </Text>
-              {agent.isBuiltin && (
-                <Badge colorScheme="blue" fontSize="xs">
-                  Built-in
-                </Badge>
-              )}
-            </HStack>
-            <Text color={textColorSecondary} fontSize="xs">
-              {agent.description}
-            </Text>
-            <HStack spacing="8px" mt="8px">
-              <Badge colorScheme="purple" fontSize="xs" variant="subtle">
-                {agent.category}
-              </Badge>
-              <Badge colorScheme="gray" fontSize="xs" variant="subtle">
-                {agent.stage}
-              </Badge>
-            </HStack>
-          </VStack>
-        </HStack>
+  const AgentCard = ({ agent, showToggle = false }) => {
+    const isExpanded = expandedAgents[agent.id] || false;
 
-        <VStack spacing="8px" align="end">
-          {showToggle && !agent.isBuiltin && (
-            <Switch
-              colorScheme="teal"
-              isChecked={agent.status === 'active'}
-              onChange={() => handleToggleAgent(agent.id)}
-              size="sm"
+    const toggleExpand = () => {
+      setExpandedAgents(prev => ({
+        ...prev,
+        [agent.id]: !prev[agent.id]
+      }));
+    };
+
+    return (
+      <Card
+        bg={cardBg}
+        p="20px"
+        borderRadius="12px"
+        border="1px solid"
+        borderColor={agent.status === 'active' ? 'teal.200' : borderColor}
+        _hover={{ boxShadow: 'md' }}
+        transition="all 0.2s"
+      >
+        <Flex justify="space-between" align="start">
+          <HStack spacing="12px" align="start" flex="1">
+            <Icon
+              as={agent.icon}
+              boxSize="24px"
+              color={agent.status === 'active' ? brandColor : 'gray.400'}
             />
-          )}
-          {agent.isBuiltin && (
-            <Badge
-              colorScheme={agent.status === 'active' ? 'green' : 'gray'}
-              fontSize="xs"
+            <VStack align="start" spacing="4px" flex="1">
+              <HStack>
+                <Text color={textColor} fontSize="md" fontWeight="600">
+                  {agent.name}
+                </Text>
+                {agent.isBuiltin && (
+                  <Badge colorScheme="blue" fontSize="xs">
+                    Built-in
+                  </Badge>
+                )}
+              </HStack>
+              <Text color={textColorSecondary} fontSize="xs">
+                {agent.description}
+              </Text>
+              <HStack spacing="8px" mt="8px">
+                <Badge colorScheme="purple" fontSize="xs" variant="subtle">
+                  {agent.category}
+                </Badge>
+                <Badge colorScheme="gray" fontSize="xs" variant="subtle">
+                  {agent.stage}
+                </Badge>
+              </HStack>
+            </VStack>
+          </HStack>
+
+          <VStack spacing="8px" align="end">
+            {showToggle && !agent.isBuiltin && (
+              <Switch
+                colorScheme="teal"
+                isChecked={agent.status === 'active'}
+                onChange={() => handleToggleAgent(agent.id)}
+                size="sm"
+              />
+            )}
+            {agent.isBuiltin && (
+              <Badge
+                colorScheme={agent.status === 'active' ? 'green' : 'gray'}
+                fontSize="xs"
+              >
+                {agent.status === 'active' ? 'Always Active' : 'Inactive'}
+              </Badge>
+            )}
+            {!agent.isBuiltin && (
+              <HStack spacing="4px">
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  color={textColorSecondary}
+                  onClick={() => handleEditAgent(agent)}
+                  title="Edit agent"
+                >
+                  <Icon as={MdEdit} />
+                </Button>
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  color="red.500"
+                  onClick={() => handleDeleteAgent(agent.id)}
+                  title="Delete agent"
+                >
+                  <Icon as={MdDelete} />
+                </Button>
+              </HStack>
+            )}
+          </VStack>
+        </Flex>
+
+        {/* System Prompt Section */}
+        <Box mt="12px">
+          <Button
+            size="xs"
+            variant="ghost"
+            leftIcon={<Icon as={isExpanded ? MdExpandLess : MdExpandMore} />}
+            onClick={toggleExpand}
+            color={textColorSecondary}
+          >
+            {isExpanded ? 'Hide' : 'Show'} System Prompt
+          </Button>
+
+          <Collapse in={isExpanded} animateOpacity>
+            <Box
+              mt="8px"
+              p="12px"
+              bg="gray.50"
+              borderRadius="8px"
+              border="1px solid"
+              borderColor={borderColor}
             >
-              {agent.status === 'active' ? 'Always Active' : 'Inactive'}
-            </Badge>
-          )}
-          {!agent.isBuiltin && (
-            <HStack spacing="4px">
-              <Button
-                size="xs"
-                variant="ghost"
-                color={textColorSecondary}
-                onClick={() => handleEditAgent(agent)}
-                title="Edit agent"
-              >
-                <Icon as={MdEdit} />
-              </Button>
-              <Button
-                size="xs"
-                variant="ghost"
-                color="red.500"
-                onClick={() => handleDeleteAgent(agent.id)}
-                title="Delete agent"
-              >
-                <Icon as={MdDelete} />
-              </Button>
-            </HStack>
-          )}
-        </VStack>
-      </Flex>
-    </Card>
-  );
+              {agent.systemPrompt ? (
+                <Text
+                  fontSize="xs"
+                  fontFamily="mono"
+                  color={textColor}
+                  whiteSpace="pre-wrap"
+                >
+                  {agent.systemPrompt}
+                </Text>
+              ) : (
+                <Text fontSize="xs" color="gray.500" fontStyle="italic">
+                  {agent.isBuiltin
+                    ? 'Built-in agents have hardcoded system prompts in the backend'
+                    : 'No system prompt configured'}
+                </Text>
+              )}
+            </Box>
+          </Collapse>
+        </Box>
+      </Card>
+    );
+  };
 
   return (
     <Box minH="100vh" bg="#FAFAFA" p={{ base: '20px', md: '40px' }}>
