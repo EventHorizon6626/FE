@@ -23,11 +23,10 @@ import {
   MdAccountTree,
   MdMenu,
   MdShowChart,
-  MdChevronLeft,
-  MdChevronRight,
   MdSettings,
   MdLanguage,
   MdLogout,
+  MdMenuOpen,
 } from 'react-icons/md';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
@@ -209,11 +208,13 @@ const SidebarContent = ({ navigate, currentPath, isCollapsed, onToggleCollapse }
           </Box>
           {!isCollapsed && (
             <IconButton
-              icon={<Icon as={MdChevronLeft} />}
-              size="xs"
+              icon={<Icon as={MdMenuOpen} />}
+              size="sm"
               variant="ghost"
               onClick={onToggleCollapse}
               aria-label="Collapse sidebar"
+              color="gray.600"
+              _hover={{ bg: 'gray.100' }}
             />
           )}
         </HStack>
@@ -240,12 +241,14 @@ const SidebarContent = ({ navigate, currentPath, isCollapsed, onToggleCollapse }
       <VStack spacing="8px" w="full" px="8px">
         {isCollapsed && (
           <IconButton
-            icon={<Icon as={MdChevronRight} />}
+            icon={<Icon as={MdMenu} />}
             size="sm"
             variant="ghost"
             onClick={onToggleCollapse}
             aria-label="Expand sidebar"
             mb="8px"
+            color="gray.600"
+            _hover={{ bg: 'gray.100' }}
           />
         )}
         <Box
