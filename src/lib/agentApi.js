@@ -27,8 +27,8 @@ export const deleteAgent = async (id) => {
   return response;
 };
 
-export const generateAgentPrompt = async (name, description, category) => {
-  const response = await request.post('/agents/generate-prompt', {
+export const generateAgentSystemPrompt = async (name, description, category) => {
+  const response = await request.post('/agents/generate-agent-system-prompt', {
     name,
     description,
     category,

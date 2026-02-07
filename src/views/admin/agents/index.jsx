@@ -43,7 +43,7 @@ import {
   getAgents,
   updateAgent,
   deleteAgent,
-  generateAgentPrompt,
+  generateAgentSystemPrompt,
 } from 'lib/agentApi';
 import {
   MdAdd,
@@ -347,7 +347,7 @@ export default function AgentsPage() {
 
     try {
       setIsGenerating(true);
-      const response = await generateAgentPrompt(
+      const response = await generateAgentSystemPrompt(
         newAgent.name,
         newAgent.description,
         newAgent.system === 'System 2' ? newAgent.stage : newAgent.category
@@ -428,7 +428,7 @@ export default function AgentsPage() {
     if (!systemPrompt.trim()) {
       try {
         setIsGenerating(true);
-        const response = await generateAgentPrompt(
+        const response = await generateAgentSystemPrompt(
           newAgent.name,
           newAgent.description || "",
           newAgent.system === 'System 2' ? newAgent.stage : newAgent.category

@@ -1,5 +1,8 @@
 /* eslint-disable */
 import {
+  Alert,
+  AlertDescription,
+  AlertIcon,
   Badge,
   Box,
   Button,
@@ -22,6 +25,7 @@ import {
   ModalFooter,
   ModalHeader,
   ModalOverlay,
+  Progress,
   Select,
   Spinner,
   Switch,
@@ -78,7 +82,7 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 import '../../../assets/css/ReactFlowCustom.css';
 import { searchSecurities, SECURITIES } from 'data/securities';
-import { runAgent, getAgentInputData } from 'lib/agentApi';
+import { runAgent, getAgentInputData, generateAgentSystemPrompt } from 'lib/agentApi';
 import { request } from 'lib/api';
 import portfolioApi from 'lib/portfolioApi';
 import horizonAgentApi from 'lib/horizonAgentApi';
@@ -571,6 +575,7 @@ function PipelineBuilderInner() {
   });
 
   const [editingAgent, setEditingAgent] = useState(null);
+  const [isGeneratingPrompt, setIsGeneratingPrompt] = useState(false);
   const [tempHorizonName, setTempHorizonName] = useState('');
   const [showDataAgents, setShowDataAgents] = useState(false);
   const [showAnalyzers, setShowAnalyzers] = useState(false);
@@ -1356,6 +1361,46 @@ function PipelineBuilderInner() {
       return;
     }
 
+    // AUTO-GENERATE system prompt using Google GenAI API (CRITICAL FIX)
+    let systemPrompt = (newAgent.systemPrompt || '').trim();
+    if (!systemPrompt && !editingAgent) {
+      try {
+        setIsGeneratingPrompt(true);
+        // Call Google GenAI endpoint: POST /api/agents/generate-agent-system-prompt
+        const response = await generateAgentSystemPrompt(
+          newAgent.name,
+          newAgent.description || '',
+          newAgent.system === 'data' ? 'data_retriever' : 'custom_analyzer'
+        );
+
+        if (response.success && response.data?.systemPrompt) {
+          systemPrompt = response.data.systemPrompt;
+
+          // Validate it's not empty
+          if (!systemPrompt.trim()) {
+            throw new Error('Generated system prompt is empty');
+          }
+
+          // Update form to show generated prompt
+          setNewAgent(prev => ({ ...prev, systemPrompt }));
+        } else {
+          throw new Error('Failed to generate system prompt');
+        }
+      } catch (error) {
+        toast({
+          title: 'Generation failed',
+          description: error.message,
+          status: 'error',
+          duration: 3000,
+          isClosable: true,
+        });
+        setIsGeneratingPrompt(false);
+        return; // STOP - don't create agent without prompt
+      } finally {
+        setIsGeneratingPrompt(false);
+      }
+    }
+
     try {
       const agentData = {
         name: newAgent.name.trim(),
@@ -1363,7 +1408,7 @@ function PipelineBuilderInner() {
         type: 'custom_agent',
         system: newAgent.system,
         model: newAgent.model,
-        systemPrompt: (newAgent.systemPrompt || '').trim(),
+        systemPrompt: systemPrompt || (newAgent.systemPrompt || '').trim(),
         icon: 'MdSmartToy',
         color: newAgent.system === 'data' ? 'blue' : 'purple',
         isBuiltin: false,
@@ -2703,17 +2748,99 @@ function PipelineBuilderInner() {
               <FormControl>
                 <FormLabel fontSize="sm" fontWeight="600">
                   System Prompt
+                  <Button
+                    size="xs"
+                    ml="8px"
+                    onClick={async () => {
+                      if (!newAgent.name?.trim()) {
+                        toast({
+                          title: 'Please enter agent name first',
+                          status: 'warning',
+                          duration: 2000,
+                          isClosable: true,
+                        });
+                        return;
+                      }
+                      setIsGeneratingPrompt(true);
+                      try {
+                        const response = await generateAgentSystemPrompt(
+                          newAgent.name,
+                          newAgent.description || '',
+                          newAgent.system === 'data' ? 'data_retriever' : 'custom_analyzer'
+                        );
+                        if (response.success && response.data?.systemPrompt) {
+                          setNewAgent(prev => ({
+                            ...prev,
+                            systemPrompt: response.data.systemPrompt
+                          }));
+                          toast({
+                            title: 'System prompt generated',
+                            status: 'success',
+                            duration: 2000,
+                            isClosable: true,
+                          });
+                        }
+                      } catch (error) {
+                        toast({
+                          title: 'Generation failed',
+                          description: error.message,
+                          status: 'error',
+                          duration: 3000,
+                          isClosable: true,
+                        });
+                      } finally {
+                        setIsGeneratingPrompt(false);
+                      }
+                    }}
+                    isLoading={isGeneratingPrompt}
+                    colorScheme="purple"
+                    variant="outline"
+                  >
+                    {newAgent.systemPrompt ? 'Regenerate' : 'Generate'}
+                  </Button>
                 </FormLabel>
                 <Textarea
-                  placeholder="Define the agent's behavior and instructions..."
-                  value={newAgent.systemPrompt}
+                  value={newAgent.systemPrompt || ''}
                   onChange={(e) => setNewAgent({ ...newAgent, systemPrompt: e.target.value })}
-                  rows={4}
-                  fontSize="sm"
+                  placeholder="Will be auto-generated from name and description when you create the agent"
+                  rows={6}
+                  fontFamily="mono"
+                  fontSize="xs"
                 />
+                <Text fontSize="xs" color="gray.500" mt="4px">
+                  System prompt will be auto-generated if left empty
+                </Text>
               </FormControl>
 
-              <Button colorScheme="teal" onClick={handleCreateAgent} size="lg" w="full">
+              {/* Progress Indicator */}
+              {isGeneratingPrompt && (
+                <Box>
+                  <Alert status="info" borderRadius="8px" mb="8px">
+                    <AlertIcon>
+                      <Spinner size="sm" />
+                    </AlertIcon>
+                    <AlertDescription fontSize="sm" fontWeight="500">
+                      Generating system prompt...
+                    </AlertDescription>
+                  </Alert>
+                  <Progress
+                    size="xs"
+                    isIndeterminate
+                    colorScheme="teal"
+                    borderRadius="full"
+                  />
+                </Box>
+              )}
+
+              <Button
+                colorScheme="teal"
+                onClick={handleCreateAgent}
+                size="lg"
+                w="full"
+                isLoading={isGeneratingPrompt}
+                loadingText={isGeneratingPrompt ? 'Generating...' : 'Creating...'}
+                isDisabled={isGeneratingPrompt}
+              >
                 {editingAgent ? 'Update Agent' : 'Create Agent'}
               </Button>
             </VStack>

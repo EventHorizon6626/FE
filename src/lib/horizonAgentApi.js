@@ -2,6 +2,14 @@ import { request } from './api';
 
 export const horizonAgentApi = {
   async create(horizonId, data) {
+    // Frontend validation - ensure system prompt is not empty for custom agents
+    if (data.type === 'custom_agent' && (!data.systemPrompt || !data.systemPrompt.trim())) {
+      throw new Error(
+        'System prompt is required for custom agents. ' +
+        'Please generate or provide a system prompt before creating the agent.'
+      );
+    }
+
     try {
       const response = await request.post('/agents', {
         horizonId,
