@@ -426,7 +426,12 @@ export const useRunAgent = ({
         horizonId,
         agentNodeId: nodeId,
         agentPosition: node?.position || { x: 0, y: 0 },
-      } : undefined;
+      } : {};
+
+      // Custom DATA agents should only fetch data, not enter discovery/thinking loop
+      if (agentType === 'custom_agent' && agent?.system === 'data') {
+        executionContext.execution_mode = 'fetch_data';
+      }
 
       const result = await runAgent(agentType, inputData, customAgentConfig, executionContext);
 
