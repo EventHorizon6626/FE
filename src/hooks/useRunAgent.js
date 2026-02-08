@@ -54,6 +54,7 @@ export const useRunAgent = ({
     const agentData = {
       name: agentSpec.name,
       type: agentType,
+      system: 'data',
       description: agentSpec.description || `Data agent: ${agentSpec.name}`,
       color: agentColor,
       isAutoCreated: true,

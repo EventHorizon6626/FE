@@ -1408,8 +1408,8 @@ function PipelineBuilderInner() {
           newAgent.system === 'data' ? 'data_retriever' : 'custom_analyzer'
         );
 
-        if (response.success && response.data?.systemPrompt) {
-          systemPrompt = response.data.systemPrompt;
+        if (response.status === 'success' && response.system_prompt) {
+          systemPrompt = response.system_prompt;
 
           // Validate it's not empty
           if (!systemPrompt.trim()) {
@@ -2365,10 +2365,10 @@ function PipelineBuilderInner() {
                               nodeConfig.description,
                               selectedNode.data.agent.stage || selectedNode.data.agent.category
                             );
-                            if (response.success && response.data?.systemPrompt) {
+                            if (response.status === 'success' && response.system_prompt) {
                               setNodeConfig({
                                 ...nodeConfig,
-                                systemPrompt: response.data.systemPrompt,
+                                systemPrompt: response.system_prompt,
                               });
                               toast({
                                 title: 'System prompt regenerated',
@@ -2803,10 +2803,10 @@ function PipelineBuilderInner() {
                           newAgent.description || '',
                           newAgent.system === 'data' ? 'data_retriever' : 'custom_analyzer'
                         );
-                        if (response.success && response.data?.systemPrompt) {
+                        if (response.status === 'success' && response.system_prompt) {
                           setNewAgent(prev => ({
                             ...prev,
-                            systemPrompt: response.data.systemPrompt
+                            systemPrompt: response.system_prompt
                           }));
                           toast({
                             title: 'System prompt generated',
