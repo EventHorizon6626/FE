@@ -2,6 +2,7 @@ import { useMutation } from '@tanstack/react-query';
 import { useToast } from '@chakra-ui/react';
 import { runAgent, getAgentInputData, runCustomAgentApi } from 'lib/agentApi';
 import nodeApi from 'lib/nodeApi';
+import { horizonAgentApi } from 'lib/horizonAgentApi';
 
 export const useRunAgent = ({
   onSuccess,
@@ -58,6 +59,7 @@ export const useRunAgent = ({
       description: agentSpec.description || `Data agent: ${agentSpec.name}`,
       color: agentColor,
       isAutoCreated: true,
+      isBuiltin: isStandard,
     };
     if (agentSpec.system_prompt) {
       agentData.systemPrompt = agentSpec.system_prompt;
@@ -166,6 +168,33 @@ export const useRunAgent = ({
           isClosable: true,
         });
         return;
+      }
+    }
+
+    // 1b. Persist exotic agents to the agent library
+    // Uses the SAME system_prompt from EH's generate_data_agent_prompt()
+    for (const agent of createdAgents) {
+      if (agent.agentSpec.source !== 'eh_pipeline' && agent.agentSpec.system_prompt) {
+        try {
+          await horizonAgentApi.create(horizonId, {
+            name: agent.agentSpec.name,
+            description: agent.agentSpec.description || `Data agent: ${agent.agentSpec.name}`,
+            type: 'custom_agent',
+            system: 'data',
+            category: 'data_retriever',
+            systemPrompt: agent.agentSpec.system_prompt,
+            icon: 'MdSmartToy',
+            color: 'purple',
+            isBuiltin: false,
+            config: {
+              dataType: agent.agentSpec.data_type || 'specialized data',
+              source: 'web_search',
+              autoCreated: true,
+            },
+          });
+        } catch (err) {
+          console.warn(`[useRunAgent] Failed to save exotic agent to library:`, err.message);
+        }
       }
     }
 

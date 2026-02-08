@@ -2399,7 +2399,11 @@ function PipelineBuilderInner() {
                     }
                     rows={6}
                     fontSize="sm"
-                    placeholder="Define the agent's behavior..."
+                    placeholder={
+                      selectedNode?.data?.agent?.isBuiltin
+                        ? "Built-in agent — pre-configured system prompts"
+                        : "Define the agent's behavior..."
+                    }
                     isReadOnly={selectedNode?.data?.agent?.isBuiltin}
                     bg={selectedNode?.data?.agent?.isBuiltin ? 'gray.50' : 'white'}
                   />
