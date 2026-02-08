@@ -1,4 +1,5 @@
 import {
+  Badge,
   Box,
   HStack,
   Icon,
@@ -103,6 +104,11 @@ export const CustomAgentNode = ({ data, id, selected }) => {
             <Text fontSize="md" fontWeight="700">
               {data.agent?.name || 'Agent'}
             </Text>
+            {data.agent?.isAutoCreated && (
+              <Badge colorScheme="purple" fontSize="2xs" variant="solid" borderRadius="full" px="6px">
+                Auto
+              </Badge>
+            )}
           </HStack>
 
           {/* ID Section with Tooltip and Copy Button */}

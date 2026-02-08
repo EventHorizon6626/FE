@@ -1,9 +1,10 @@
 import { useMutation } from '@tanstack/react-query';
 import { useToast } from '@chakra-ui/react';
-import { runAgent, getAgentInputData } from 'lib/agentApi';
+import { runAgent, getAgentInputData, runCustomAgentApi } from 'lib/agentApi';
+import nodeApi from 'lib/nodeApi';
 
-export const useRunAgent = ({ 
-  onSuccess, 
+export const useRunAgent = ({
+  onSuccess,
   onError,
   setNodes,
   setEdges,
@@ -13,6 +14,361 @@ export const useRunAgent = ({
   refetchHorizon,  // Add refetchHorizon parameter
 }) => {
   const toast = useToast();
+
+  // Traverse edges backward to find the connected portfolio node
+  const findConnectedPortfolio = (nodeId, edges, nodes) => {
+    const incomingEdges = edges.filter(e => e.target === nodeId);
+    for (const edge of incomingEdges) {
+      const sourceNode = nodes.find(n => n.id === edge.source);
+      if (!sourceNode) continue;
+      if (sourceNode.type === 'portfolioNode') return sourceNode;
+      // Recurse one level up (portfolio -> data agent -> custom agent)
+      const upstream = findConnectedPortfolio(sourceNode.id, edges, nodes);
+      if (upstream) return upstream;
+    }
+    return null;
+  };
+
+  // Position data agents between portfolio and custom agent
+  const calculateDataAgentPosition = (customAgentNode, portfolioNode, index, total) => {
+    const midX = (portfolioNode.position.x + customAgentNode.position.x) / 2;
+    const spreadY = 120; // vertical spacing between data agents
+    const totalHeight = (total - 1) * spreadY;
+    const startY = customAgentNode.position.y - totalHeight / 2;
+    return {
+      x: midX,
+      y: startY + index * spreadY,
+    };
+  };
+
+  // Create a data agent node via API and add to canvas
+  const createDataAgentNode = async ({ agentSpec, portfolioNode, customAgentNode, index, total }) => {
+    const position = calculateDataAgentPosition(customAgentNode, portfolioNode, index, total);
+
+    // Save to DB via nodeApi
+    const savedNode = await nodeApi.create({
+      horizonId,
+      type: 'agentNode',
+      position,
+      data: {
+        agent: {
+          name: agentSpec.name,
+          type: 'custom_agent',
+          systemPrompt: agentSpec.system_prompt,
+          description: agentSpec.description || `Auto-created data agent: ${agentSpec.name}`,
+          color: 'purple',
+          isAutoCreated: true,
+        },
+      },
+    });
+
+    const nodeId = savedNode._id || savedNode.id;
+
+    // Build ReactFlow node for the canvas
+    const reactFlowNode = {
+      id: nodeId,
+      type: 'agentNode',
+      position,
+      data: {
+        agent: {
+          name: agentSpec.name,
+          type: 'custom_agent',
+          systemPrompt: agentSpec.system_prompt,
+          description: agentSpec.description || `Auto-created data agent: ${agentSpec.name}`,
+          color: 'purple',
+          isAutoCreated: true,
+        },
+        horizonId,
+        refetchHorizon,
+      },
+    };
+
+    return { reactFlowNode, nodeId, agentSpec };
+  };
+
+  // Execute a custom data agent (web search based)
+  const executeDataAgent = async (nodeId, agentSpec, stocks, executionContext) => {
+    const result = await runCustomAgentApi(stocks, agentSpec.system_prompt, null, executionContext);
+    return { name: agentSpec.name, nodeId, result };
+  };
+
+  // Main orchestrator: create agents, execute them, re-run custom agent
+  const handleNeedsData = async ({ customAgentNodeId, requiredAgents, currentNodes, currentEdges, node, agentName }) => {
+    const portfolioNode = findConnectedPortfolio(customAgentNodeId, currentEdges, currentNodes);
+    if (!portfolioNode) {
+      toast({
+        title: 'Cannot auto-create data agents',
+        description: 'No portfolio node connected. Please connect a portfolio to this agent.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    const stocks = portfolioNode.data.portfolio?.stocks || [];
+    if (stocks.length === 0) {
+      toast({
+        title: 'Cannot auto-create data agents',
+        description: 'Connected portfolio has no stocks. Please add stocks to the portfolio.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    const customAgentNode = currentNodes.find(n => n.id === customAgentNodeId);
+    if (!customAgentNode) return;
+
+    toast({
+      title: 'Auto-creating data agents',
+      description: `Creating ${requiredAgents.length} data agent(s) for missing data...`,
+      status: 'info',
+      duration: 3000,
+      isClosable: true,
+    });
+
+    // 1. Create data agent nodes
+    const createdAgents = [];
+    for (let i = 0; i < requiredAgents.length; i++) {
+      try {
+        const created = await createDataAgentNode({
+          agentSpec: requiredAgents[i],
+          portfolioNode,
+          customAgentNode,
+          index: i,
+          total: requiredAgents.length,
+        });
+        createdAgents.push(created);
+      } catch (err) {
+        console.error(`[useRunAgent] Failed to create data agent node:`, err);
+        toast({
+          title: 'Failed to create data agent',
+          description: err.message,
+          status: 'error',
+          duration: 5000,
+          isClosable: true,
+        });
+        return;
+      }
+    }
+
+    // 2. Add nodes + edges to canvas
+    const newNodes = createdAgents.map(a => a.reactFlowNode);
+    const newEdges = [];
+
+    for (const agent of createdAgents) {
+      // Edge: portfolio -> data agent
+      newEdges.push({
+        id: `edge-${portfolioNode.id}-${agent.nodeId}`,
+        source: portfolioNode.id,
+        target: agent.nodeId,
+        type: 'custom',
+        animated: true,
+      });
+      // Edge: data agent -> custom agent
+      newEdges.push({
+        id: `edge-${agent.nodeId}-${customAgentNodeId}`,
+        source: agent.nodeId,
+        target: customAgentNodeId,
+        type: 'custom',
+        animated: true,
+      });
+    }
+
+    setNodes(nds => [...nds, ...newNodes]);
+    setEdges(eds => [...eds, ...newEdges]);
+
+    // 3. Execute each data agent
+    toast({
+      title: 'Executing data agents',
+      description: `Running ${createdAgents.length} data agent(s)...`,
+      status: 'info',
+      duration: null,
+      isClosable: false,
+    });
+
+    const collectedData = {};
+    for (const agent of createdAgents) {
+      try {
+        const executionContext = horizonId ? {
+          horizonId,
+          agentNodeId: agent.nodeId,
+          agentPosition: agent.reactFlowNode.position,
+        } : {};
+
+        const { name, result } = await executeDataAgent(
+          agent.nodeId,
+          agent.agentSpec,
+          stocks,
+          executionContext,
+        );
+
+        collectedData[name] = result;
+
+        // Update the data agent node with its output
+        setNodes(nds =>
+          nds.map(n =>
+            n.id === agent.nodeId
+              ? { ...n, data: { ...n.data, output: result, lastRun: new Date().toISOString() } }
+              : n
+          )
+        );
+
+        // Handle backend-saved outputNode for data agent
+        const savedOutputNode = result?._outputNode;
+        if (savedOutputNode) {
+          const outputNode = {
+            id: savedOutputNode.id,
+            type: 'outputNode',
+            position: {
+              x: agent.reactFlowNode.position.x + 350,
+              y: agent.reactFlowNode.position.y,
+            },
+            data: {
+              result,
+              agentName: name,
+              timestamp: savedOutputNode.createdAt,
+              sourceAgentNodeId: agent.nodeId,
+            },
+          };
+          setNodes(nds => [...nds, outputNode]);
+          setEdges(eds => [...eds, {
+            id: `edge-${agent.nodeId}-${savedOutputNode.id}`,
+            source: agent.nodeId,
+            target: savedOutputNode.id,
+            type: 'custom',
+            data: { output: result },
+            animated: true,
+          }]);
+        }
+      } catch (err) {
+        console.error(`[useRunAgent] Data agent "${agent.agentSpec.name}" failed:`, err);
+        toast({
+          title: `Data agent failed: ${agent.agentSpec.name}`,
+          description: err.message,
+          status: 'error',
+          duration: 5000,
+          isClosable: true,
+        });
+        return;
+      }
+    }
+
+    // 4. Re-execute the custom agent with collected data
+    toast({
+      title: 'Re-running custom agent',
+      description: `${agentName} is re-executing with collected data...`,
+      status: 'info',
+      duration: null,
+      isClosable: false,
+    });
+
+    try {
+      const customAgent = customAgentNode.data.agent;
+      const executionContext = horizonId ? {
+        horizonId,
+        agentNodeId: customAgentNodeId,
+        agentPosition: customAgentNode.position,
+        agentName: agentName,
+        input_data: collectedData,
+      } : { input_data: collectedData };
+
+      const finalResult = await runCustomAgentApi(
+        stocks,
+        customAgent.systemPrompt,
+        customAgent.userPrompt || null,
+        executionContext,
+      );
+
+      // Update the custom agent node with final result
+      setNodes(nds =>
+        nds.map(n =>
+          n.id === customAgentNodeId
+            ? { ...n, data: { ...n.data, output: finalResult, lastRun: new Date().toISOString() } }
+            : n
+        )
+      );
+
+      // Handle backend-saved outputNode for the re-executed custom agent
+      const savedOutputNode = finalResult?._outputNode;
+      if (savedOutputNode) {
+        // Remove old outputNode from canvas (if exists)
+        const latestNodes = getNodes();
+        const oldOutputNode = latestNodes.find(n =>
+          n.type === 'outputNode' && n.data?.sourceAgentNodeId === customAgentNodeId
+        );
+        if (oldOutputNode) {
+          setNodes(nds => nds.filter(n => n.id !== oldOutputNode.id));
+          setEdges(eds => eds.filter(e =>
+            e.source !== oldOutputNode.id && e.target !== oldOutputNode.id
+          ));
+        }
+
+        const agentNodePosition = customAgentNode.position || { x: 0, y: 0 };
+        const newOutputNode = {
+          id: savedOutputNode.id,
+          type: 'outputNode',
+          position: {
+            x: agentNodePosition.x + 350,
+            y: agentNodePosition.y,
+          },
+          data: {
+            result: finalResult,
+            agentName,
+            timestamp: savedOutputNode.createdAt,
+            sourceAgentNodeId: customAgentNodeId,
+          },
+        };
+
+        setNodes(nds => [...nds, newOutputNode]);
+        setEdges(eds => [...eds, {
+          id: `edge-${customAgentNodeId}-${savedOutputNode.id}`,
+          source: customAgentNodeId,
+          target: savedOutputNode.id,
+          type: 'custom',
+          data: { output: finalResult },
+          animated: true,
+        }]);
+
+        setNodes(nds =>
+          nds.map(n =>
+            n.id === customAgentNodeId
+              ? { ...n, data: { ...n.data, currentOutputNodeId: savedOutputNode.id, lastExecutedAt: savedOutputNode.createdAt } }
+              : n
+          )
+        );
+      }
+
+      toast.closeAll();
+      toast({
+        title: 'Agent completed',
+        description: `${agentName} finished with auto-collected data`,
+        status: 'success',
+        duration: 5000,
+        isClosable: true,
+      });
+
+      if (onSuccess) {
+        onSuccess({ nodeId: customAgentNodeId, result: finalResult, agentName, currentNodes: getNodes() });
+      }
+
+      if (refetchHorizon) {
+        refetchHorizon();
+      }
+    } catch (err) {
+      console.error(`[useRunAgent] Re-execution of custom agent failed:`, err);
+      toast.closeAll();
+      toast({
+        title: 'Re-execution failed',
+        description: err.message,
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    }
+  };
 
   const mutation = useMutation({
     mutationFn: async ({ nodeId }) => {
@@ -50,7 +406,7 @@ export const useRunAgent = ({
       console.log('[useRunAgent] Total edges:', currentEdges.length);
 
       const inputData = getAgentInputData(node, currentEdges, currentNodes);
-      
+
       // Build execution context for backend auto-save
       const executionContext = horizonId ? {
         horizonId,
@@ -85,10 +441,47 @@ export const useRunAgent = ({
 
       return { loadingToastId, agentName };
     },
-    onSuccess: (data, variables, context) => {
-      const { nodeId, agentName, result, currentNodes, node } = data;
+    onSuccess: async (data, variables, context) => {
+      const { nodeId, agentName, result, currentNodes, currentEdges, node } = data;
 
-      // Update node with result
+      // Close loading toast first
+      if (context?.loadingToastId) {
+        toast.close(context.loadingToastId);
+      }
+
+      // Check if agent needs data — auto-create flow
+      if (result.status === 'needs_data' && result.required_agents?.length > 0) {
+        console.log('[useRunAgent] Agent needs data, starting auto-create flow:', result.required_agents);
+
+        toast({
+          title: 'Agent needs additional data',
+          description: `Auto-creating ${result.required_agents.length} data agent(s)...`,
+          status: 'info',
+          duration: 3000,
+          isClosable: true,
+        });
+
+        // Update node to show it's in the auto-create flow
+        setNodes((nds) =>
+          nds.map((n) =>
+            n.id === nodeId
+              ? { ...n, data: { ...n.data, output: result, lastRun: new Date().toISOString() } }
+              : n
+          )
+        );
+
+        await handleNeedsData({
+          customAgentNodeId: nodeId,
+          requiredAgents: result.required_agents,
+          currentNodes,
+          currentEdges,
+          node,
+          agentName,
+        });
+        return;
+      }
+
+      // Normal flow: update node with result
       setNodes((nds) =>
         nds.map((n) =>
           n.id === nodeId
@@ -117,11 +510,6 @@ export const useRunAgent = ({
         )
       );
 
-      // Close loading toast and show success
-      if (context?.loadingToastId) {
-        toast.close(context.loadingToastId);
-      }
-
       toast({
         title: 'Agent completed',
         description: `${agentName} finished successfully`,
@@ -134,19 +522,19 @@ export const useRunAgent = ({
 
       // Handle backend-saved outputNode
       const savedOutputNode = result?._outputNode;
-      
+
       if (savedOutputNode) {
         console.log('[useRunAgent] Backend saved outputNode:', savedOutputNode);
-        
+
         // Remove old outputNode from canvas (if exists)
-        const oldOutputNode = currentNodes.find(n => 
+        const oldOutputNode = currentNodes.find(n =>
           n.type === 'outputNode' && n.data?.sourceAgentNodeId === nodeId
         );
-        
+
         if (oldOutputNode) {
           console.log('[useRunAgent] Removing old output:', oldOutputNode.id);
           setNodes((nds) => nds.filter((n) => n.id !== oldOutputNode.id));
-          setEdges((eds) => eds.filter((e) => 
+          setEdges((eds) => eds.filter((e) =>
             e.source !== oldOutputNode.id && e.target !== oldOutputNode.id
           ));
         }
