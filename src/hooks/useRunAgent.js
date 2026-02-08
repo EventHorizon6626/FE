@@ -4,6 +4,14 @@ import { runAgent, getAgentInputData, runCustomAgentApi } from 'lib/agentApi';
 import nodeApi from 'lib/nodeApi';
 import { horizonAgentApi } from 'lib/horizonAgentApi';
 
+const STANDARD_AGENT_DETAILS = {
+  candlestick: { name: 'Candlestick', color: 'blue', description: 'OHLCV price data — open, high, low, close, volume for each trading day' },
+  earnings:    { name: 'Earnings', color: 'green', description: 'Financial reports, quarterly earnings, EPS history, revenue data' },
+  news:        { name: 'News', color: 'orange', description: 'Recent news articles, headlines, and press releases' },
+  technical:   { name: 'Technical', color: 'purple', description: 'Technical indicators — SMA, RSI, MACD, Bollinger Bands' },
+  fundamentals:{ name: 'Fundamentals', color: 'teal', description: 'Fundamental metrics — P/E ratio, EPS, dividend yield, market cap' },
+};
+
 export const useRunAgent = ({
   onSuccess,
   onError,
@@ -49,28 +57,36 @@ export const useRunAgent = ({
     // Standard EH pipeline agents use their tool name as type (candlestick, earnings, etc.)
     // Custom/exotic agents use 'custom_agent' type
     const isStandard = agentSpec.source === 'eh_pipeline';
+    const details = isStandard ? STANDARD_AGENT_DETAILS[agentSpec.name] : null;
     const agentType = isStandard ? agentSpec.name : 'custom_agent';
-    const agentColor = isStandard ? 'blue' : 'purple';
 
     const agentData = {
-      name: agentSpec.name,
+      name: details?.name || agentSpec.name,
       type: agentType,
       system: 'data',
-      description: agentSpec.description || `Data agent: ${agentSpec.name}`,
-      color: agentColor,
+      description: details?.description || agentSpec.description || `Data agent: ${agentSpec.name}`,
+      color: details?.color || (isStandard ? 'blue' : 'purple'),
       isAutoCreated: true,
       isBuiltin: isStandard,
     };
+
+    // Standard built-in agents: add descriptive read-only prompt
+    if (isStandard && details) {
+      agentData.systemPrompt = `Built-in ${details.name} data pipeline agent.\n\nRetrieves ${details.description.toLowerCase()} for the given stocks using the standard EH data pipeline.\n\nThis agent uses a pre-configured endpoint and does not require a custom system prompt.`;
+    }
+
+    // Exotic agents: use the LLM-generated system prompt from EH
     if (agentSpec.system_prompt) {
       agentData.systemPrompt = agentSpec.system_prompt;
     }
 
-    // Save to DB via nodeApi
+    // Save to DB via nodeApi — include parentId so buildEdgesFromNodes() generates edges on refetch
     const savedNode = await nodeApi.create({
       horizonId,
       type: 'agentNode',
       position,
       data: { agent: agentData },
+      parentId: portfolioNode.id,
     });
 
     const nodeId = savedNode._id || savedNode.id;
@@ -398,9 +414,9 @@ export const useRunAgent = ({
         onSuccess({ nodeId: customAgentNodeId, result: finalResult, agentName, currentNodes: getNodes() });
       }
 
-      if (refetchHorizon) {
-        refetchHorizon();
-      }
+      // Note: refetchHorizon intentionally NOT called here — it would replace canvas
+      // state and destroy auto-created edges. Nodes are already persisted to DB with
+      // parentId, so edges will regenerate on next full page load.
     } catch (err) {
       console.error(`[useRunAgent] Re-execution of custom agent failed:`, err);
       toast.closeAll();
