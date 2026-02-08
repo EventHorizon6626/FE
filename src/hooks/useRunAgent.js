@@ -45,21 +45,29 @@ export const useRunAgent = ({
   const createDataAgentNode = async ({ agentSpec, portfolioNode, customAgentNode, index, total }) => {
     const position = calculateDataAgentPosition(customAgentNode, portfolioNode, index, total);
 
+    // Standard EH pipeline agents use their tool name as type (candlestick, earnings, etc.)
+    // Custom/exotic agents use 'custom_agent' type
+    const isStandard = agentSpec.source === 'eh_pipeline';
+    const agentType = isStandard ? agentSpec.name : 'custom_agent';
+    const agentColor = isStandard ? 'blue' : 'purple';
+
+    const agentData = {
+      name: agentSpec.name,
+      type: agentType,
+      description: agentSpec.description || `Data agent: ${agentSpec.name}`,
+      color: agentColor,
+      isAutoCreated: true,
+    };
+    if (agentSpec.system_prompt) {
+      agentData.systemPrompt = agentSpec.system_prompt;
+    }
+
     // Save to DB via nodeApi
     const savedNode = await nodeApi.create({
       horizonId,
       type: 'agentNode',
       position,
-      data: {
-        agent: {
-          name: agentSpec.name,
-          type: 'custom_agent',
-          systemPrompt: agentSpec.system_prompt,
-          description: agentSpec.description || `Auto-created data agent: ${agentSpec.name}`,
-          color: 'purple',
-          isAutoCreated: true,
-        },
-      },
+      data: { agent: agentData },
     });
 
     const nodeId = savedNode._id || savedNode.id;
@@ -70,14 +78,7 @@ export const useRunAgent = ({
       type: 'agentNode',
       position,
       data: {
-        agent: {
-          name: agentSpec.name,
-          type: 'custom_agent',
-          systemPrompt: agentSpec.system_prompt,
-          description: agentSpec.description || `Auto-created data agent: ${agentSpec.name}`,
-          color: 'purple',
-          isAutoCreated: true,
-        },
+        agent: agentData,
         horizonId,
         refetchHorizon,
       },
@@ -86,9 +87,17 @@ export const useRunAgent = ({
     return { reactFlowNode, nodeId, agentSpec };
   };
 
-  // Execute a custom data agent (web search based)
+  // Execute a data agent — route standard EH pipeline agents to their endpoints,
+  // custom/exotic agents to the custom agent endpoint
   const executeDataAgent = async (nodeId, agentSpec, stocks, executionContext) => {
-    const result = await runCustomAgentApi(stocks, agentSpec.system_prompt, null, executionContext);
+    let result;
+    if (agentSpec.source === 'eh_pipeline') {
+      // Standard EH data agent — use the specific endpoint (candlestick, earnings, etc.)
+      result = await runAgent(agentSpec.name, { stocks, data: null }, null, executionContext);
+    } else {
+      // Custom/exotic data agent — run via custom agent endpoint
+      result = await runCustomAgentApi(stocks, agentSpec.system_prompt, null, executionContext);
+    }
     return { name: agentSpec.name, nodeId, result };
   };
 
