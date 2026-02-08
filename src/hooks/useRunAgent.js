@@ -95,8 +95,13 @@ export const useRunAgent = ({
       // Standard EH data agent — use the specific endpoint (candlestick, earnings, etc.)
       result = await runAgent(agentSpec.name, { stocks, data: null }, null, executionContext);
     } else {
-      // Custom/exotic data agent — run via custom agent endpoint
-      result = await runCustomAgentApi(stocks, agentSpec.system_prompt, null, executionContext);
+      // Custom/exotic data agent — run via custom agent endpoint with fetch mode
+      result = await runCustomAgentApi(
+        stocks,
+        agentSpec.system_prompt,
+        null,
+        { ...executionContext, execution_mode: 'fetch_data' },
+      );
     }
     return { name: agentSpec.name, nodeId, result };
   };
