@@ -32,6 +32,177 @@ import {
 import { request } from 'lib/api';
 import { formatRelativeTime } from 'utils/formatTime';
 
+// Color mapping for agent node types
+const AGENT_COLORS = {
+  candlestick: '#3B82F6',  // blue
+  earnings: '#22C55E',     // green
+  news: '#F97316',         // orange
+  technical: '#A855F7',    // purple
+  fundamentals: '#14B8A6', // teal
+  bull_bear_analyzer: '#A855F7',
+  risk_manager: '#F97316',
+  custom_agent: '#6366F1', // indigo
+};
+
+const NODE_TYPE_COLORS = {
+  agentNode: '#3B82F6',
+  portfolioNode: '#0D9488',
+  outputNode: '#6B7280',
+};
+
+/** Mini SVG workflow preview — auto-layouts nodes as a left-to-right tree */
+function WorkflowPreview({ nodes, edges }) {
+  if (!nodes || nodes.length === 0) {
+    return (
+      <Box
+        h="80px"
+        bg="gray.50"
+        borderRadius="8px"
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
+        mb="12px"
+      >
+        <Text fontSize="xs" color="gray.400">No nodes yet</Text>
+      </Box>
+    );
+  }
+
+  const getNodeColor = (node) => {
+    if (node.type === 'portfolioNode') return NODE_TYPE_COLORS.portfolioNode;
+    if (node.type === 'outputNode') return NODE_TYPE_COLORS.outputNode;
+    const agentType = node.data?.agent?.type;
+    const agentColor = node.data?.agent?.color;
+    if (agentType && AGENT_COLORS[agentType]) return AGENT_COLORS[agentType];
+    const colorMap = { blue: '#3B82F6', green: '#22C55E', orange: '#F97316', purple: '#A855F7', teal: '#14B8A6' };
+    if (agentColor && colorMap[agentColor]) return colorMap[agentColor];
+    return NODE_TYPE_COLORS.agentNode;
+  };
+
+  // Build adjacency from edges or parentId
+  const nodeMap = {};
+  nodes.forEach(n => { nodeMap[n.id || n._id] = n; });
+
+  const children = {}; // parentId -> [childIds]
+  const hasParent = new Set();
+
+  const resolvedEdges = (edges && edges.length > 0) ? edges : nodes
+    .filter(n => n.parentId || n.data?.parentId)
+    .map(n => ({ source: n.parentId || n.data?.parentId, target: n.id || n._id }));
+
+  resolvedEdges.forEach(e => {
+    const src = e.source;
+    const tgt = e.target;
+    if (!children[src]) children[src] = [];
+    children[src].push(tgt);
+    hasParent.add(tgt);
+  });
+
+  // Find roots (nodes with no parent)
+  const roots = nodes.filter(n => !hasParent.has(n.id || n._id));
+  // If no roots found (circular), just use all nodes
+  if (roots.length === 0) roots.push(...nodes);
+
+  // BFS to assign column (depth) and row within each column
+  const laid = {}; // nodeId -> { col, row }
+  const colCounts = {}; // col -> count of nodes placed
+
+  const queue = roots.map((r, i) => ({ id: r.id || r._id, col: 0, rootIdx: i }));
+  const visited = new Set();
+
+  while (queue.length > 0) {
+    const { id, col } = queue.shift();
+    if (visited.has(id)) continue;
+    visited.add(id);
+    if (!colCounts[col]) colCounts[col] = 0;
+    laid[id] = { col, row: colCounts[col]++ };
+    const kids = children[id] || [];
+    kids.forEach(kid => {
+      if (!visited.has(kid)) queue.push({ id: kid, col: col + 1 });
+    });
+  }
+
+  // Place any unvisited nodes (disconnected)
+  let disconnectedRow = 0;
+  nodes.forEach(n => {
+    const nid = n.id || n._id;
+    if (!visited.has(nid)) {
+      const col = 0;
+      if (!colCounts[col]) colCounts[col] = 0;
+      laid[nid] = { col, row: colCounts[col]++ };
+    }
+  });
+
+  // Convert layout to SVG positions
+  const svgWidth = 300;
+  const svgHeight = 80;
+  const padding = 20;
+  const maxCol = Math.max(...Object.values(laid).map(l => l.col), 0);
+  const maxRowPerCol = {};
+  Object.values(laid).forEach(l => {
+    maxRowPerCol[l.col] = Math.max(maxRowPerCol[l.col] || 0, l.row);
+  });
+
+  const colSpacing = maxCol > 0 ? (svgWidth - padding * 2) / maxCol : 0;
+
+  const toSvg = (nodeId) => {
+    const l = laid[nodeId];
+    if (!l) return { x: svgWidth / 2, y: svgHeight / 2 };
+    const maxRow = maxRowPerCol[l.col] || 0;
+    const rowSpacing = maxRow > 0 ? (svgHeight - padding * 2) / maxRow : 0;
+    return {
+      x: padding + l.col * colSpacing,
+      y: maxRow === 0 ? svgHeight / 2 : padding + l.row * rowSpacing,
+    };
+  };
+
+  return (
+    <Box
+      h="80px"
+      bg="gray.50"
+      borderRadius="8px"
+      overflow="hidden"
+      mb="12px"
+    >
+      <svg width="100%" height="80" viewBox={`0 0 ${svgWidth} ${svgHeight}`} preserveAspectRatio="xMidYMid meet">
+        {/* Edges */}
+        {resolvedEdges.map((edge, i) => {
+          const src = toSvg(edge.source);
+          const tgt = toSvg(edge.target);
+          return (
+            <line
+              key={`e-${i}`}
+              x1={src.x} y1={src.y}
+              x2={tgt.x} y2={tgt.y}
+              stroke="#CBD5E0"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+            />
+          );
+        })}
+        {/* Nodes */}
+        {nodes.map((node) => {
+          const nid = node.id || node._id;
+          const pos = toSvg(nid);
+          const color = getNodeColor(node);
+          const radius = node.type === 'outputNode' ? 4 : 6;
+          return (
+            <circle
+              key={nid}
+              cx={pos.x}
+              cy={pos.y}
+              r={radius}
+              fill={color}
+              stroke="white"
+              strokeWidth="1.5"
+            />
+          );
+        })}
+      </svg>
+    </Box>
+  );
+}
+
 export default function PipelineList() {
   const [savedHorizons, setSavedHorizons] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -352,16 +523,8 @@ export default function PipelineList() {
                   {horizon.name}
                 </Text>
 
-                {/* Description */}
-                <Text
-                  fontSize="sm"
-                  color="gray.600"
-                  mb="16px"
-                  noOfLines={3}
-                  minHeight="60px"
-                >
-                  {horizon.description || 'No description'}
-                </Text>
+                {/* Workflow Preview */}
+                <WorkflowPreview nodes={horizon.nodes} edges={horizon.edges} />
 
                 {/* Updated timestamp */}
                 <Text fontSize="sm" color="gray.500">
