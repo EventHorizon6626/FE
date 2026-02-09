@@ -26,7 +26,7 @@ import { useAuth } from 'context/AuthContext';
 
 export default function Profile() {
   const { user = {}, logout } = useAuth();
-
+  
   const {
     email = '',
     name = '',
@@ -37,7 +37,6 @@ export default function Profile() {
     createdAt = '',
     has2fa = false,
   } = user || {};
-
   const InfoRow = ({ icon, label, value, action }) => (
     <HStack justify="space-between" w="full" py="12px">
       <HStack spacing="12px">

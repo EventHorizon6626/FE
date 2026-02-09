@@ -29,6 +29,8 @@ import {
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { SidebarToggleIcon } from './SidebarToggleIcon';
+import { useAuth } from 'context/AuthContext';
+import { IDshorten } from 'utils'
 
 const SidebarItem = ({ icon, label, onClick, isActive, isCollapsed, onExpand }) => {
   const handleClick = () => {
@@ -89,13 +91,17 @@ const SidebarItem = ({ icon, label, onClick, isActive, isCollapsed, onExpand }) 
 };
 
 const AccountMenu = ({ isCollapsed }) => {
+  const { user = {}, logout } = useAuth();
+
+  const {
+    email = '',
+    name = '',
+    avatar = '',
+  } = user || {};
   const navigate = useNavigate();
 
   const handleLogout = () => {
-    // Clear any auth tokens
-    localStorage.removeItem('token');
-    // Navigate to sign in
-    navigate('/auth/sign-in');
+    logout()
   };
 
   return (
@@ -111,17 +117,17 @@ const AccountMenu = ({ isCollapsed }) => {
         >
           {isCollapsed ? (
             <Flex justify="center">
-              <Avatar size="sm" name="User" bg="teal.500" />
+              <Avatar src={avatar} size="sm" name={name || email} bg="teal.500" />
             </Flex>
           ) : (
-            <HStack spacing="10px">
-              <Avatar size="sm" name="User" bg="teal.500" />
+            <HStack spacing="10px" w="full" >
+              <Avatar src={avatar} size="sm" name={name || email} bg="teal.500" />
               <VStack align="start" spacing="0" flex="1">
                 <Text fontSize="13px" fontWeight="600" color="gray.800">
                   Account
                 </Text>
                 <Text fontSize="11px" color="gray.500">
-                  user@email.com
+                  {IDshorten(email)}
                 </Text>
               </VStack>
             </HStack>
@@ -256,10 +262,10 @@ const SidebarContent = ({ navigate, currentPath, isCollapsed, onToggleCollapse }
       </VStack>
 
       {/* Bottom Section */}
-      <VStack spacing="8px" w="full" px="8px">
+      <VStack spacing="8px" w="full" px="8px" >
         <Box
           cursor="pointer"
-          onClick={isCollapsed ? handleExpand : undefined}
+          onClick={isCollapsed ? handleExpand : undefined} w="full"
         >
           <AccountMenu isCollapsed={isCollapsed} />
         </Box>
@@ -328,7 +334,7 @@ export default function EventHorizonLayout({ children, showMobileMenu = true }) 
               navigate={navigate}
               currentPath={location.pathname}
               isCollapsed={false}
-              onToggleCollapse={() => {}}
+              onToggleCollapse={() => { }}
             />
           </DrawerBody>
         </DrawerContent>

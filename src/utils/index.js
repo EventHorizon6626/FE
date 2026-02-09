@@ -1,4 +1,4 @@
-export const IDshorten = (id) => {
+export const IDshorten = (id, length = 8) => {
   if (!id || typeof id !== 'string') return '';
-  return id.length > 8 ? `${id.slice(0, 4)}...${id.slice(-4)}` : id;
+  return id.length > length ? `${id.slice(0, 4)}...${id.slice(-4)}` : id;
 };
