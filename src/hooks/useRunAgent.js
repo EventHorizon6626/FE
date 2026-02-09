@@ -414,6 +414,17 @@ export const useRunAgent = ({
             : e
         )
       );
+
+      // Persist output on the agent node for wired data agents (edge icon needs it on reload)
+      if (isDataAgentWiredToAnalyzer(srcNode.id, edges, nodes)) {
+        try {
+          await nodeApi.update(srcNode.id, {
+            data: { ...srcNode.data, output: srcResult, lastRun: new Date().toISOString() },
+          });
+        } catch (err) {
+          console.warn('[useRunAgent] Failed to persist cascaded agent output:', err.message);
+        }
+      }
     }
   };
 
@@ -595,6 +606,17 @@ export const useRunAgent = ({
             : edge
         )
       );
+
+      // Persist output on the agent node for wired data agents (edge icon needs it on reload)
+      if (isDataAgentWiredToAnalyzer(nodeId, currentEdges, currentNodes)) {
+        try {
+          await nodeApi.update(nodeId, {
+            data: { ...node.data, output: result, lastRun: new Date().toISOString() },
+          });
+        } catch (err) {
+          console.warn('[useRunAgent] Failed to persist wired agent output:', err.message);
+        }
+      }
 
       toast({
         title: 'Agent completed',

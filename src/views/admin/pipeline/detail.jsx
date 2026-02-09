@@ -2705,7 +2705,18 @@ function PipelineBuilderInner() {
       );
       
       setNodes(visibleNodes);
-      setEdges(horizonData.edges || []);
+      setEdges(prevEdges => {
+        const newEdges = horizonData.edges || [];
+        const prevEdgeMap = new Map(prevEdges.map(e => [e.id, e]));
+        return newEdges.map(newEdge => {
+          const prev = prevEdgeMap.get(newEdge.id);
+          // Preserve existing output data if backend doesn't have it
+          if (prev?.data?.output && !newEdge.data?.output) {
+            return { ...newEdge, data: { ...newEdge.data, output: prev.data.output }, animated: prev.animated };
+          }
+          return newEdge;
+        });
+      });
       
       // System 1: Data Agents - Merge builtin + library-activated + custom
       const loadedDataAgents = horizonData.dataAgents || horizonData.availableAgents || [];
