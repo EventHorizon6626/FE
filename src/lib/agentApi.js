@@ -235,7 +235,13 @@ export const runAgent = async (agentType, inputData, customAgentConfig = null, e
     'web_search',
   ]);
 
-  if (customAgentConfig && customAgentConfig.systemPrompt && !BUILTIN_DATA_AGENTS.has(agentType)) {
+  const BUILTIN_ANALYZER_AGENTS = new Set([
+    'bull_bear_analyzer',
+  ]);
+
+  if (customAgentConfig && customAgentConfig.systemPrompt
+      && !BUILTIN_DATA_AGENTS.has(agentType)
+      && !BUILTIN_ANALYZER_AGENTS.has(agentType)) {
     // Check if thinking mode is enabled
     if (customAgentConfig.enableThinking) {
       return await runThinkingAgent(
