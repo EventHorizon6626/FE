@@ -75,6 +75,7 @@ import ReactFlow, {
   Panel,
   Position,
   ReactFlowProvider,
+  SelectionMode,
   useEdgesState,
   useNodesState,
   useReactFlow,
@@ -94,6 +95,7 @@ import nodeApi from 'lib/nodeApi';
 import { CustomAgentNode } from 'components/pipeline/CustomAgentNode';
 import { CustomBlockNode } from 'components/pipeline/CustomBlockNode';
 import { RobotHead } from 'components/pipeline/RobotHead';
+import ConsoleLog from 'components/pipeline/ConsoleLog';
 import Chart from 'react-apexcharts';
 import StockAnalysisCard from 'views/admin/portfolio/components/StockAnalysisCard';
 import { IDshorten } from 'utils';
@@ -723,21 +725,43 @@ function PipelineBuilderInner() {
   const { id } = useParams(); // Get horizon ID from URL
   const navigate = useNavigate();
   
+  // Suppress ResizeObserver warnings
+  useEffect(() => {
+    const resizeObserverErrHandler = (e) => {
+      if (e.message === 'ResizeObserver loop completed with undelivered notifications.') {
+        const resizeObserverErr = e;
+        resizeObserverErr.stopImmediatePropagation();
+        return false;
+      }
+    };
+    window.addEventListener('error', resizeObserverErrHandler);
+    return () => window.removeEventListener('error', resizeObserverErrHandler);
+  }, []);
+  
   const [nodes, setNodes, onNodesChangeDefault] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChangeDefault] = useEdgesState(initialEdges);
   const [reactFlowError, setReactFlowError] = useState(null);
   
-  // Custom onNodesChange to ensure only one node is selected at a time
+  // Custom onNodesChange to ensure only one node is selected at a time (unless Shift is held)
+  const shiftHeldRef = useRef(false);
+  useEffect(() => {
+    const down = (e) => { if (e.key === 'Shift') shiftHeldRef.current = true; };
+    const up = (e) => { if (e.key === 'Shift') shiftHeldRef.current = false; };
+    window.addEventListener('keydown', down);
+    window.addEventListener('keyup', up);
+    return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); };
+  }, []);
+
   const onNodesChange = useCallback(
     (changes) => {
       try {
         // Check if any selection changes
-        const selectionChanges = changes.filter(change => 
+        const selectionChanges = changes.filter(change =>
           change.type === 'select' && change.selected === true
         );
 
-        if (selectionChanges.length === 1) {
-          // Single click — keep single-select behavior
+        if (selectionChanges.length === 1 && !shiftHeldRef.current) {
+          // Single click without Shift — keep single-select behavior
           const selectedNodeId = selectionChanges[0].id;
 
           setNodes((nds) =>
@@ -747,7 +771,7 @@ function PipelineBuilderInner() {
             }))
           );
         } else {
-          // Multi-select (Shift+drag box) or no selection changes — let React Flow handle it natively
+          // Shift+click, multi-select (Shift+drag box), or no selection changes — let React Flow handle it natively
           onNodesChangeDefault(changes);
         }
       } catch (error) {
@@ -853,6 +877,7 @@ function PipelineBuilderInner() {
   const [isDragging, setIsDragging] = useState(false);
   const [draggedItem, setDraggedItem] = useState(null);
   const [dragPreviewNodeId, setDragPreviewNodeId] = useState(null);
+  const dragStartPosRef = useRef(null); // Track mouse start position to require minimum drag distance
 
   // State for block node
   const [selectedBlockId, setSelectedBlockId] = useState(null);
@@ -867,6 +892,9 @@ function PipelineBuilderInner() {
   const [selectedRevisionIndex, setSelectedRevisionIndex] = useState(0);
   const [isLoadingRevisions, setIsLoadingRevisions] = useState(false);
   const [sidebarView, setSidebarView] = useState(SIDEBAR_VIEW.LIST);
+  
+  // Ref for Console Log
+  const consoleLogRef = useRef(null);
   
   useEffect(() => {
     if (editingPortfolio) {
@@ -1056,13 +1084,14 @@ function PipelineBuilderInner() {
               if (refetchHorizon) {
                 refetchHorizon();
               }
-              toast({
-                title: 'Nodes deleted',
-                description: `${deletableNodes.length} node(s) removed`,
-                status: 'success',
-                duration: 2000,
-                isClosable: true,
-              });
+              consoleLogRef.current?.addLog('success', `${deletableNodes.length} node(s) deleted`);
+              // toast({
+              //   title: 'Nodes deleted',
+              //   description: `${deletableNodes.length} node(s) removed`,
+              //   status: 'success',
+              //   duration: 2000,
+              //   isClosable: true,
+              // });
             });
           }
         }
@@ -1150,24 +1179,12 @@ function PipelineBuilderInner() {
       // Refetch to get updated data
       await refetchHorizon();
 
-      toast({
-        title: 'Node added to block',
-        description: 'Continue selecting nodes or press ESC to finish',
-        status: 'success',
-        duration: 2000,
-        isClosable: true,
-      });
+      consoleLogRef.current?.addLog('success', 'Node added to block. Continue selecting nodes or press ESC to finish');
     } catch (error) {
       console.error('Failed to add node to block:', error);
-      toast({
-        title: 'Failed to add node',
-        description: error.message,
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      });
+      consoleLogRef.current?.addLog('error', `Failed to add node: ${error.message}`);
     }
-  }, [isAddingToBlock, selectedBlockId, getNodes, getEdges, setNodes, toast]);
+  }, [isAddingToBlock, selectedBlockId, getNodes, getEdges, setNodes]);
 
   const handleNodeClick = useCallback(async (event, node) => {
     // Handle block selection mode
@@ -1241,26 +1258,15 @@ function PipelineBuilderInner() {
       // Refetch horizon data to get updated nodes with cleaned parentId references
       await refetchHorizon();
 
-      toast({
-        title: 'Node deleted',
-        description: 'The node has been removed',
-        status: 'info',
-        duration: 2000,
-        isClosable: true,
-      });
+      console.log('[Delete] Adding log, ref:', consoleLogRef.current);
+      consoleLogRef.current?.addLog('info', `Node deleted: ${nodeId}`);
     } catch (error) {
       // Rollback tracking on failure
       deletedNodeIdsRef.current.delete(nodeId);
       console.error('Failed to delete node:', error);
-      toast({
-        title: 'Failed to delete node',
-        description: error.message,
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      });
+      consoleLogRef.current?.addLog('error', `Failed to delete node: ${error.message}`);
     }
-  }, [refetchHorizon, toast, setNodes]);
+  }, [refetchHorizon, setNodes]);
 
 
   // Add a child node from the "+" button on a node's outbound side
@@ -1297,24 +1303,12 @@ function PipelineBuilderInner() {
       // Refetch horizon to get updated data
       await refetchHorizon();
 
-      toast({
-        title: 'Node added',
-        description: `${agentTemplate.name} connected to pipeline`,
-        status: 'success',
-        duration: 2000,
-        isClosable: true,
-      });
+      consoleLogRef.current?.addLog('success', `Node added: ${agentTemplate.name} connected to pipeline`);
     } catch (error) {
       console.error('Failed to add child node:', error);
-      toast({
-        title: 'Failed to add node',
-        description: error.message || 'Could not create node',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      });
+      consoleLogRef.current?.addLog('error', `Failed to add node: ${error.message || 'Could not create node'}`);
     }
-  }, [getNodes, currentHorizonId, setNodes, setEdges, toast, handleNodeDelete, refetchHorizon]);
+  }, [getNodes, currentHorizonId, setNodes, setEdges, handleNodeDelete, refetchHorizon]);
 
   // Auto-layout: barycenter method — centers parents with children, spaces subtrees
   const handleAutoLayout = useCallback(() => {
@@ -1499,13 +1493,20 @@ function PipelineBuilderInner() {
     // Track which node is being dragged
     setDraggingNodeId(node.id);
 
-    // Set dragged node as the only selected node
-    setNodes((nds) =>
-      nds.map((n) => ({
-        ...n,
-        selected: n.id === node.id,
-      }))
-    );
+    // Only force single-select when NOT holding Shift and the dragged node isn't part of a multi-selection
+    const currentNodes = getNodes();
+    const selectedNodes = currentNodes.filter(n => n.selected);
+    const isDraggedNodeSelected = selectedNodes.some(n => n.id === node.id);
+
+    if (!shiftHeldRef.current && !(selectedNodes.length > 1 && isDraggedNodeSelected)) {
+      // Set dragged node as the only selected node
+      setNodes((nds) =>
+        nds.map((n) => ({
+          ...n,
+          selected: n.id === node.id,
+        }))
+      );
+    }
 
     // Skip if dragging a block or output node
     if (node.type === 'block' || node.type === 'outputNode') {
@@ -1526,7 +1527,6 @@ function PipelineBuilderInner() {
     }
 
     // Find all block nodes
-    const currentNodes = getNodes();
     const blockNodes = currentNodes.filter(n => n.type === 'block');
 
     // Check if currently overlapping with any block
@@ -1632,28 +1632,16 @@ function PipelineBuilderInner() {
       }
     } catch (error) {
       console.error('Failed to save node position:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to save node position',
-        status: 'error',
-        duration: 2000,
-        isClosable: true,
-      });
+      consoleLogRef.current?.addLog('error', 'Failed to save node position');
     }
-  }, [getNodes, getEdges, checkNodeOverlap, setNodes, toast]);
+  }, [getNodes, getEdges, checkNodeOverlap, setNodes]);
 
   // Start adding nodes to block
   const handleAddToBlock = useCallback((blockId) => {
     setSelectedBlockId(blockId);
     setIsAddingToBlock(true);
-    toast({
-      title: 'Select nodes to add',
-      description: 'Click on disconnected nodes to add them to the block. Press ESC to cancel.',
-      status: 'info',
-      duration: 5000,
-      isClosable: true,
-    });
-  }, [toast]);
+    consoleLogRef.current?.addLog('info', 'Select nodes to add to block. Click on disconnected nodes or press ESC to cancel.');
+  }, []);
 
   // Handle drop node to block (drag & drop)
   const handleDropToBlock = useCallback(async (blockId, nodeId) => {
@@ -1666,25 +1654,13 @@ function PipelineBuilderInner() {
     );
 
     if (hasConnection) {
-      toast({
-        title: 'Cannot add connected node',
-        description: 'Only disconnected nodes can be added to a block',
-        status: 'warning',
-        duration: 3000,
-        isClosable: true,
-      });
+      consoleLogRef.current?.addLog('warn', 'Cannot add connected node - only disconnected nodes can be added to a block');
       return;
     }
 
     const nodeToAdd = currentNodes.find(n => n.id === nodeId);
     if (!nodeToAdd || nodeToAdd.type === 'block' || nodeToAdd.type === 'outputNode') {
-      toast({
-        title: 'Invalid node',
-        description: 'Cannot add this type of node to block',
-        status: 'warning',
-        duration: 2000,
-        isClosable: true,
-      });
+      consoleLogRef.current?.addLog('warn', 'Invalid node - cannot add this type of node to block');
       return;
     }
 
@@ -2006,6 +1982,7 @@ function PipelineBuilderInner() {
     setNodes((nds) => nds.concat(previewNode));
     setDragPreviewNodeId(previewNodeId);
     setExtractingChild({ blockId, childNodeId, childNode });
+    dragStartPosRef.current = { x: mouseEvent.clientX, y: mouseEvent.clientY };
     setIsDragging(true);
 
     toast({
@@ -2096,6 +2073,7 @@ function PipelineBuilderInner() {
     setNodes((nds) => nds.concat(previewNode));
     setDraggedItem({ type: 'agent', data: agent });
     setDragPreviewNodeId(previewNodeId);
+    dragStartPosRef.current = { x: event.clientX, y: event.clientY };
     setIsDragging(true);
 
   }, [screenToFlowPosition, setNodes, currentHorizonId, refetchHorizon]);
@@ -2126,6 +2104,7 @@ function PipelineBuilderInner() {
     setNodes((nds) => nds.concat(previewNode));
     setDraggedItem({ type: 'portfolio', data: portfolio });
     setDragPreviewNodeId(previewNodeId);
+    dragStartPosRef.current = { x: event.clientX, y: event.clientY };
     setIsDragging(true);
 
   }, [screenToFlowPosition, setNodes, currentHorizonId, refetchHorizon]);
@@ -2163,6 +2142,7 @@ function PipelineBuilderInner() {
     setNodes((nds) => nds.concat(previewNode));
     setDraggedItem({ type: 'block', data: {} });
     setDragPreviewNodeId(previewNodeId);
+    dragStartPosRef.current = { x: event.clientX, y: event.clientY };
     setIsDragging(true);
 
   }, [screenToFlowPosition, setNodes, currentHorizonId]);
@@ -2187,13 +2167,31 @@ function PipelineBuilderInner() {
       );
     };
 
-    const handleMouseUp = async () => {
+    const handleMouseUp = async (event) => {
       // Get final position
       const previewNode = getNodes().find(n => n.id === dragPreviewNodeId);
       const finalPosition = previewNode?.position || { x: 0, y: 0 };
 
       // Remove preview node
       setNodes((nds) => nds.filter((n) => n.id !== dragPreviewNodeId));
+
+      // Require minimum drag distance (30px) to prevent accidental click-to-create
+      const MIN_DRAG_DISTANCE = 30;
+      if (dragStartPosRef.current) {
+        const dx = event.clientX - dragStartPosRef.current.x;
+        const dy = event.clientY - dragStartPosRef.current.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        if (distance < MIN_DRAG_DISTANCE) {
+          // Not enough drag — cancel operation
+          setIsDragging(false);
+          setDraggedItem(null);
+          setDragPreviewNodeId(null);
+          setExtractingChild(null);
+          dragStartPosRef.current = null;
+          return;
+        }
+      }
+      dragStartPosRef.current = null;
 
       // Handle extracting child from block
       if (extractingChild) {
@@ -2262,14 +2260,7 @@ function PipelineBuilderInner() {
             
             // Refetch horizon to get updated data
             await refetchHorizon();
-
-            toast({
-              title: 'Agent added',
-              description: `${draggedItem.data.name} added to pipeline`,
-              status: 'success',
-              duration: 2000,
-              isClosable: true,
-            });
+            consoleLogRef.current?.addLog('info', `Added agent node: ${draggedItem.data.name}`);
           } else if (draggedItem.type === 'portfolio') {
             const response = await nodeApi.create({
               horizonId: currentHorizonId,
@@ -2942,6 +2933,7 @@ function PipelineBuilderInner() {
           onClick={handleStartEditingName}
           _hover={{ borderColor: 'teal.400', boxShadow: 'lg' }}
           transition="all 0.2s"
+          pointerEvents="auto"
         >
           <Icon as={MdHub} color="teal.600" boxSize="20px" />
           <Text fontSize="sm" fontWeight="600" color="gray.800" noOfLines={1}>
@@ -2955,6 +2947,7 @@ function PipelineBuilderInner() {
           position="relative"
           onMouseEnter={() => setShowPortfolio(true)}
           onMouseLeave={() => setShowPortfolio(false)}
+          pointerEvents="auto"
         >
           <HStack
             bg="whiteAlpha.900"
@@ -3098,6 +3091,7 @@ function PipelineBuilderInner() {
           position="relative"
           onMouseEnter={() => setShowDataAgents(true)}
           onMouseLeave={() => setShowDataAgents(false)}
+          pointerEvents="auto"
         >
           <HStack
             bg="whiteAlpha.900"
@@ -3244,6 +3238,7 @@ function PipelineBuilderInner() {
           position="relative"
           onMouseEnter={() => setShowAnalyzers(true)}
           onMouseLeave={() => setShowAnalyzers(false)}
+          pointerEvents="auto"
         >
           <HStack
             bg="whiteAlpha.900"
@@ -3416,6 +3411,7 @@ function PipelineBuilderInner() {
             _hover={{ borderColor: 'purple.400', boxShadow: 'lg', transform: 'translateY(-2px)' }}
             transition="all 0.2s"
             onMouseDown={handleBlockMouseDown}
+            pointerEvents="auto"
           >
             <Icon as={MdAccountTree} color="purple.600" boxSize="24px" />
             <Text fontSize="sm" fontWeight="600" color="gray.800">
@@ -3449,14 +3445,14 @@ function PipelineBuilderInner() {
             defaultViewport={{ x: 0, y: 0, zoom: 0.9 }}
             minZoom={0.1}
             maxZoom={2}
-            panOnDrag={true}
+            panOnDrag={[0]}
             selectionKeyCode="Shift"
             multiSelectionKeyCode="Shift"
-            selectionMode="partial"
+            selectionMode={SelectionMode.Partial}
             deleteKeyCode={null}
           >
-            <Controls />
-            <MiniMap />
+            <Controls style={{marginLeft: "220px"}} />
+            <MiniMap position='bottom-left'/>
             <Background variant="dots" gap={16} size={1} />
 
             <Panel position="top-right">
@@ -5430,6 +5426,10 @@ function PipelineBuilderInner() {
           </Box>
         </>
       )}
+
+
+      {/* Console Log Component */}
+      <ConsoleLog ref={consoleLogRef} />
 
     </Box>
   );
