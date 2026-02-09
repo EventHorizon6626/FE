@@ -11,14 +11,16 @@ import {
   Badge,
 } from '@chakra-ui/react';
 import { useState } from 'react';
-import { Handle, Position } from 'reactflow';
+import { Handle, Position, useReactFlow } from 'reactflow';
 import {
   MdContentCopy,
   MdAccountTree,
   MdAdd,
   MdPanTool,
   MdSettings,
+  MdPlayArrow,
 } from 'react-icons/md';
+import { useRunBlock } from '../../hooks/useRunBlock';
 import { IDshorten } from 'utils';
 
 // Mini node component to render child nodes inside block
@@ -167,11 +169,27 @@ function ChildNodeDisplay({ child, index, onExtractAndDrag, onConfig }) {
 }
 
 export function CustomBlockNode({ data, id, selected }) {
+  const { setNodes, setEdges, getNodes, getEdges } = useReactFlow();
   const { hasCopied, onCopy } = useClipboard(id);
   const [isExpanded, setIsExpanded] = useState(true);
 
   const childNodes = data.childNodes || [];
   const isHighlighted = data.isHighlighted || false;
+
+  const runBlockMutation = useRunBlock({
+    setNodes,
+    setEdges,
+    getNodes,
+    getEdges,
+    horizonId: data.horizonId,
+    refetchHorizon: data.refetchHorizon,
+  });
+
+  const handlePlay = (e) => {
+    e.stopPropagation();
+    if (runBlockMutation.isPending) return;
+    runBlockMutation.mutate({ blockId: id });
+  };
 
   // Handle extract and drag child node - now takes childNodeId instead of index
   const handleExtractAndDrag = (childNodeId, event) => {
@@ -188,8 +206,8 @@ export function CustomBlockNode({ data, id, selected }) {
   };
 
   return (
-    <Box 
-      position="relative" 
+    <Box
+      position="relative"
       className="custom-block-node"
     >
       {/* Handles */}
@@ -204,6 +222,31 @@ export function CustomBlockNode({ data, id, selected }) {
         style={{ background: '#805AD5', width: '12px', height: '12px' }}
       />
 
+      {/* Play button — only show when block has children */}
+      {childNodes.length > 0 && (
+        <Box
+          position="absolute"
+          top="-12px"
+          right="-12px"
+          zIndex="10"
+        >
+          <IconButton
+            icon={<Icon as={MdPlayArrow} />}
+            size="sm"
+            colorScheme="green"
+            variant="solid"
+            aria-label="Run block"
+            onClick={handlePlay}
+            borderRadius="full"
+            boxShadow="md"
+            _hover={{ transform: 'scale(1.1)', boxShadow: 'lg' }}
+            transition="all 0.2s"
+            isLoading={runBlockMutation.isPending}
+            isDisabled={runBlockMutation.isPending}
+          />
+        </Box>
+      )}
+
       <Box
         p="16px"
         bg="white"
@@ -213,40 +256,43 @@ export function CustomBlockNode({ data, id, selected }) {
           isHighlighted ? "green.400" : (selected ? "purple.500" : "purple.300")
         }
         boxShadow={
-          isHighlighted 
-            ? "0 0 0 4px rgba(72, 187, 120, 0.3), 0 4px 12px rgba(72, 187, 120, 0.4)" 
+          isHighlighted
+            ? "0 0 0 4px rgba(72, 187, 120, 0.3), 0 4px 12px rgba(72, 187, 120, 0.4)"
             : (selected ? "0 4px 12px rgba(128, 90, 213, 0.4)" : "md")
         }
         minW="320px"
         maxW="500px"
         transition="all 0.2s"
         bg={isHighlighted ? "green.50" : "white"}
+        opacity={runBlockMutation.isPending ? 0.7 : 1}
       >
         <VStack align="start" spacing="12px">
           {/* Header */}
           <HStack justify="space-between" w="full">
             <HStack spacing="8px">
-              <Icon 
-                as={MdAccountTree} 
-                color={isHighlighted ? "green.600" : "purple.600"} 
-                boxSize="20px" 
+              <Icon
+                as={MdAccountTree}
+                color={isHighlighted ? "green.600" : "purple.600"}
+                boxSize="20px"
               />
               <Text fontSize="sm" fontWeight="700" color="gray.800">
                 Block Container
               </Text>
             </HStack>
-            {data.onAddToBlock && (
-              <Tooltip label="Add nodes to block" placement="top">
-                <IconButton
-                  icon={<Icon as={MdAdd} />}
-                  size="xs"
-                  colorScheme={isHighlighted ? "green" : "purple"}
-                  variant="ghost"
-                  aria-label="Add to block"
-                  onClick={() => data.onAddToBlock(id)}
-                />
-              </Tooltip>
-            )}
+            <HStack spacing="4px">
+              {data.onAddToBlock && (
+                <Tooltip label="Add nodes to block" placement="top">
+                  <IconButton
+                    icon={<Icon as={MdAdd} />}
+                    size="xs"
+                    colorScheme={isHighlighted ? "green" : "purple"}
+                    variant="ghost"
+                    aria-label="Add to block"
+                    onClick={() => data.onAddToBlock(id)}
+                  />
+                </Tooltip>
+              )}
+            </HStack>
           </HStack>
 
           {/* ID Section with Tooltip and Copy Button */}
@@ -316,6 +362,13 @@ export function CustomBlockNode({ data, id, selected }) {
             //   </Text>
               
             // </VStack>
+          )}
+
+          {/* Running indicator */}
+          {runBlockMutation.isPending && (
+            <Text fontSize="xs" color="gray.500" w="full" textAlign="center">
+              Running...
+            </Text>
           )}
 
           {/* Empty state */}
