@@ -75,6 +75,7 @@ import ReactFlow, {
   Panel,
   Position,
   ReactFlowProvider,
+  SelectionMode,
   useEdgesState,
   useNodesState,
   useReactFlow,
@@ -741,17 +742,26 @@ function PipelineBuilderInner() {
   const [edges, setEdges, onEdgesChangeDefault] = useEdgesState(initialEdges);
   const [reactFlowError, setReactFlowError] = useState(null);
   
-  // Custom onNodesChange to ensure only one node is selected at a time
+  // Custom onNodesChange to ensure only one node is selected at a time (unless Shift is held)
+  const shiftHeldRef = useRef(false);
+  useEffect(() => {
+    const down = (e) => { if (e.key === 'Shift') shiftHeldRef.current = true; };
+    const up = (e) => { if (e.key === 'Shift') shiftHeldRef.current = false; };
+    window.addEventListener('keydown', down);
+    window.addEventListener('keyup', up);
+    return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); };
+  }, []);
+
   const onNodesChange = useCallback(
     (changes) => {
       try {
         // Check if any selection changes
-        const selectionChanges = changes.filter(change => 
+        const selectionChanges = changes.filter(change =>
           change.type === 'select' && change.selected === true
         );
 
-        if (selectionChanges.length === 1) {
-          // Single click — keep single-select behavior
+        if (selectionChanges.length === 1 && !shiftHeldRef.current) {
+          // Single click without Shift — keep single-select behavior
           const selectedNodeId = selectionChanges[0].id;
 
           setNodes((nds) =>
@@ -761,7 +771,7 @@ function PipelineBuilderInner() {
             }))
           );
         } else {
-          // Multi-select (Shift+drag box) or no selection changes — let React Flow handle it natively
+          // Shift+click, multi-select (Shift+drag box), or no selection changes — let React Flow handle it natively
           onNodesChangeDefault(changes);
         }
       } catch (error) {
@@ -867,6 +877,7 @@ function PipelineBuilderInner() {
   const [isDragging, setIsDragging] = useState(false);
   const [draggedItem, setDraggedItem] = useState(null);
   const [dragPreviewNodeId, setDragPreviewNodeId] = useState(null);
+  const dragStartPosRef = useRef(null); // Track mouse start position to require minimum drag distance
 
   // State for block node
   const [selectedBlockId, setSelectedBlockId] = useState(null);
@@ -1482,13 +1493,20 @@ function PipelineBuilderInner() {
     // Track which node is being dragged
     setDraggingNodeId(node.id);
 
-    // Set dragged node as the only selected node
-    setNodes((nds) =>
-      nds.map((n) => ({
-        ...n,
-        selected: n.id === node.id,
-      }))
-    );
+    // Only force single-select when NOT holding Shift and the dragged node isn't part of a multi-selection
+    const currentNodes = getNodes();
+    const selectedNodes = currentNodes.filter(n => n.selected);
+    const isDraggedNodeSelected = selectedNodes.some(n => n.id === node.id);
+
+    if (!shiftHeldRef.current && !(selectedNodes.length > 1 && isDraggedNodeSelected)) {
+      // Set dragged node as the only selected node
+      setNodes((nds) =>
+        nds.map((n) => ({
+          ...n,
+          selected: n.id === node.id,
+        }))
+      );
+    }
 
     // Skip if dragging a block or output node
     if (node.type === 'block' || node.type === 'outputNode') {
@@ -1509,7 +1527,6 @@ function PipelineBuilderInner() {
     }
 
     // Find all block nodes
-    const currentNodes = getNodes();
     const blockNodes = currentNodes.filter(n => n.type === 'block');
 
     // Check if currently overlapping with any block
@@ -1956,6 +1973,7 @@ function PipelineBuilderInner() {
     setNodes((nds) => nds.concat(previewNode));
     setDragPreviewNodeId(previewNodeId);
     setExtractingChild({ blockId, childNodeId, childNode });
+    dragStartPosRef.current = { x: mouseEvent.clientX, y: mouseEvent.clientY };
     setIsDragging(true);
 
     toast({
@@ -2046,6 +2064,7 @@ function PipelineBuilderInner() {
     setNodes((nds) => nds.concat(previewNode));
     setDraggedItem({ type: 'agent', data: agent });
     setDragPreviewNodeId(previewNodeId);
+    dragStartPosRef.current = { x: event.clientX, y: event.clientY };
     setIsDragging(true);
 
   }, [screenToFlowPosition, setNodes, currentHorizonId, refetchHorizon]);
@@ -2076,6 +2095,7 @@ function PipelineBuilderInner() {
     setNodes((nds) => nds.concat(previewNode));
     setDraggedItem({ type: 'portfolio', data: portfolio });
     setDragPreviewNodeId(previewNodeId);
+    dragStartPosRef.current = { x: event.clientX, y: event.clientY };
     setIsDragging(true);
 
   }, [screenToFlowPosition, setNodes, currentHorizonId, refetchHorizon]);
@@ -2113,6 +2133,7 @@ function PipelineBuilderInner() {
     setNodes((nds) => nds.concat(previewNode));
     setDraggedItem({ type: 'block', data: {} });
     setDragPreviewNodeId(previewNodeId);
+    dragStartPosRef.current = { x: event.clientX, y: event.clientY };
     setIsDragging(true);
 
   }, [screenToFlowPosition, setNodes, currentHorizonId]);
@@ -2137,13 +2158,31 @@ function PipelineBuilderInner() {
       );
     };
 
-    const handleMouseUp = async () => {
+    const handleMouseUp = async (event) => {
       // Get final position
       const previewNode = getNodes().find(n => n.id === dragPreviewNodeId);
       const finalPosition = previewNode?.position || { x: 0, y: 0 };
 
       // Remove preview node
       setNodes((nds) => nds.filter((n) => n.id !== dragPreviewNodeId));
+
+      // Require minimum drag distance (30px) to prevent accidental click-to-create
+      const MIN_DRAG_DISTANCE = 30;
+      if (dragStartPosRef.current) {
+        const dx = event.clientX - dragStartPosRef.current.x;
+        const dy = event.clientY - dragStartPosRef.current.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        if (distance < MIN_DRAG_DISTANCE) {
+          // Not enough drag — cancel operation
+          setIsDragging(false);
+          setDraggedItem(null);
+          setDragPreviewNodeId(null);
+          setExtractingChild(null);
+          dragStartPosRef.current = null;
+          return;
+        }
+      }
+      dragStartPosRef.current = null;
 
       // Handle extracting child from block
       if (extractingChild) {
@@ -3397,10 +3436,10 @@ function PipelineBuilderInner() {
             defaultViewport={{ x: 0, y: 0, zoom: 0.9 }}
             minZoom={0.1}
             maxZoom={2}
-            panOnDrag={true}
+            panOnDrag={[0]}
             selectionKeyCode="Shift"
             multiSelectionKeyCode="Shift"
-            selectionMode="partial"
+            selectionMode={SelectionMode.Partial}
             deleteKeyCode={null}
           >
             <Controls style={{marginLeft: "220px"}} />
