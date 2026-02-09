@@ -1101,55 +1101,135 @@ function PipelineBuilderInner() {
     }
   }, [getNodes, currentHorizonId, setNodes, setEdges, toast, handleNodeDelete, refetchHorizon]);
 
-  // Auto-layout: arrange connected nodes as a tree, push disconnected nodes off to the side
+  // Auto-layout: barycenter method — centers parents with children, spaces subtrees
   const handleAutoLayout = useCallback(() => {
     const currentNodes = getNodes();
     const currentEdges = getEdges();
     if (currentNodes.length === 0) return;
 
+    const RANK_SEP = 120;
+    const NODE_SEP = 50;
+
     // Separate connected vs disconnected
     const connectedIds = new Set();
     currentEdges.forEach(e => { connectedIds.add(e.source); connectedIds.add(e.target); });
 
-    // Use dagre for the connected graph (handles DAGs, multiple parents, etc.)
-    const g = new dagre.graphlib.Graph();
-    g.setDefaultEdgeLabel(() => ({}));
-    g.setGraph({
-      rankdir: 'LR',
-      nodesep: 40,
-      ranksep: 80,
-      edgesep: 20,
-      ranker: 'tight-tree',
-    });
-
-    // Use actual rendered node dimensions (ReactFlow measures them after render)
-    currentNodes.forEach(node => {
-      if (connectedIds.has(node.id)) {
-        const w = node.width || 250;
-        const h = node.height || 120;
-        g.setNode(node.id, { width: w, height: h });
-      }
-    });
-    currentEdges.forEach(edge => {
-      if (connectedIds.has(edge.source) && connectedIds.has(edge.target)) {
-        g.setEdge(edge.source, edge.target);
+    // Build adjacency
+    const childrenOf = {};
+    const parentsOf = {};
+    currentEdges.forEach(e => {
+      if (connectedIds.has(e.source) && connectedIds.has(e.target)) {
+        if (!childrenOf[e.source]) childrenOf[e.source] = [];
+        if (!childrenOf[e.source].includes(e.target)) childrenOf[e.source].push(e.target);
+        if (!parentsOf[e.target]) parentsOf[e.target] = [];
+        if (!parentsOf[e.target].includes(e.source)) parentsOf[e.target].push(e.source);
       }
     });
 
-    dagre.layout(g);
+    // Node dimensions
+    const nodeMap = {};
+    currentNodes.forEach(n => { nodeMap[n.id] = n; });
+    const getW = (id) => nodeMap[id]?.width || 250;
+    const getH = (id) => nodeMap[id]?.height || 120;
 
-    // Apply positions using each node's actual size
+    // Find roots
+    const roots = [...connectedIds].filter(id => !parentsOf[id] || parentsOf[id].length === 0);
+    if (roots.length === 0 && connectedIds.size > 0) roots.push([...connectedIds][0]);
+
+    // Assign layers via longest path
+    const layers = {};
+    function assignLayer(nodeId, layer) {
+      if (layers[nodeId] !== undefined && layers[nodeId] >= layer) return;
+      layers[nodeId] = layer;
+      (childrenOf[nodeId] || []).forEach(cid => assignLayer(cid, layer + 1));
+    }
+    roots.forEach(r => assignLayer(r, 0));
+    connectedIds.forEach(id => { if (layers[id] === undefined) layers[id] = 0; });
+
+    // Group by layer
+    const layerGroups = {};
+    connectedIds.forEach(id => {
+      const l = layers[id];
+      if (!layerGroups[l]) layerGroups[l] = [];
+      layerGroups[l].push(id);
+    });
+    const maxLayer = Math.max(...Object.values(layers), 0);
+
+    // X offset per layer
+    const layerX = {};
+    let xPos = 0;
+    for (let l = 0; l <= maxLayer; l++) {
+      const ids = layerGroups[l] || [];
+      const maxW = ids.length > 0 ? Math.max(...ids.map(id => getW(id))) : 250;
+      layerX[l] = xPos;
+      xPos += maxW + RANK_SEP;
+    }
+
+    // Initial Y: evenly spaced per layer
+    const positions = {};
+    for (let l = 0; l <= maxLayer; l++) {
+      let y = 0;
+      (layerGroups[l] || []).forEach(id => {
+        positions[id] = { x: layerX[l], y };
+        y += getH(id) + NODE_SEP;
+      });
+    }
+
+    // Resolve overlaps within a sorted layer, then re-center the group
+    function resolveOverlaps(sortedIds) {
+      if (sortedIds.length <= 1) return;
+      const desiredCenter = sortedIds.reduce((s, id) => s + positions[id].y + getH(id) / 2, 0) / sortedIds.length;
+      for (let i = 1; i < sortedIds.length; i++) {
+        const prev = sortedIds[i - 1];
+        const curr = sortedIds[i];
+        const minY = positions[prev].y + getH(prev) + NODE_SEP;
+        if (positions[curr].y < minY) positions[curr].y = minY;
+      }
+      const actualCenter = sortedIds.reduce((s, id) => s + positions[id].y + getH(id) / 2, 0) / sortedIds.length;
+      const shift = desiredCenter - actualCenter;
+      sortedIds.forEach(id => { positions[id].y += shift; });
+    }
+
+    // Barycenter: 8 passes forward + backward
+    for (let pass = 0; pass < 8; pass++) {
+      // Forward: position each layer based on parents
+      for (let l = 1; l <= maxLayer; l++) {
+        const ids = [...(layerGroups[l] || [])];
+        const bary = {};
+        ids.forEach(id => {
+          const pars = (parentsOf[id] || []).filter(p => positions[p]);
+          bary[id] = pars.length > 0
+            ? pars.reduce((s, p) => s + positions[p].y + getH(p) / 2, 0) / pars.length
+            : positions[id].y + getH(id) / 2;
+        });
+        ids.sort((a, b) => bary[a] - bary[b]);
+        ids.forEach(id => { positions[id].y = bary[id] - getH(id) / 2; });
+        resolveOverlaps(ids);
+        layerGroups[l] = ids;
+      }
+      // Backward: position each layer based on children
+      for (let l = maxLayer - 1; l >= 0; l--) {
+        const ids = [...(layerGroups[l] || [])];
+        const bary = {};
+        ids.forEach(id => {
+          const kids = (childrenOf[id] || []).filter(k => positions[k]);
+          bary[id] = kids.length > 0
+            ? kids.reduce((s, k) => s + positions[k].y + getH(k) / 2, 0) / kids.length
+            : positions[id].y + getH(id) / 2;
+        });
+        ids.sort((a, b) => bary[a] - bary[b]);
+        ids.forEach(id => { positions[id].y = bary[id] - getH(id) / 2; });
+        resolveOverlaps(ids);
+        layerGroups[l] = ids;
+      }
+    }
+
+    // Apply positions
     let maxTreeY = 0;
     const finalNodes = currentNodes.map(node => {
-      if (connectedIds.has(node.id)) {
-        const dn = g.node(node.id);
-        const w = node.width || 250;
-        const h = node.height || 120;
-        const pos = {
-          x: Math.round(dn.x - w / 2),
-          y: Math.round(dn.y - h / 2),
-        };
-        maxTreeY = Math.max(maxTreeY, pos.y + h);
+      if (connectedIds.has(node.id) && positions[node.id]) {
+        const pos = { x: Math.round(positions[node.id].x), y: Math.round(positions[node.id].y) };
+        maxTreeY = Math.max(maxTreeY, pos.y + getH(node.id));
         return { ...node, position: pos };
       }
       return node;

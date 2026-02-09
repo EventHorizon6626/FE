@@ -1,25 +1,57 @@
 /* eslint-disable */
 import {
+  Alert,
+  AlertDescription,
+  AlertIcon,
   Badge,
   Box,
   Button,
   Collapse,
+  FormControl,
+  FormLabel,
   Grid,
   HStack,
   Icon,
   IconButton,
+  Input,
+  Menu,
+  MenuButton,
+  MenuItem,
+  MenuList,
+  Modal,
+  ModalBody,
+  ModalCloseButton,
+  ModalContent,
+  ModalHeader,
+  ModalOverlay,
+  Progress,
+  Select,
+  Spinner,
   Text,
+  Textarea,
+  useDisclosure,
   useToast,
   VStack,
 } from '@chakra-ui/react';
-import { useState } from 'react';
-import { MdContentCopy, MdExpandMore, MdExpandLess, MdCheck, MdPowerSettingsNew } from 'react-icons/md';
+import { useEffect, useState } from 'react';
+import {
+  MdAdd,
+  MdCheck,
+  MdContentCopy,
+  MdDelete,
+  MdEdit,
+  MdExpandLess,
+  MdExpandMore,
+  MdMoreVert,
+  MdPowerSettingsNew,
+} from 'react-icons/md';
 import {
   BUILTIN_AGENT_IDS,
-  ALL_LIBRARY_AGENTS,
   getActivatedAgentIds,
   toggleAgentActivation,
 } from 'data/libraryAgents';
+import horizonAgentApi from 'lib/horizonAgentApi';
+import { generateAgentSystemPrompt } from 'lib/agentApi';
 
 const DATA_AGENTS = [
   {
@@ -178,7 +210,7 @@ const ANALYZER_AGENTS = [
   },
 ];
 
-function AgentCard({ agent, system, isBuiltIn, isActivated, onToggle }) {
+function AgentCard({ agent, system, isBuiltIn, isActivated, isCustom, onToggle, onEdit, onDelete }) {
   const toast = useToast();
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -215,30 +247,17 @@ function AgentCard({ agent, system, isBuiltIn, isActivated, onToggle }) {
         </HStack>
         <HStack spacing="6px">
           {isBuiltIn && (
-            <Badge
-              fontSize="10px"
-              px="6px"
-              py="2px"
-              borderRadius="6px"
-              bg="blue.50"
-              color="blue.600"
-              fontWeight="600"
-              textTransform="none"
-            >
+            <Badge fontSize="10px" px="6px" py="2px" borderRadius="6px" bg="blue.50" color="blue.600" fontWeight="600" textTransform="none">
               Built-in
             </Badge>
           )}
+          {isCustom && (
+            <Badge fontSize="10px" px="6px" py="2px" borderRadius="6px" bg="orange.50" color="orange.600" fontWeight="600" textTransform="none">
+              Custom
+            </Badge>
+          )}
           {isActivated && !isBuiltIn && (
-            <Badge
-              fontSize="10px"
-              px="6px"
-              py="2px"
-              borderRadius="6px"
-              bg="green.50"
-              color="green.600"
-              fontWeight="600"
-              textTransform="none"
-            >
+            <Badge fontSize="10px" px="6px" py="2px" borderRadius="6px" bg="green.50" color="green.600" fontWeight="600" textTransform="none">
               Active
             </Badge>
           )}
@@ -262,14 +281,7 @@ function AgentCard({ agent, system, isBuiltIn, isActivated, onToggle }) {
       </Text>
 
       <Collapse in={isExpanded} animateOpacity>
-        <Box
-          bg="gray.50"
-          borderRadius="8px"
-          p="14px"
-          mb="12px"
-          border="1px solid"
-          borderColor="gray.100"
-        >
+        <Box bg="gray.50" borderRadius="8px" p="14px" mb="12px" border="1px solid" borderColor="gray.100">
           <HStack justify="space-between" mb="8px">
             <Text fontSize="11px" fontWeight="600" color="gray.500" textTransform="uppercase" letterSpacing="0.5px">
               System Prompt
@@ -284,13 +296,7 @@ function AgentCard({ agent, system, isBuiltIn, isActivated, onToggle }) {
               aria-label="Copy system prompt"
             />
           </HStack>
-          <Text
-            fontSize="12px"
-            color="gray.600"
-            lineHeight="1.7"
-            whiteSpace="pre-wrap"
-            fontFamily="mono"
-          >
+          <Text fontSize="12px" color="gray.600" lineHeight="1.7" whiteSpace="pre-wrap" fontFamily="mono">
             {agent.systemPrompt}
           </Text>
         </Box>
@@ -320,7 +326,24 @@ function AgentCard({ agent, system, isBuiltIn, isActivated, onToggle }) {
             onClick={handleCopy}
             aria-label="Copy system prompt"
           />
-          {!isBuiltIn && (
+          {isCustom && (
+            <Menu>
+              <MenuButton
+                as={IconButton}
+                icon={<Icon as={MdMoreVert} boxSize="16px" />}
+                size="sm"
+                variant="ghost"
+                color="gray.400"
+                _hover={{ color: 'gray.600', bg: 'gray.50' }}
+                aria-label="Agent options"
+              />
+              <MenuList>
+                <MenuItem icon={<Icon as={MdEdit} />} onClick={() => onEdit(agent)}>Edit</MenuItem>
+                <MenuItem icon={<Icon as={MdDelete} />} color="red.500" onClick={() => onDelete(agent)}>Delete</MenuItem>
+              </MenuList>
+            </Menu>
+          )}
+          {!isBuiltIn && !isCustom && (
             <Button
               size="sm"
               fontSize="12px"
@@ -340,26 +363,163 @@ function AgentCard({ agent, system, isBuiltIn, isActivated, onToggle }) {
 }
 
 export default function Library() {
+  const toast = useToast();
+  const { isOpen, onOpen, onClose } = useDisclosure();
   const [activatedIds, setActivatedIds] = useState(() => getActivatedAgentIds());
+  const [customAgents, setCustomAgents] = useState([]);
+  const [editingAgent, setEditingAgent] = useState(null);
+  const [isGeneratingPrompt, setIsGeneratingPrompt] = useState(false);
+  const [newAgent, setNewAgent] = useState({
+    name: '',
+    description: '',
+    system: 'data',
+    model: 'gpt-4',
+    systemPrompt: '',
+  });
+
+  // Load custom agents from backend
+  useEffect(() => {
+    const loadCustomAgents = async () => {
+      try {
+        const response = await horizonAgentApi.getAll({ limit: 100 });
+        if (response.success && response.data) {
+          const agents = Array.isArray(response.data) ? response.data : response.data.agents || [];
+          // Only show agents not tied to a specific horizon (library-global agents)
+          setCustomAgents(agents.filter(a => !a.horizonId));
+        }
+      } catch (error) {
+        // Silently fail — custom agents are optional
+      }
+    };
+    loadCustomAgents();
+  }, []);
 
   const handleToggle = (agentId) => {
     const newIds = toggleAgentActivation(agentId);
     setActivatedIds(newIds);
   };
 
+  const handleCreateAgent = async () => {
+    if (!newAgent.name.trim()) {
+      toast({ title: 'Name required', status: 'warning', duration: 2000, isClosable: true });
+      return;
+    }
+
+    let systemPrompt = (newAgent.systemPrompt || '').trim();
+
+    // Auto-generate system prompt if empty
+    if (!systemPrompt && !editingAgent) {
+      try {
+        setIsGeneratingPrompt(true);
+        const response = await generateAgentSystemPrompt(
+          newAgent.name,
+          newAgent.description || '',
+          newAgent.system === 'data' ? 'data_retriever' : 'custom_analyzer'
+        );
+        if (response.success && response.data?.systemPrompt) {
+          systemPrompt = response.data.systemPrompt;
+          if (!systemPrompt.trim()) throw new Error('Generated system prompt is empty');
+          setNewAgent(prev => ({ ...prev, systemPrompt }));
+        } else {
+          throw new Error('Failed to generate system prompt');
+        }
+      } catch (error) {
+        toast({ title: 'Generation failed', description: error.message, status: 'error', duration: 3000, isClosable: true });
+        setIsGeneratingPrompt(false);
+        return;
+      } finally {
+        setIsGeneratingPrompt(false);
+      }
+    }
+
+    try {
+      const agentData = {
+        name: newAgent.name.trim(),
+        description: (newAgent.description || '').trim(),
+        type: 'custom_agent',
+        system: newAgent.system,
+        model: newAgent.model,
+        systemPrompt: systemPrompt || (newAgent.systemPrompt || '').trim(),
+        icon: 'MdSmartToy',
+        color: newAgent.system === 'data' ? 'blue' : 'purple',
+        isBuiltin: false,
+      };
+
+      if (editingAgent) {
+        const response = await horizonAgentApi.update(editingAgent.id, agentData);
+        if (response.success) {
+          setCustomAgents(customAgents.map(a => a.id === editingAgent.id ? response.data : a));
+          toast({ title: 'Agent updated', description: `${response.data.name} has been updated`, status: 'success', duration: 2000, isClosable: true });
+        }
+      } else {
+        // Create without horizonId — global library agent
+        const response = await horizonAgentApi.create(undefined, agentData);
+        if (response.success) {
+          setCustomAgents([...customAgents, response.data]);
+          toast({ title: 'Agent created', description: `${response.data.name} added to library`, status: 'success', duration: 2000, isClosable: true });
+        }
+      }
+
+      setNewAgent({ name: '', description: '', system: 'data', model: 'gpt-4', systemPrompt: '' });
+      setEditingAgent(null);
+      onClose();
+    } catch (error) {
+      toast({ title: 'Failed to save agent', description: error.raw?.details || error.message, status: 'error', duration: 3000, isClosable: true });
+    }
+  };
+
+  const handleEditAgent = (agent) => {
+    setEditingAgent(agent);
+    setNewAgent({
+      name: agent.name,
+      description: agent.description || '',
+      system: agent.system || 'data',
+      model: agent.model || 'gpt-4',
+      systemPrompt: agent.systemPrompt || '',
+    });
+    onOpen();
+  };
+
+  const handleDeleteAgent = async (agent) => {
+    try {
+      await horizonAgentApi.delete(agent.id);
+      setCustomAgents(customAgents.filter(a => a.id !== agent.id));
+      toast({ title: 'Agent deleted', description: `${agent.name} removed`, status: 'info', duration: 2000, isClosable: true });
+    } catch (error) {
+      toast({ title: 'Failed to delete', description: error.message, status: 'error', duration: 3000, isClosable: true });
+    }
+  };
+
+  const customDataAgents = customAgents.filter(a => a.system === 'data');
+  const customAnalyzerAgents = customAgents.filter(a => a.system === 'analyzer');
+
   return (
     <Box h="100vh" bg="#FAFAFA" p="40px" overflowY="auto">
       <VStack maxW="1200px" mx="auto" spacing="40px" align="stretch">
         {/* Page Header */}
-        <VStack align="start" spacing="4px">
-          <Text fontSize="24px" fontWeight="700" color="gray.800">
-            Agent Library
-          </Text>
-          <Text fontSize="14px" color="gray.500">
-            Pre-built agents for financial analysis. Activate agents to make
-            them available in Horizon pipelines.
-          </Text>
-        </VStack>
+        <HStack justify="space-between" align="start">
+          <VStack align="start" spacing="4px">
+            <Text fontSize="24px" fontWeight="700" color="gray.800">
+              Agent Library
+            </Text>
+            <Text fontSize="14px" color="gray.500">
+              Pre-built agents for financial analysis. Activate agents to make
+              them available in Horizon pipelines.
+            </Text>
+          </VStack>
+          <Button
+            leftIcon={<Icon as={MdAdd} />}
+            colorScheme="teal"
+            size="sm"
+            onClick={() => {
+              setEditingAgent(null);
+              setNewAgent({ name: '', description: '', system: 'data', model: 'gpt-4', systemPrompt: '' });
+              onOpen();
+            }}
+          >
+            Create Agent
+          </Button>
+        </HStack>
 
         {/* Data Agents Section */}
         <VStack align="stretch" spacing="16px">
@@ -367,22 +527,11 @@ export default function Library() {
             <Text fontSize="17px" fontWeight="600" color="gray.700">
               Data Agents
             </Text>
-            <Badge
-              fontSize="12px"
-              px="8px"
-              py="2px"
-              borderRadius="full"
-              bg="gray.100"
-              color="gray.600"
-              fontWeight="600"
-            >
-              {DATA_AGENTS.length}
+            <Badge fontSize="12px" px="8px" py="2px" borderRadius="full" bg="gray.100" color="gray.600" fontWeight="600">
+              {DATA_AGENTS.length + customDataAgents.length}
             </Badge>
           </HStack>
-          <Grid
-            templateColumns="repeat(auto-fill, minmax(320px, 1fr))"
-            gap="16px"
-          >
+          <Grid templateColumns="repeat(auto-fill, minmax(320px, 1fr))" gap="16px">
             {DATA_AGENTS.map((agent) => {
               const isBuiltIn = BUILTIN_AGENT_IDS.includes(agent.id);
               return (
@@ -396,6 +545,17 @@ export default function Library() {
                 />
               );
             })}
+            {customDataAgents.map((agent) => (
+              <AgentCard
+                key={agent.id}
+                agent={agent}
+                system="Data"
+                isCustom
+                isActivated
+                onEdit={handleEditAgent}
+                onDelete={handleDeleteAgent}
+              />
+            ))}
           </Grid>
         </VStack>
 
@@ -405,22 +565,11 @@ export default function Library() {
             <Text fontSize="17px" fontWeight="600" color="gray.700">
               Analyzer Agents
             </Text>
-            <Badge
-              fontSize="12px"
-              px="8px"
-              py="2px"
-              borderRadius="full"
-              bg="gray.100"
-              color="gray.600"
-              fontWeight="600"
-            >
-              {ANALYZER_AGENTS.length}
+            <Badge fontSize="12px" px="8px" py="2px" borderRadius="full" bg="gray.100" color="gray.600" fontWeight="600">
+              {ANALYZER_AGENTS.length + customAnalyzerAgents.length}
             </Badge>
           </HStack>
-          <Grid
-            templateColumns="repeat(auto-fill, minmax(320px, 1fr))"
-            gap="16px"
-          >
+          <Grid templateColumns="repeat(auto-fill, minmax(320px, 1fr))" gap="16px">
             {ANALYZER_AGENTS.map((agent) => {
               const isBuiltIn = BUILTIN_AGENT_IDS.includes(agent.id);
               return (
@@ -434,9 +583,134 @@ export default function Library() {
                 />
               );
             })}
+            {customAnalyzerAgents.map((agent) => (
+              <AgentCard
+                key={agent.id}
+                agent={agent}
+                system="Analyzer"
+                isCustom
+                isActivated
+                onEdit={handleEditAgent}
+                onDelete={handleDeleteAgent}
+              />
+            ))}
           </Grid>
         </VStack>
       </VStack>
+
+      {/* Create/Edit Agent Modal */}
+      <Modal isOpen={isOpen} onClose={() => { onClose(); setEditingAgent(null); setNewAgent({ name: '', description: '', system: 'data', model: 'gpt-4', systemPrompt: '' }); }} isCentered size="lg">
+        <ModalOverlay bg="blackAlpha.600" backdropFilter="blur(4px)" />
+        <ModalContent borderRadius="20px">
+          <ModalCloseButton />
+          <ModalHeader>{editingAgent ? 'Edit Agent' : 'Create Custom Agent'}</ModalHeader>
+          <ModalBody pb="20px">
+            <VStack spacing="20px" align="stretch">
+              <FormControl isRequired>
+                <FormLabel fontSize="sm" fontWeight="600">Agent Name</FormLabel>
+                <Input
+                  placeholder="e.g., Crypto Price Fetcher"
+                  value={newAgent.name}
+                  onChange={(e) => setNewAgent({ ...newAgent, name: e.target.value })}
+                />
+              </FormControl>
+
+              <FormControl>
+                <FormLabel fontSize="sm" fontWeight="600">Description</FormLabel>
+                <Textarea
+                  placeholder="What does this agent do?"
+                  value={newAgent.description}
+                  onChange={(e) => setNewAgent({ ...newAgent, description: e.target.value })}
+                  rows={2}
+                />
+              </FormControl>
+
+              <FormControl>
+                <FormLabel fontSize="sm" fontWeight="600">Agent Type</FormLabel>
+                <Select
+                  value={newAgent.system}
+                  onChange={(e) => setNewAgent({ ...newAgent, system: e.target.value })}
+                >
+                  <option value="data">Data Agent</option>
+                  <option value="analyzer">Analyzer Agent</option>
+                </Select>
+              </FormControl>
+
+              <FormControl>
+                <FormLabel fontSize="sm" fontWeight="600">
+                  System Prompt
+                  <Button
+                    size="xs"
+                    ml="8px"
+                    onClick={async () => {
+                      if (!newAgent.name?.trim()) {
+                        toast({ title: 'Please enter agent name first', status: 'warning', duration: 2000, isClosable: true });
+                        return;
+                      }
+                      setIsGeneratingPrompt(true);
+                      try {
+                        const response = await generateAgentSystemPrompt(
+                          newAgent.name,
+                          newAgent.description || '',
+                          newAgent.system === 'data' ? 'data_retriever' : 'custom_analyzer'
+                        );
+                        if (response.success && response.data?.systemPrompt) {
+                          setNewAgent(prev => ({ ...prev, systemPrompt: response.data.systemPrompt }));
+                          toast({ title: 'System prompt generated', status: 'success', duration: 2000, isClosable: true });
+                        }
+                      } catch (error) {
+                        toast({ title: 'Generation failed', description: error.message, status: 'error', duration: 3000, isClosable: true });
+                      } finally {
+                        setIsGeneratingPrompt(false);
+                      }
+                    }}
+                    isLoading={isGeneratingPrompt}
+                    colorScheme="purple"
+                    variant="outline"
+                  >
+                    {newAgent.systemPrompt ? 'Regenerate' : 'Generate'}
+                  </Button>
+                </FormLabel>
+                <Textarea
+                  value={newAgent.systemPrompt || ''}
+                  onChange={(e) => setNewAgent({ ...newAgent, systemPrompt: e.target.value })}
+                  placeholder="Will be auto-generated from name and description when you create the agent"
+                  rows={6}
+                  fontFamily="mono"
+                  fontSize="xs"
+                />
+                <Text fontSize="xs" color="gray.500" mt="4px">
+                  System prompt will be auto-generated if left empty
+                </Text>
+              </FormControl>
+
+              {isGeneratingPrompt && (
+                <Box>
+                  <Alert status="info" borderRadius="8px" mb="8px">
+                    <AlertIcon><Spinner size="sm" /></AlertIcon>
+                    <AlertDescription fontSize="sm" fontWeight="500">
+                      Generating system prompt...
+                    </AlertDescription>
+                  </Alert>
+                  <Progress size="xs" isIndeterminate colorScheme="teal" borderRadius="full" />
+                </Box>
+              )}
+
+              <Button
+                colorScheme="teal"
+                onClick={handleCreateAgent}
+                size="lg"
+                w="full"
+                isLoading={isGeneratingPrompt}
+                loadingText={isGeneratingPrompt ? 'Generating...' : 'Creating...'}
+                isDisabled={isGeneratingPrompt}
+              >
+                {editingAgent ? 'Update Agent' : 'Create Agent'}
+              </Button>
+            </VStack>
+          </ModalBody>
+        </ModalContent>
+      </Modal>
     </Box>
   );
 }
