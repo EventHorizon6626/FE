@@ -126,7 +126,7 @@ export const useRunAgent = ({
   };
 
   // Main orchestrator: create agents, execute them, re-run custom agent
-  const handleNeedsData = async ({ customAgentNodeId, requiredAgents, currentNodes, currentEdges, node, agentName }) => {
+  const handleNeedsData = async ({ customAgentNodeId, requiredAgents, currentNodes, currentEdges, node, agentName, agentType }) => {
     const portfolioNode = findConnectedPortfolio(customAgentNodeId, currentEdges, currentNodes);
     if (!portfolioNode) {
       toast({
@@ -324,9 +324,9 @@ export const useRunAgent = ({
       }
     }
 
-    // 4. Re-execute the custom agent with collected data
+    // 4. Re-execute the agent with collected data
     toast({
-      title: 'Re-running custom agent',
+      title: 'Re-running agent',
       description: `${agentName} is re-executing with collected data...`,
       status: 'info',
       duration: null,
@@ -334,21 +334,33 @@ export const useRunAgent = ({
     });
 
     try {
-      const customAgent = customAgentNode.data.agent;
-      const executionContext = horizonId ? {
-        horizonId,
-        agentNodeId: customAgentNodeId,
-        agentPosition: customAgentNode.position,
-        agentName: agentName,
-        input_data: collectedData,
-      } : { input_data: collectedData };
+      let finalResult;
 
-      const finalResult = await runCustomAgentApi(
-        stocks,
-        customAgent.systemPrompt,
-        customAgent.userPrompt || null,
-        executionContext,
-      );
+      if (agentType === 'bull_bear_analyzer' || agentType === 'risk_manager') {
+        // Built-in analyzer agents — route through runAgent with collected data
+        const executionContext = horizonId ? {
+          horizonId,
+          agentNodeId: customAgentNodeId,
+          agentPosition: customAgentNode.position,
+        } : {};
+        finalResult = await runAgent(agentType, { stocks, data: collectedData }, null, executionContext);
+      } else {
+        // Custom agents — use runCustomAgentApi with system prompt
+        const customAgent = customAgentNode.data.agent;
+        const executionContext = horizonId ? {
+          horizonId,
+          agentNodeId: customAgentNodeId,
+          agentPosition: customAgentNode.position,
+          agentName: agentName,
+          input_data: collectedData,
+        } : { input_data: collectedData };
+        finalResult = await runCustomAgentApi(
+          stocks,
+          customAgent.systemPrompt,
+          customAgent.userPrompt || null,
+          executionContext,
+        );
+      }
 
       // Update the custom agent node with final result
       setNodes(nds =>
@@ -550,6 +562,7 @@ export const useRunAgent = ({
           currentEdges,
           node,
           agentName,
+          agentType: node?.data?.agent?.type,
         });
         return;
       }

@@ -288,12 +288,10 @@ export const runAgent = async (agentType, inputData, customAgentConfig = null, e
       return await runResearchManagerAgent(data?.bullThesis, data?.bearThesis, context);
 
     case 'bull_bear_analyzer':
-      // Use 60 second timeout for bull-bear analyzer (thinking agent with iterative reasoning)
-      return await request.withTimeout(60000).post('/ai/agents/bull-bear-analyzer', {
+      // Use 120 second timeout for bull-bear analyzer (Stage 2/3 processing + debate)
+      return await request.withTimeout(120000).post('/ai/agents/bull-bear-analyzer', {
         stocks,
-        input_data: data,
-        max_iterations: 5,
-        available_tools: ['candlestick', 'earnings', 'news', 'technical', 'fundamentals'],
+        raw_data: data,
         ...context,
       });
 
@@ -356,6 +354,25 @@ export const getAgentInputData = (node, edges, nodes) => {
       };
     }
   });
+
+  // If no portfolio found among direct parents, traverse upstream through agent chain
+  if (inputData.stocks.length === 0) {
+    const visited = new Set();
+    const findStocksUpstream = (nodeId) => {
+      if (visited.has(nodeId)) return [];
+      visited.add(nodeId);
+      const incoming = edges.filter(e => e.target === nodeId);
+      for (const edge of incoming) {
+        const src = nodes.find(n => n.id === edge.source);
+        if (!src) continue;
+        if (src.type === 'portfolioNode') return src.data.portfolio?.stocks || [];
+        const upstream = findStocksUpstream(src.id);
+        if (upstream.length > 0) return upstream;
+      }
+      return [];
+    };
+    inputData.stocks = findStocksUpstream(node.id);
+  }
 
   console.log('[getAgentInputData] Final input data:', inputData);
 

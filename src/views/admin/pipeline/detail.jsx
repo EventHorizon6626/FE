@@ -184,7 +184,7 @@ const AGENT_CATEGORIES = [
 
 // Helper to extract data_by_symbol regardless of field name (used across components)
 const extractDataBySymbol = (result) => {
-  if (!result) return {};
+  if (!result || typeof result !== 'object') return {};
 
   // Try known agent-specific fields first
   const knownField = result.chart_data_by_symbol ||
@@ -196,13 +196,13 @@ const extractDataBySymbol = (result) => {
          result.data?.chart_data_by_symbol ||
          result.result?.chart_data_by_symbol;
 
-  if (knownField) return knownField;
+  if (knownField && typeof knownField === 'object') return knownField;
 
   // For custom agents: look for any field ending in _by_symbol or _data
   const symbolField = Object.keys(result).find(key =>
     key.endsWith('_by_symbol') || key.endsWith('_data')
   );
-  if (symbolField) return result[symbolField];
+  if (symbolField && typeof result[symbolField] === 'object') return result[symbolField];
 
   // If no structured field found, return the entire result for custom rendering
   // This handles arbitrary JSON from custom agents
@@ -3963,7 +3963,7 @@ function PipelineBuilderInner() {
                           };
 
                           console.log('[Sidebar Render] Full result:', displayResult);
-                          console.log('[Sidebar Render] result keys:', displayResult ? Object.keys(displayResult) : 'no result');
+                          console.log('[Sidebar Render] result keys:', displayResult && typeof displayResult === 'object' ? Object.keys(displayResult) : 'no result');
 
                           const dataType = detectDataType(displayResult);
                           const dataBySymbol = extractDataBySymbol(displayResult);
