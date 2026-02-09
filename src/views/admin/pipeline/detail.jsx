@@ -204,6 +204,11 @@ const extractDataBySymbol = (result) => {
   );
   if (symbolField && typeof result[symbolField] === 'object') return result[symbolField];
 
+  // If result looks like an AnalysisResponse (has analysis text + status), wrap it
+  if (result.analysis && result.status) {
+    return { _analysis: result };
+  }
+
   // If no structured field found, return the entire result for custom rendering
   // This handles arbitrary JSON from custom agents
   return result;
@@ -3669,6 +3674,12 @@ function PipelineBuilderInner() {
                             );
                             if (symbolField) return result[symbolField];
 
+                            // If result looks like an AnalysisResponse (has analysis text + status), wrap it
+                            // so the renderer can display the analysis text instead of iterating raw fields
+                            if (result.analysis && result.status) {
+                              return { _analysis: result };
+                            }
+
                             // If no structured field found, return the entire result for custom rendering
                             // This handles arbitrary JSON from custom agents
                             return result;
@@ -4019,6 +4030,9 @@ function PipelineBuilderInner() {
                               {Object.keys(dataBySymbol).map((symbol) => {
                                 const symbolData = dataBySymbol[symbol];
 
+                                // Skip null/undefined/primitive values to prevent Object.keys(null) crash
+                                if (symbolData == null || typeof symbolData !== 'object') return null;
+
                                 // Render based on detected agent type
                                 if (dataType === 'candlestick') {
                                   // Keep existing candlestick chart rendering logic
@@ -4060,6 +4074,33 @@ function PipelineBuilderInner() {
                                 } else if (dataType === 'fundamentals') {
                                   return <FundamentalsDataRenderer key={symbol} symbol={symbol} data={symbolData} />;
                                 } else if (dataType === 'custom') {
+                                  // Handle AnalysisResponse wrapper — render analysis text directly
+                                  if (symbol === '_analysis' && symbolData.analysis) {
+                                    const analysisText = typeof symbolData.analysis === 'string'
+                                      ? symbolData.analysis
+                                      : JSON.stringify(symbolData.analysis, null, 2);
+                                    return (
+                                      <Box key={symbol} p="16px" bg="white" borderRadius="12px" border="1px solid" borderColor="purple.200" mb="12px">
+                                        <VStack align="start" spacing="8px">
+                                          <HStack>
+                                            <Badge colorScheme="green">{symbolData.status || 'complete'}</Badge>
+                                            {symbolData.agent_name && (
+                                              <Text fontSize="xs" color="gray.500">Agent: {symbolData.agent_name}</Text>
+                                            )}
+                                            {symbolData.model && (
+                                              <Text fontSize="xs" color="gray.500">Model: {symbolData.model}</Text>
+                                            )}
+                                          </HStack>
+                                          <Box bg="gray.50" p="12px" borderRadius="8px" w="full" maxH="500px" overflowY="auto">
+                                            <pre style={{ fontSize: '12px', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: '1.5', fontFamily: 'inherit' }}>
+                                              {analysisText}
+                                            </pre>
+                                          </Box>
+                                        </VStack>
+                                      </Box>
+                                    );
+                                  }
+
                                   // Custom agents - use generic JSON renderer
                                   // If dataBySymbol has multiple keys, render each separately
                                   // Otherwise render the whole result
