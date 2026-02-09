@@ -1996,7 +1996,8 @@ function PipelineBuilderInner() {
     });
   }, [getNodes, screenToFlowPosition, setNodes, toast]);
 
-  // Create a new block node
+  // Create a new block node (OLD - now using drag from sidebar)
+  /*
   const handleCreateBlock = useCallback(async () => {
     if (!currentHorizonId) return;
 
@@ -2037,6 +2038,8 @@ function PipelineBuilderInner() {
       });
     }
   }, [currentHorizonId, setNodes, toast, handleNodeDelete, handleAddToBlock, handleDropToBlock, handleRemoveFromBlock, handleConfigChildNode, handleExtractAndDrag]);
+  */
+
 
   const handleAgentMouseDown = useCallback((event, agent) => {
     event.preventDefault();
@@ -2105,6 +2108,43 @@ function PipelineBuilderInner() {
     setIsDragging(true);
 
   }, [screenToFlowPosition, setNodes, currentHorizonId, refetchHorizon]);
+
+  const handleBlockMouseDown = useCallback((event) => {
+    event.preventDefault();
+
+    const position = screenToFlowPosition({
+      x: event.clientX,
+      y: event.clientY,
+    });
+
+    // Start drag operation - create preview block node
+    const previewNodeId = `preview-block-${Date.now()}`;
+    const previewNode = {
+      id: previewNodeId,
+      type: 'block',
+      position,
+      data: {
+        childNodeIds: [],
+        childNodes: [],
+        horizonId: currentHorizonId,
+        onDelete: () => {},
+        onAddToBlock: () => {},
+        onDropToBlock: () => {},
+        onRemoveFromBlock: () => {},
+        onConfigChildNode: () => {},
+        onExtractAndDrag: () => {},
+        isHighlighted: false,
+      },
+      draggable: false,
+      style: { opacity: 0.6 }, // Preview style
+    };
+
+    setNodes((nds) => nds.concat(previewNode));
+    setDraggedItem({ type: 'block', data: {} });
+    setDragPreviewNodeId(previewNodeId);
+    setIsDragging(true);
+
+  }, [screenToFlowPosition, setNodes, currentHorizonId]);
 
   // Handle drag and drop
   useEffect(() => {
@@ -2227,6 +2267,27 @@ function PipelineBuilderInner() {
             toast({
               title: 'Portfolio added',
               description: `${draggedItem.data.name} data source added`,
+              status: 'success',
+              duration: 2000,
+              isClosable: true,
+            });
+          } else if (draggedItem.type === 'block') {
+            const response = await nodeApi.create({
+              horizonId: currentHorizonId,
+              type: 'block',
+              position: finalPosition,
+              data: {},
+              childNodeIds: [],
+            });
+
+            const savedNode = response.data;
+            
+            // Refetch horizon to get updated data
+            await refetchHorizon();
+
+            toast({
+              title: 'Block added',
+              description: 'Block container created',
               status: 'success',
               duration: 2000,
               isClosable: true,
@@ -3252,7 +3313,7 @@ function PipelineBuilderInner() {
         </Box>
 
         {/* 5. Create Block Button */}
-        <Tooltip label="Create Block Container" placement="right" hasArrow>
+        <Tooltip label="Hold and drag to create block" placement="right" hasArrow>
           <HStack
             bg="whiteAlpha.900"
             backdropFilter="blur(10px)"
@@ -3263,14 +3324,15 @@ function PipelineBuilderInner() {
             border="1px solid"
             borderColor="whiteAlpha.400"
             boxShadow="md"
-            cursor="pointer"
+            cursor="grab"
+            _active={{ cursor: 'grabbing' }}
             _hover={{ borderColor: 'purple.400', boxShadow: 'lg', transform: 'translateY(-2px)' }}
             transition="all 0.2s"
-            onClick={handleCreateBlock}
+            onMouseDown={handleBlockMouseDown}
           >
             <Icon as={MdAccountTree} color="purple.600" boxSize="24px" />
             <Text fontSize="sm" fontWeight="600" color="gray.800">
-              Create Block
+              Block
             </Text>
           </HStack>
         </Tooltip>
