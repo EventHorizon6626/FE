@@ -96,6 +96,7 @@ import { RobotHead } from 'components/pipeline/RobotHead';
 import Chart from 'react-apexcharts';
 import StockAnalysisCard from 'views/admin/portfolio/components/StockAnalysisCard';
 import { IDshorten } from 'utils';
+import { getActivatedDataAgents, getActivatedAnalyzerAgents } from 'data/libraryAgents';
 
 // Sidebar view modes
 const SIDEBAR_VIEW = {
@@ -1931,16 +1932,16 @@ function PipelineBuilderInner() {
       setNodes(nodesWithHorizonId);
       setEdges(horizonData.edges || []);
       
-      // System 1: Data Agents - Merge builtin with custom
+      // System 1: Data Agents - Merge builtin + library-activated + custom
       const loadedDataAgents = horizonData.dataAgents || horizonData.availableAgents || [];
-      const customDataAgents = loadedDataAgents.filter(a => !a.isBuiltin);
-      const mergedDataAgents = [...BUILTIN_AGENTS, ...customDataAgents];
+      const customDataAgents = loadedDataAgents.filter(a => !a.isBuiltin && !a.isLibrary);
+      const mergedDataAgents = [...BUILTIN_AGENTS, ...getActivatedDataAgents(), ...customDataAgents];
       setAvailableAgents(mergedDataAgents);
 
-      // System 2: Analyzer Agents - Merge builtin with custom
+      // System 2: Analyzer Agents - Merge builtin + library-activated + custom
       const loadedAnalyzerAgents = horizonData.analyzerAgents || [];
-      const customAnalyzerAgents = loadedAnalyzerAgents.filter(a => !a.isBuiltin);
-      const mergedAnalyzerAgents = [...DEFAULT_ANALYZERS, ...customAnalyzerAgents];
+      const customAnalyzerAgents = loadedAnalyzerAgents.filter(a => !a.isBuiltin && !a.isLibrary);
+      const mergedAnalyzerAgents = [...DEFAULT_ANALYZERS, ...getActivatedAnalyzerAgents(), ...customAnalyzerAgents];
       setAnalyzerAgents(mergedAnalyzerAgents);
       
       setCustomAgents(horizonData.customAgents || []);
@@ -2228,9 +2229,14 @@ function PipelineBuilderInner() {
                         Built-in
                       </Badge>
                     )}
+                    {agent.isLibrary && (
+                      <Badge colorScheme="teal" fontSize="xs">
+                        Library
+                      </Badge>
+                    )}
                   </HStack>
-                  
-                  {!agent.isBuiltin && (
+
+                  {!agent.isBuiltin && !agent.isLibrary && (
                     <Menu>
                       <MenuButton
                         as={IconButton}
@@ -2383,9 +2389,14 @@ function PipelineBuilderInner() {
                           Default
                         </Badge>
                       )}
+                      {agent.isLibrary && (
+                        <Badge colorScheme="teal" fontSize="xs">
+                          Library
+                        </Badge>
+                      )}
                     </HStack>
 
-                    {!agent.isBuiltin && (
+                    {!agent.isBuiltin && !agent.isLibrary && (
                       <Menu>
                         <MenuButton
                           as={IconButton}
@@ -2590,7 +2601,7 @@ function PipelineBuilderInner() {
                     <FormLabel fontSize="sm" fontWeight="600" mb="0">
                       System Prompt
                     </FormLabel>
-                    {selectedNode?.data?.agent && !selectedNode.data.agent.isBuiltin && (
+                    {selectedNode?.data?.agent && !selectedNode.data.agent.isBuiltin && !selectedNode.data.agent.isLibrary && (
                       <Button
                         size="xs"
                         leftIcon={<Icon as={MdRefresh} />}
@@ -2656,14 +2667,18 @@ function PipelineBuilderInner() {
                     placeholder={
                       selectedNode?.data?.agent?.isBuiltin
                         ? "Built-in agent — pre-configured system prompts"
+                        : selectedNode?.data?.agent?.isLibrary
+                        ? "Library agent — pre-configured system prompts"
                         : "Define the agent's behavior..."
                     }
-                    isReadOnly={selectedNode?.data?.agent?.isBuiltin}
-                    bg={selectedNode?.data?.agent?.isBuiltin ? 'gray.50' : 'white'}
+                    isReadOnly={selectedNode?.data?.agent?.isBuiltin || selectedNode?.data?.agent?.isLibrary}
+                    bg={selectedNode?.data?.agent?.isBuiltin || selectedNode?.data?.agent?.isLibrary ? 'gray.50' : 'white'}
                   />
                   <Text fontSize="xs" color="gray.500" mt="4px">
                     {selectedNode?.data?.agent?.isBuiltin
                       ? 'Built-in agents have pre-configured system prompts (read-only)'
+                      : selectedNode?.data?.agent?.isLibrary
+                      ? 'Library agents have pre-configured system prompts (read-only)'
                       : 'The core instruction that defines this agent\'s behavior. Click "Regenerate" after changing the description.'}
                   </Text>
                 </FormControl>

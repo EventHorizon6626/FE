@@ -20,6 +20,7 @@ import {
 } from '@chakra-ui/react';
 import {
   MdAccountTree,
+  MdLibraryBooks,
   MdMenu,
   MdShowChart,
   MdSettings,
@@ -248,6 +249,14 @@ const SidebarContent = ({ navigate, currentPath, isCollapsed, onToggleCollapse }
           label="Horizon"
           onClick={() => navigate('/pipeline')}
           isActive={currentPath === '/pipeline' || currentPath.startsWith('/pipeline/')}
+          isCollapsed={isCollapsed}
+          onExpand={handleExpand}
+        />
+        <SidebarItem
+          icon={MdLibraryBooks}
+          label="Library"
+          onClick={() => navigate('/library')}
+          isActive={currentPath === '/library'}
           isCollapsed={isCollapsed}
           onExpand={handleExpand}
         />

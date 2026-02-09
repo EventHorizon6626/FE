@@ -4,12 +4,14 @@ import {
   MdHome,
   MdLock,
   MdShowChart,
+  MdLibraryBooks,
 } from 'react-icons/md';
 
 import LandingPage from 'views/admin/landing';
 import Dashboard from 'views/admin/dashboard';
 import PipelineList from 'views/admin/pipeline';
 import PipelineDetail from 'views/admin/pipeline/detail';
+import Library from 'views/admin/library';
 import Profile from 'views/admin/profile';
 import SignInCentered from 'views/auth/signIn';
 
@@ -30,6 +32,14 @@ const routes = [
     icon: <Icon as={MdHome} width="20px" height="20px" color="inherit" />,
     component: <PipelineList />,
     requiresAuth: false, // Temporarily disabled for testing
+  },
+  {
+    name: 'Library',
+    layout: '/',
+    path: '/library',
+    icon: <Icon as={MdLibraryBooks} width="20px" height="20px" color="inherit" />,
+    component: <Library />,
+    requiresAuth: false,
   },
   {
     name: 'Dashboard',
