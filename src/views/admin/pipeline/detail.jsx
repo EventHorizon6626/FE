@@ -82,7 +82,7 @@ import ReactFlow, {
   EdgeLabelRenderer,
   getBezierPath,
 } from 'reactflow';
-// import dagre from 'dagre';
+import dagre from 'dagre';
 import 'reactflow/dist/style.css';
 import '../../../assets/css/ReactFlowCustom.css';
 import { searchSecurities, SECURITIES } from 'data/securities';
@@ -1083,77 +1083,76 @@ function PipelineBuilderInner() {
   }, [getNodes, currentHorizonId, setNodes, setEdges, toast, handleNodeDelete, refetchHorizon]);
 
   // Auto-layout: arrange connected nodes as a tree, push disconnected nodes off to the side
-  // COMMENTED OUT - dagre package removed
-  // const handleAutoLayout = useCallback(() => {
-  //   const currentNodes = getNodes();
-  //   const currentEdges = getEdges();
-  //   if (currentNodes.length === 0) return;
+  const handleAutoLayout = useCallback(() => {
+    const currentNodes = getNodes();
+    const currentEdges = getEdges();
+    if (currentNodes.length === 0) return;
 
-  //   // Separate connected vs disconnected
-  //   const connectedIds = new Set();
-  //   currentEdges.forEach(e => { connectedIds.add(e.source); connectedIds.add(e.target); });
+    // Separate connected vs disconnected
+    const connectedIds = new Set();
+    currentEdges.forEach(e => { connectedIds.add(e.source); connectedIds.add(e.target); });
 
-  //   // Use dagre for the connected graph (handles DAGs, multiple parents, etc.)
-  //   const g = new dagre.graphlib.Graph();
-  //   g.setDefaultEdgeLabel(() => ({}));
-  //   g.setGraph({
-  //     rankdir: 'LR',
-  //     nodesep: 40,
-  //     ranksep: 80,
-  //     edgesep: 20,
-  //     ranker: 'tight-tree',
-  //   });
+    // Use dagre for the connected graph (handles DAGs, multiple parents, etc.)
+    const g = new dagre.graphlib.Graph();
+    g.setDefaultEdgeLabel(() => ({}));
+    g.setGraph({
+      rankdir: 'LR',
+      nodesep: 40,
+      ranksep: 80,
+      edgesep: 20,
+      ranker: 'tight-tree',
+    });
 
-  //   // Use actual rendered node dimensions (ReactFlow measures them after render)
-  //   currentNodes.forEach(node => {
-  //     if (connectedIds.has(node.id)) {
-  //       const w = node.width || 250;
-  //       const h = node.height || 120;
-  //       g.setNode(node.id, { width: w, height: h });
-  //     }
-  //   });
-  //   currentEdges.forEach(edge => {
-  //     if (connectedIds.has(edge.source) && connectedIds.has(edge.target)) {
-  //       g.setEdge(edge.source, edge.target);
-  //     }
-  //   });
+    // Use actual rendered node dimensions (ReactFlow measures them after render)
+    currentNodes.forEach(node => {
+      if (connectedIds.has(node.id)) {
+        const w = node.width || 250;
+        const h = node.height || 120;
+        g.setNode(node.id, { width: w, height: h });
+      }
+    });
+    currentEdges.forEach(edge => {
+      if (connectedIds.has(edge.source) && connectedIds.has(edge.target)) {
+        g.setEdge(edge.source, edge.target);
+      }
+    });
 
-  //   dagre.layout(g);
+    dagre.layout(g);
 
-  //   // Apply positions using each node's actual size
-  //   let maxTreeY = 0;
-  //   const finalNodes = currentNodes.map(node => {
-  //     if (connectedIds.has(node.id)) {
-  //       const dn = g.node(node.id);
-  //       const w = node.width || 250;
-  //       const h = node.height || 120;
-  //       const pos = {
-  //         x: Math.round(dn.x - w / 2),
-  //         y: Math.round(dn.y - h / 2),
-  //       };
-  //       maxTreeY = Math.max(maxTreeY, pos.y + h);
-  //       return { ...node, position: pos };
-  //     }
-  //     return node;
-  //   });
+    // Apply positions using each node's actual size
+    let maxTreeY = 0;
+    const finalNodes = currentNodes.map(node => {
+      if (connectedIds.has(node.id)) {
+        const dn = g.node(node.id);
+        const w = node.width || 250;
+        const h = node.height || 120;
+        const pos = {
+          x: Math.round(dn.x - w / 2),
+          y: Math.round(dn.y - h / 2),
+        };
+        maxTreeY = Math.max(maxTreeY, pos.y + h);
+        return { ...node, position: pos };
+      }
+      return node;
+    });
 
-  //   // Disconnected nodes in a row below
-  //   let dx = 0;
-  //   const result = finalNodes.map(node => {
-  //     if (!connectedIds.has(node.id)) {
-  //       const pos = { x: dx, y: maxTreeY + 100 };
-  //       dx += 260;
-  //       return { ...node, position: pos };
-  //     }
-  //     return node;
-  //   });
+    // Disconnected nodes in a row below
+    let dx = 0;
+    const result = finalNodes.map(node => {
+      if (!connectedIds.has(node.id)) {
+        const pos = { x: dx, y: maxTreeY + 100 };
+        dx += 260;
+        return { ...node, position: pos };
+      }
+      return node;
+    });
 
-  //   setNodes(result);
-  //   result.forEach(node => {
-  //     nodeApi.update(node.id, { position: node.position }).catch(() => {});
-  //   });
-  //   setTimeout(() => fitView({ padding: 0.15, duration: 400 }), 50);
-  // }, [getNodes, getEdges, setNodes, fitView]);
+    setNodes(result);
+    result.forEach(node => {
+      nodeApi.update(node.id, { position: node.position }).catch(() => {});
+    });
+    setTimeout(() => fitView({ padding: 0.15, duration: 400 }), 50);
+  }, [getNodes, getEdges, setNodes, fitView]);
 
   // Save node position to backend when drag stops
   const handleNodeDragStop = useCallback(async (event, node) => {
@@ -2448,8 +2447,7 @@ function PipelineBuilderInner() {
 
           <Panel position="top-right">
             <HStack spacing={2}>
-              {/* Auto Layout button commented out - dagre package removed */}
-              {/* <Tooltip label="Auto Layout" placement="left" hasArrow>
+              <Tooltip label="Auto Layout" placement="left" hasArrow>
                 <IconButton
                   icon={<Icon as={MdAccountTree} />}
                   size="md"
@@ -2459,7 +2457,7 @@ function PipelineBuilderInner() {
                   onClick={handleAutoLayout}
                   boxShadow="lg"
                 />
-              </Tooltip> */}
+              </Tooltip>
               <Tooltip label="Back to Horizons" placement="left" hasArrow>
                 <IconButton
                   icon={<Icon as={MdHome} />}
