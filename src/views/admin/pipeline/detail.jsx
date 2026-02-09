@@ -97,7 +97,7 @@ import { RobotHead } from 'components/pipeline/RobotHead';
 import Chart from 'react-apexcharts';
 import StockAnalysisCard from 'views/admin/portfolio/components/StockAnalysisCard';
 import { IDshorten } from 'utils';
-import { getActivatedDataAgents, getActivatedAnalyzerAgents } from 'data/libraryAgents';
+import { getActivatedDataAgents, getActivatedAnalyzerAgents, getActivatedAgentIds } from 'data/libraryAgents';
 
 // Sidebar view modes
 const SIDEBAR_VIEW = {
@@ -2826,17 +2826,47 @@ function PipelineBuilderInner() {
         });
       });
       
-      // System 1: Data Agents - Merge builtin + library-activated + custom
+      // System 1 & 2: Merge builtin + library-activated + activated custom agents
+      // Custom agents from horizonData only includes agents saved to THIS horizon.
+      // We also need to fetch global library custom agents so they appear on new horizons too.
       const loadedDataAgents = horizonData.dataAgents || horizonData.availableAgents || [];
-      const customDataAgents = loadedDataAgents.filter(a => !a.isBuiltin && !a.isLibrary);
-      const mergedDataAgents = [...BUILTIN_AGENTS, ...getActivatedDataAgents(), ...customDataAgents];
-      setAvailableAgents(mergedDataAgents);
-
-      // System 2: Analyzer Agents - Merge builtin + library-activated + custom
+      const horizonCustomData = loadedDataAgents.filter(a => !a.isBuiltin && !a.isLibrary);
       const loadedAnalyzerAgents = horizonData.analyzerAgents || [];
-      const customAnalyzerAgents = loadedAnalyzerAgents.filter(a => !a.isBuiltin && !a.isLibrary);
-      const mergedAnalyzerAgents = [...DEFAULT_ANALYZERS, ...getActivatedAnalyzerAgents(), ...customAnalyzerAgents];
-      setAnalyzerAgents(mergedAnalyzerAgents);
+      const horizonCustomAnalyzers = loadedAnalyzerAgents.filter(a => !a.isBuiltin && !a.isLibrary);
+
+      // Fetch global library custom agents from backend
+      horizonAgentApi.getAll({ limit: 100 }).then(response => {
+        const activatedIds = getActivatedAgentIds();
+        let globalCustomData = [];
+        let globalCustomAnalyzers = [];
+
+        if (response.success && response.data) {
+          const allLibraryAgents = Array.isArray(response.data) ? response.data : response.data.agents || [];
+          // Only global library agents (no horizonId) that are activated
+          const globalAgents = allLibraryAgents.filter(a => !a.horizonId && activatedIds.includes(a.id));
+          globalCustomData = globalAgents.filter(a => a.system === 'data');
+          globalCustomAnalyzers = globalAgents.filter(a => a.system === 'analyzer');
+        }
+
+        // Merge horizon-specific custom agents (activated) + global library custom agents (activated)
+        const horizonCustomDataIds = new Set(horizonCustomData.map(a => a.id));
+        const horizonCustomAnalyzerIds = new Set(horizonCustomAnalyzers.map(a => a.id));
+        const activatedHorizonData = horizonCustomData.filter(a => activatedIds.includes(a.id));
+        const activatedHorizonAnalyzers = horizonCustomAnalyzers.filter(a => activatedIds.includes(a.id));
+        // Avoid duplicates: only add global agents not already in horizon data
+        const extraData = globalCustomData.filter(a => !horizonCustomDataIds.has(a.id));
+        const extraAnalyzers = globalCustomAnalyzers.filter(a => !horizonCustomAnalyzerIds.has(a.id));
+
+        setAvailableAgents([...BUILTIN_AGENTS, ...getActivatedDataAgents(), ...activatedHorizonData, ...extraData]);
+        setAnalyzerAgents([...DEFAULT_ANALYZERS, ...getActivatedAnalyzerAgents(), ...activatedHorizonAnalyzers, ...extraAnalyzers]);
+      }).catch(() => {
+        // Fallback: just use horizon data if fetch fails
+        const activatedIds = getActivatedAgentIds();
+        const activatedCustomData = horizonCustomData.filter(a => activatedIds.includes(a.id));
+        const activatedCustomAnalyzers = horizonCustomAnalyzers.filter(a => activatedIds.includes(a.id));
+        setAvailableAgents([...BUILTIN_AGENTS, ...getActivatedDataAgents(), ...activatedCustomData]);
+        setAnalyzerAgents([...DEFAULT_ANALYZERS, ...getActivatedAnalyzerAgents(), ...activatedCustomAnalyzers]);
+      });
       
       setCustomAgents(horizonData.customAgents || []);
       setCurrentHorizonName(horizonData.name);
