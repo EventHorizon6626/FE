@@ -37,18 +37,7 @@ export const CustomAgentNode = ({ data, id, selected }) => {
       return; // Prevent multiple clicks
     }
 
-    runAgentMutation.mutate(
-      { nodeId: id },
-      {
-        onSuccess: () => {
-          // Refetch horizon data after agent completes
-          if (data.refetchHorizon) {
-            console.log('[CustomAgentNode] Refetching horizon after agent execution');
-            data.refetchHorizon();
-          }
-        },
-      }
-    );
+    runAgentMutation.mutate({ nodeId: id });
   };
 
   return (
