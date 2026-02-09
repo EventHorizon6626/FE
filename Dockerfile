@@ -9,8 +9,9 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install ALL dependencies including devDependencies (needed for build)
-# Force install ajv@8 first to resolve dependency conflicts
-RUN npm install --legacy-peer-deps --force
+# Then fix ajv dependency conflict that breaks webpack/schema-utils
+RUN npm install --legacy-peer-deps --force && \
+    npm install ajv@8 --legacy-peer-deps
 
 # Copy source code
 COPY . .

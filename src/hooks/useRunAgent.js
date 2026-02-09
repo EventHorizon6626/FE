@@ -240,6 +240,14 @@ export const useRunAgent = ({
     setNodes(nds => [...nds, ...newNodes]);
     setEdges(eds => [...eds, ...newEdges]);
 
+    // Persist data agent → custom agent relationship for edge reconstruction on reload
+    const dataAgentNodeIds = createdAgents.map(a => a.nodeId);
+    try {
+      await nodeApi.update(customAgentNodeId, { inputNodeIds: dataAgentNodeIds });
+    } catch (err) {
+      console.warn('[useRunAgent] Failed to persist inputNodeIds:', err.message);
+    }
+
     // 3. Execute each data agent
     toast({
       title: 'Executing data agents',
