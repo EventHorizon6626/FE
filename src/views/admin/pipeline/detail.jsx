@@ -94,6 +94,7 @@ import nodeApi from 'lib/nodeApi';
 import { CustomAgentNode } from 'components/pipeline/CustomAgentNode';
 import { CustomBlockNode } from 'components/pipeline/CustomBlockNode';
 import { RobotHead } from 'components/pipeline/RobotHead';
+import ConsoleLog from 'components/pipeline/ConsoleLog';
 import Chart from 'react-apexcharts';
 import StockAnalysisCard from 'views/admin/portfolio/components/StockAnalysisCard';
 import { IDshorten } from 'utils';
@@ -723,6 +724,19 @@ function PipelineBuilderInner() {
   const { id } = useParams(); // Get horizon ID from URL
   const navigate = useNavigate();
   
+  // Suppress ResizeObserver warnings
+  useEffect(() => {
+    const resizeObserverErrHandler = (e) => {
+      if (e.message === 'ResizeObserver loop completed with undelivered notifications.') {
+        const resizeObserverErr = e;
+        resizeObserverErr.stopImmediatePropagation();
+        return false;
+      }
+    };
+    window.addEventListener('error', resizeObserverErrHandler);
+    return () => window.removeEventListener('error', resizeObserverErrHandler);
+  }, []);
+  
   const [nodes, setNodes, onNodesChangeDefault] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChangeDefault] = useEdgesState(initialEdges);
   const [reactFlowError, setReactFlowError] = useState(null);
@@ -867,6 +881,9 @@ function PipelineBuilderInner() {
   const [selectedRevisionIndex, setSelectedRevisionIndex] = useState(0);
   const [isLoadingRevisions, setIsLoadingRevisions] = useState(false);
   const [sidebarView, setSidebarView] = useState(SIDEBAR_VIEW.LIST);
+  
+  // Ref for Console Log
+  const consoleLogRef = useRef(null);
   
   useEffect(() => {
     if (editingPortfolio) {
@@ -1056,13 +1073,14 @@ function PipelineBuilderInner() {
               if (refetchHorizon) {
                 refetchHorizon();
               }
-              toast({
-                title: 'Nodes deleted',
-                description: `${deletableNodes.length} node(s) removed`,
-                status: 'success',
-                duration: 2000,
-                isClosable: true,
-              });
+              consoleLogRef.current?.addLog('success', `${deletableNodes.length} node(s) deleted`);
+              // toast({
+              //   title: 'Nodes deleted',
+              //   description: `${deletableNodes.length} node(s) removed`,
+              //   status: 'success',
+              //   duration: 2000,
+              //   isClosable: true,
+              // });
             });
           }
         }
@@ -1150,24 +1168,12 @@ function PipelineBuilderInner() {
       // Refetch to get updated data
       await refetchHorizon();
 
-      toast({
-        title: 'Node added to block',
-        description: 'Continue selecting nodes or press ESC to finish',
-        status: 'success',
-        duration: 2000,
-        isClosable: true,
-      });
+      consoleLogRef.current?.addLog('success', 'Node added to block. Continue selecting nodes or press ESC to finish');
     } catch (error) {
       console.error('Failed to add node to block:', error);
-      toast({
-        title: 'Failed to add node',
-        description: error.message,
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      });
+      consoleLogRef.current?.addLog('error', `Failed to add node: ${error.message}`);
     }
-  }, [isAddingToBlock, selectedBlockId, getNodes, getEdges, setNodes, toast]);
+  }, [isAddingToBlock, selectedBlockId, getNodes, getEdges, setNodes]);
 
   const handleNodeClick = useCallback(async (event, node) => {
     // Handle block selection mode
@@ -1241,26 +1247,15 @@ function PipelineBuilderInner() {
       // Refetch horizon data to get updated nodes with cleaned parentId references
       await refetchHorizon();
 
-      toast({
-        title: 'Node deleted',
-        description: 'The node has been removed',
-        status: 'info',
-        duration: 2000,
-        isClosable: true,
-      });
+      console.log('[Delete] Adding log, ref:', consoleLogRef.current);
+      consoleLogRef.current?.addLog('info', `Node deleted: ${nodeId}`);
     } catch (error) {
       // Rollback tracking on failure
       deletedNodeIdsRef.current.delete(nodeId);
       console.error('Failed to delete node:', error);
-      toast({
-        title: 'Failed to delete node',
-        description: error.message,
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      });
+      consoleLogRef.current?.addLog('error', `Failed to delete node: ${error.message}`);
     }
-  }, [refetchHorizon, toast, setNodes]);
+  }, [refetchHorizon, setNodes]);
 
 
   // Add a child node from the "+" button on a node's outbound side
@@ -1297,24 +1292,12 @@ function PipelineBuilderInner() {
       // Refetch horizon to get updated data
       await refetchHorizon();
 
-      toast({
-        title: 'Node added',
-        description: `${agentTemplate.name} connected to pipeline`,
-        status: 'success',
-        duration: 2000,
-        isClosable: true,
-      });
+      consoleLogRef.current?.addLog('success', `Node added: ${agentTemplate.name} connected to pipeline`);
     } catch (error) {
       console.error('Failed to add child node:', error);
-      toast({
-        title: 'Failed to add node',
-        description: error.message || 'Could not create node',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      });
+      consoleLogRef.current?.addLog('error', `Failed to add node: ${error.message || 'Could not create node'}`);
     }
-  }, [getNodes, currentHorizonId, setNodes, setEdges, toast, handleNodeDelete, refetchHorizon]);
+  }, [getNodes, currentHorizonId, setNodes, setEdges, handleNodeDelete, refetchHorizon]);
 
   // Auto-layout: barycenter method — centers parents with children, spaces subtrees
   const handleAutoLayout = useCallback(() => {
@@ -1632,28 +1615,16 @@ function PipelineBuilderInner() {
       }
     } catch (error) {
       console.error('Failed to save node position:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to save node position',
-        status: 'error',
-        duration: 2000,
-        isClosable: true,
-      });
+      consoleLogRef.current?.addLog('error', 'Failed to save node position');
     }
-  }, [getNodes, getEdges, checkNodeOverlap, setNodes, toast]);
+  }, [getNodes, getEdges, checkNodeOverlap, setNodes]);
 
   // Start adding nodes to block
   const handleAddToBlock = useCallback((blockId) => {
     setSelectedBlockId(blockId);
     setIsAddingToBlock(true);
-    toast({
-      title: 'Select nodes to add',
-      description: 'Click on disconnected nodes to add them to the block. Press ESC to cancel.',
-      status: 'info',
-      duration: 5000,
-      isClosable: true,
-    });
-  }, [toast]);
+    consoleLogRef.current?.addLog('info', 'Select nodes to add to block. Click on disconnected nodes or press ESC to cancel.');
+  }, []);
 
   // Handle drop node to block (drag & drop)
   const handleDropToBlock = useCallback(async (blockId, nodeId) => {
@@ -1666,25 +1637,13 @@ function PipelineBuilderInner() {
     );
 
     if (hasConnection) {
-      toast({
-        title: 'Cannot add connected node',
-        description: 'Only disconnected nodes can be added to a block',
-        status: 'warning',
-        duration: 3000,
-        isClosable: true,
-      });
+      consoleLogRef.current?.addLog('warn', 'Cannot add connected node - only disconnected nodes can be added to a block');
       return;
     }
 
     const nodeToAdd = currentNodes.find(n => n.id === nodeId);
     if (!nodeToAdd || nodeToAdd.type === 'block' || nodeToAdd.type === 'outputNode') {
-      toast({
-        title: 'Invalid node',
-        description: 'Cannot add this type of node to block',
-        status: 'warning',
-        duration: 2000,
-        isClosable: true,
-      });
+      consoleLogRef.current?.addLog('warn', 'Invalid node - cannot add this type of node to block');
       return;
     }
 
@@ -2253,14 +2212,7 @@ function PipelineBuilderInner() {
             
             // Refetch horizon to get updated data
             await refetchHorizon();
-
-            toast({
-              title: 'Agent added',
-              description: `${draggedItem.data.name} added to pipeline`,
-              status: 'success',
-              duration: 2000,
-              isClosable: true,
-            });
+            consoleLogRef.current?.addLog('info', `Added agent node: ${draggedItem.data.name}`);
           } else if (draggedItem.type === 'portfolio') {
             const response = await nodeApi.create({
               horizonId: currentHorizonId,
@@ -2933,6 +2885,7 @@ function PipelineBuilderInner() {
           onClick={handleStartEditingName}
           _hover={{ borderColor: 'teal.400', boxShadow: 'lg' }}
           transition="all 0.2s"
+          pointerEvents="auto"
         >
           <Icon as={MdHub} color="teal.600" boxSize="20px" />
           <Text fontSize="sm" fontWeight="600" color="gray.800" noOfLines={1}>
@@ -2946,6 +2899,7 @@ function PipelineBuilderInner() {
           position="relative"
           onMouseEnter={() => setShowPortfolio(true)}
           onMouseLeave={() => setShowPortfolio(false)}
+          pointerEvents="auto"
         >
           <HStack
             bg="whiteAlpha.900"
@@ -3089,6 +3043,7 @@ function PipelineBuilderInner() {
           position="relative"
           onMouseEnter={() => setShowDataAgents(true)}
           onMouseLeave={() => setShowDataAgents(false)}
+          pointerEvents="auto"
         >
           <HStack
             bg="whiteAlpha.900"
@@ -3235,6 +3190,7 @@ function PipelineBuilderInner() {
           position="relative"
           onMouseEnter={() => setShowAnalyzers(true)}
           onMouseLeave={() => setShowAnalyzers(false)}
+          pointerEvents="auto"
         >
           <HStack
             bg="whiteAlpha.900"
@@ -3407,6 +3363,7 @@ function PipelineBuilderInner() {
             _hover={{ borderColor: 'purple.400', boxShadow: 'lg', transform: 'translateY(-2px)' }}
             transition="all 0.2s"
             onMouseDown={handleBlockMouseDown}
+            pointerEvents="auto"
           >
             <Icon as={MdAccountTree} color="purple.600" boxSize="24px" />
             <Text fontSize="sm" fontWeight="600" color="gray.800">
@@ -3446,8 +3403,8 @@ function PipelineBuilderInner() {
             selectionMode="partial"
             deleteKeyCode={null}
           >
-            <Controls />
-            <MiniMap />
+            <Controls style={{marginLeft: "220px"}} />
+            <MiniMap position='bottom-left'/>
             <Background variant="dots" gap={16} size={1} />
 
             <Panel position="top-right">
@@ -5421,6 +5378,10 @@ function PipelineBuilderInner() {
           </Box>
         </>
       )}
+
+
+      {/* Console Log Component */}
+      <ConsoleLog ref={consoleLogRef} />
 
     </Box>
   );
