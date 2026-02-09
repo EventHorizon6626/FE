@@ -4104,7 +4104,8 @@ function PipelineBuilderInner() {
                                   // Custom agents - use generic JSON renderer
                                   // If dataBySymbol has multiple keys, render each separately
                                   // Otherwise render the whole result
-                                  const isMultiSymbol = typeof symbolData === 'object' &&
+                                  const isMultiSymbol = symbolData != null &&
+                                                        typeof symbolData === 'object' &&
                                                         !Array.isArray(symbolData) &&
                                                         Object.keys(symbolData).length > 1;
 
