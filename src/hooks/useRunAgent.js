@@ -12,6 +12,7 @@ const STANDARD_AGENT_DETAILS = {
   news:        { name: 'News', color: 'orange', description: 'Recent news articles, headlines, and press releases' },
   technical:   { name: 'Technical', color: 'purple', description: 'Technical indicators — SMA, RSI, MACD, Bollinger Bands' },
   fundamentals:{ name: 'Fundamentals', color: 'teal', description: 'Fundamental metrics — P/E ratio, EPS, dividend yield, market cap' },
+  web_search:  { name: 'Web Search', color: 'cyan', description: 'Web search for sentiment, analyst ratings, industry context' },
 };
 
 export const useRunAgent = ({
@@ -335,6 +336,11 @@ export const useRunAgent = ({
         srcContext.execution_mode = 'fetch_data';
       }
 
+      // Skip BE outputNode save if this data agent is wired to an analyzer
+      if (isDataAgentWiredToAnalyzer(srcNode.id, edges, nodes)) {
+        srcContext.skipOutputNode = true;
+      }
+
       console.log(`[useRunAgent] Cascade: running upstream "${srcName}" (${srcNode.id})`);
 
       const srcResult = await runAgent(srcType, srcInputData, srcCustomConfig, srcContext);
@@ -463,6 +469,11 @@ export const useRunAgent = ({
       // Custom DATA agents should only fetch data, not enter discovery/thinking loop
       if (agentType === 'custom_agent' && agent?.system === 'data') {
         executionContext.execution_mode = 'fetch_data';
+      }
+
+      // Skip BE outputNode save if this data agent is wired to an analyzer
+      if (isDataAgentWiredToAnalyzer(nodeId, currentEdges, currentNodes)) {
+        executionContext.skipOutputNode = true;
       }
 
       const result = await runAgent(agentType, inputData, customAgentConfig, executionContext);

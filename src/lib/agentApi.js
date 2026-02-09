@@ -95,6 +95,14 @@ export const runFundamentalsAgent = async (stocks, context = {}) => {
   return response;
 };
 
+export const runWebSearchAgent = async (stocks, context = {}) => {
+  const response = await request.post('/ai/agents/web-search', {
+    stocks,
+    ...context,
+  });
+  return response;
+};
+
 // ===== System 2 Team 1: Analyst Agents =====
 
 export const runFundamentalsAnalystAgent = async (stocks, context = {}) => {
@@ -224,6 +232,7 @@ export const runAgent = async (agentType, inputData, customAgentConfig = null, e
   const BUILTIN_DATA_AGENTS = new Set([
     'candlestick', 'data_retriever', 'earnings', 'news', 'news_agent',
     'technical', 'technical_agent', 'fundamentals', 'financial_metrics',
+    'web_search',
   ]);
 
   if (customAgentConfig && customAgentConfig.systemPrompt && !BUILTIN_DATA_AGENTS.has(agentType)) {
@@ -269,6 +278,9 @@ export const runAgent = async (agentType, inputData, customAgentConfig = null, e
     case 'fundamentals':
     case 'financial_metrics':
       return await runFundamentalsAgent(stocks, context);
+
+    case 'web_search':
+      return await runWebSearchAgent(stocks, context);
 
     // ===== System 2 Team 1: Analyst Agents =====
     case 'fundamentals_analyst':
