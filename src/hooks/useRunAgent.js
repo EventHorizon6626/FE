@@ -703,7 +703,9 @@ export const useRunAgent = ({
 
       // Refetch horizon data after successful agent execution
       // Note: This ensures data sync even if CustomAgentNode doesn't call refetch
-      if (refetchHorizon) {
+      // Skip for wired data agents — in-memory state + DB are already correct,
+      // and refetch causes a race that wipes edge.data.output (teal icon).
+      if (refetchHorizon && !isDataAgentWiredToAnalyzer(nodeId, currentEdges, currentNodes)) {
         console.log('[useRunAgent] Refetching horizon data after agent execution');
         refetchHorizon();
       }
