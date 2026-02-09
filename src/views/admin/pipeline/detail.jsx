@@ -452,74 +452,76 @@ function CustomEdge({ id, source, target, sourceX, sourceY, targetX, targetY, so
   return (
     <>
       <BaseEdge path={edgePath} />
-      <EdgeLabelRenderer>
-        <div
-          style={{
-            position: 'absolute',
-            transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
-            pointerEvents: 'all',
-          }}
-        >
-          <IconButton
-            icon={<Icon as={MdArticle} />}
-            size="xs"
-            colorScheme={iconColorScheme}
-            variant="solid"
-            borderRadius="full"
-            aria-label="Inspect data"
-            onClick={handleInspect}
-            boxShadow="md"
-            opacity={iconOpacity}
-            cursor={iconCursor}
-            _hover={{ transform: isDataToAnalyzer && !hasOutput ? 'none' : 'scale(1.2)' }}
-          />
-          {showOutput && data?.output && (
-            <Box
-              position="absolute"
-              top="30px"
-              left="50%"
-              transform="translateX(-50%)"
-              bg="white"
-              border="2px solid"
-              borderColor="teal.400"
-              borderRadius="8px"
-              p="12px"
-              minW="300px"
-              maxW="500px"
-              maxH="400px"
-              overflowY="auto"
-              boxShadow="lg"
-              zIndex="1000"
-            >
-              <HStack justify="space-between" mb="8px">
-                <Text fontSize="xs" fontWeight="700" color="teal.600">
-                  Data Flow
-                </Text>
-                <IconButton
-                  icon={<Icon as={MdClose} />}
-                  size="xs"
-                  variant="ghost"
-                  onClick={handleInspect}
-                  aria-label="Close"
-                />
-              </HStack>
+      {isDataToAnalyzer && (
+        <EdgeLabelRenderer>
+          <div
+            style={{
+              position: 'absolute',
+              transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
+              pointerEvents: 'all',
+            }}
+          >
+            <IconButton
+              icon={<Icon as={MdArticle} />}
+              size="xs"
+              colorScheme={iconColorScheme}
+              variant="solid"
+              borderRadius="full"
+              aria-label="Inspect data"
+              onClick={handleInspect}
+              boxShadow="md"
+              opacity={iconOpacity}
+              cursor={iconCursor}
+              _hover={{ transform: !hasOutput ? 'none' : 'scale(1.2)' }}
+            />
+            {showOutput && data?.output && (
               <Box
-                fontSize="xs"
-                fontFamily="monospace"
-                bg="gray.50"
-                p="8px"
-                borderRadius="4px"
-                userSelect="text"
-                cursor="text"
+                position="absolute"
+                top="30px"
+                left="50%"
+                transform="translateX(-50%)"
+                bg="white"
+                border="2px solid"
+                borderColor="teal.400"
+                borderRadius="8px"
+                p="12px"
+                minW="300px"
+                maxW="500px"
+                maxH="400px"
+                overflowY="auto"
+                boxShadow="lg"
+                zIndex="1000"
               >
-                <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', userSelect: 'text' }}>
-                  {JSON.stringify(data.output, null, 2)}
-                </pre>
+                <HStack justify="space-between" mb="8px">
+                  <Text fontSize="xs" fontWeight="700" color="teal.600">
+                    Data Flow
+                  </Text>
+                  <IconButton
+                    icon={<Icon as={MdClose} />}
+                    size="xs"
+                    variant="ghost"
+                    onClick={handleInspect}
+                    aria-label="Close"
+                  />
+                </HStack>
+                <Box
+                  fontSize="xs"
+                  fontFamily="monospace"
+                  bg="gray.50"
+                  p="8px"
+                  borderRadius="4px"
+                  userSelect="text"
+                  cursor="text"
+                >
+                  <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', userSelect: 'text' }}>
+                    {JSON.stringify(data.output, null, 2)}
+                  </pre>
+                </Box>
               </Box>
-            </Box>
-          )}
-        </div>
-      </EdgeLabelRenderer>
+            )}
+          </div>
+        </EdgeLabelRenderer>
+      )}
     </>
   );
 }
