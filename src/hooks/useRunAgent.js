@@ -238,222 +238,168 @@ export const useRunAgent = ({
     }
 
     setNodes(nds => [...nds, ...newNodes]);
-    setEdges(eds => [...eds, ...newEdges]);
+    // Remove old portfolio→analyzer direct edge, add new edges through data agents
+    setEdges(eds => [
+      ...eds.filter(e => !(e.source === portfolioNode.id && e.target === customAgentNodeId)),
+      ...newEdges,
+    ]);
 
     // Persist data agent → custom agent relationship for edge reconstruction on reload
     const dataAgentNodeIds = createdAgents.map(a => a.nodeId);
     try {
-      await nodeApi.update(customAgentNodeId, { inputNodeIds: dataAgentNodeIds });
+      await nodeApi.update(customAgentNodeId, {
+        inputNodeIds: dataAgentNodeIds,
+        parentId: null,  // Remove direct portfolio→analyzer link so buildEdgesFromNodes() won't recreate it
+      });
     } catch (err) {
       console.warn('[useRunAgent] Failed to persist inputNodeIds:', err.message);
     }
 
-    // 3. Execute each data agent
+    // Done — user will manually run each data agent, then re-run the analyzer
+    toast.closeAll();
     toast({
-      title: 'Executing data agents',
-      description: `Running ${createdAgents.length} data agent(s)...`,
-      status: 'info',
-      duration: null,
-      isClosable: false,
+      title: 'Data agents created',
+      description: `${createdAgents.length} data agent(s) wired to ${agentName} — run them manually`,
+      status: 'success',
+      duration: 5000,
+      isClosable: true,
     });
+  };
 
-    const collectedData = {};
-    for (const agent of createdAgents) {
-      try {
-        const executionContext = horizonId ? {
-          horizonId,
-          agentNodeId: agent.nodeId,
-          agentPosition: agent.reactFlowNode.position,
-        } : {};
+  // Backward-cascade: recursively run unexecuted upstream agents depth-first
+  const ensureUpstreamData = async (nodeId, edges, nodes, visited) => {
+    if (visited.has(nodeId)) return; // cycle protection
+    visited.add(nodeId);
 
-        const { name, result } = await executeDataAgent(
-          agent.nodeId,
-          agent.agentSpec,
-          stocks,
-          executionContext,
-        );
+    const incomingEdges = edges.filter(e => e.target === nodeId);
 
-        collectedData[name] = result;
+    for (const edge of incomingEdges) {
+      const srcIdx = nodes.findIndex(n => n.id === edge.source);
+      if (srcIdx === -1) continue;
+      const srcNode = nodes[srcIdx];
 
-        // Update the data agent node with its output
-        setNodes(nds =>
-          nds.map(n =>
-            n.id === agent.nodeId
-              ? { ...n, data: { ...n.data, output: result, lastRun: new Date().toISOString() } }
-              : n
-          )
-        );
+      // Only cascade through agent nodes that haven't produced output yet
+      if (srcNode.type !== 'agentNode') continue;
+      if (srcNode.data.output) continue; // already has output — skip
 
-        // Handle backend-saved outputNode for data agent
-        const savedOutputNode = result?._outputNode;
-        if (savedOutputNode) {
-          const outputNode = {
-            id: savedOutputNode.id,
-            type: 'outputNode',
-            position: {
-              x: agent.reactFlowNode.position.x + 350,
-              y: agent.reactFlowNode.position.y,
-            },
-            data: {
-              result,
-              agentName: name,
-              timestamp: savedOutputNode.createdAt,
-              sourceAgentNodeId: agent.nodeId,
-            },
-          };
-          setNodes(nds => [...nds, outputNode]);
-          setEdges(eds => [...eds, {
-            id: `edge-${agent.nodeId}-${savedOutputNode.id}`,
-            source: agent.nodeId,
-            target: savedOutputNode.id,
-            type: 'custom',
-            data: { output: result },
-            animated: true,
-          }]);
-        }
-      } catch (err) {
-        console.error(`[useRunAgent] Data agent "${agent.agentSpec.name}" failed:`, err);
-        toast({
-          title: `Data agent failed: ${agent.agentSpec.name}`,
-          description: err.message,
-          status: 'error',
-          duration: 5000,
-          isClosable: true,
-        });
-        return;
-      }
-    }
+      // Depth-first: ensure THIS node's upstream is satisfied first
+      await ensureUpstreamData(srcNode.id, edges, nodes, visited);
 
-    // 4. Re-execute the agent with collected data
-    toast({
-      title: 'Re-running agent',
-      description: `${agentName} is re-executing with collected data...`,
-      status: 'info',
-      duration: null,
-      isClosable: false,
-    });
+      const srcAgent = srcNode.data.agent;
+      const srcName = srcAgent?.name || 'agent';
+      const srcType = srcAgent?.type;
 
-    try {
-      let finalResult;
-
-      if (agentType === 'bull_bear_analyzer' || agentType === 'risk_manager') {
-        // Built-in analyzer agents — route through runAgent with collected data
-        const executionContext = horizonId ? {
-          horizonId,
-          agentNodeId: customAgentNodeId,
-          agentPosition: customAgentNode.position,
-        } : {};
-        finalResult = await runAgent(agentType, { stocks, data: collectedData }, null, executionContext);
-      } else {
-        // Custom agents — use runCustomAgentApi with system prompt
-        const customAgent = customAgentNode.data.agent;
-        const executionContext = horizonId ? {
-          horizonId,
-          agentNodeId: customAgentNodeId,
-          agentPosition: customAgentNode.position,
-          agentName: agentName,
-          input_data: collectedData,
-        } : { input_data: collectedData };
-        finalResult = await runCustomAgentApi(
-          stocks,
-          customAgent.systemPrompt,
-          customAgent.userPrompt || null,
-          executionContext,
+      // Validate system prompt for custom agents
+      if (srcType === 'custom_agent' && (!srcAgent?.systemPrompt || !srcAgent.systemPrompt.trim())) {
+        throw new Error(
+          `Cascade blocked: upstream agent "${srcName}" is missing a system prompt. ` +
+          `Please edit it and add a system prompt before running.`
         );
       }
 
-      // Update the custom agent node with final result
+      // Gather input data for this upstream node (its own upstream is now populated)
+      const srcInputData = getAgentInputData(srcNode, edges, nodes);
+
+      // Build customAgentConfig
+      const srcCustomConfig = srcAgent?.systemPrompt
+        ? {
+            systemPrompt: srcAgent.systemPrompt,
+            enableThinking: srcAgent.enableThinking ?? false,
+            maxIterations: srcAgent.maxIterations ?? 5,
+          }
+        : null;
+
+      // Build execution context
+      const srcContext = horizonId ? {
+        horizonId,
+        agentNodeId: srcNode.id,
+        agentPosition: srcNode.position || { x: 0, y: 0 },
+      } : {};
+
+      if (srcType === 'custom_agent' && srcAgent?.system === 'data') {
+        srcContext.execution_mode = 'fetch_data';
+      }
+
+      console.log(`[useRunAgent] Cascade: running upstream "${srcName}" (${srcNode.id})`);
+
+      const srcResult = await runAgent(srcType, srcInputData, srcCustomConfig, srcContext);
+
+      // If upstream itself needs_data, we can't auto-resolve that here
+      if (srcResult.status === 'needs_data') {
+        throw new Error(
+          `Cascade blocked: upstream agent "${srcName}" returned needs_data. ` +
+          `Run it manually first to trigger auto-create of its data agents.`
+        );
+      }
+
+      // Mutate the local nodes array so subsequent getAgentInputData calls see the output
+      nodes[srcIdx] = {
+        ...srcNode,
+        data: { ...srcNode.data, output: srcResult, lastRun: new Date().toISOString() },
+      };
+
+      // Push to React state so the canvas updates
       setNodes(nds =>
         nds.map(n =>
-          n.id === customAgentNodeId
-            ? { ...n, data: { ...n.data, output: finalResult, lastRun: new Date().toISOString() } }
+          n.id === srcNode.id
+            ? { ...n, data: { ...n.data, output: srcResult, lastRun: new Date().toISOString() } }
             : n
         )
       );
 
-      // Handle backend-saved outputNode for the re-executed custom agent
-      const savedOutputNode = finalResult?._outputNode;
+      // Handle _outputNode from backend (same logic as onSuccess)
+      const savedOutputNode = srcResult?._outputNode;
       if (savedOutputNode) {
-        // Remove old outputNode from canvas (if exists)
-        const latestNodes = getNodes();
-        const oldOutputNode = latestNodes.find(n =>
-          n.type === 'outputNode' && n.data?.sourceAgentNodeId === customAgentNodeId
-        );
-        if (oldOutputNode) {
-          setNodes(nds => nds.filter(n => n.id !== oldOutputNode.id));
-          setEdges(eds => eds.filter(e =>
-            e.source !== oldOutputNode.id && e.target !== oldOutputNode.id
-          ));
-        }
-
-        const agentNodePosition = customAgentNode.position || { x: 0, y: 0 };
+        const agentPos = srcNode.position || { x: 0, y: 0 };
         const newOutputNode = {
           id: savedOutputNode.id,
           type: 'outputNode',
-          position: {
-            x: agentNodePosition.x + 350,
-            y: agentNodePosition.y,
-          },
+          position: { x: agentPos.x + 350, y: agentPos.y },
           data: {
-            result: finalResult,
-            agentName,
+            result: srcResult,
+            agentName: srcName,
             timestamp: savedOutputNode.createdAt,
-            sourceAgentNodeId: customAgentNodeId,
+            sourceAgentNodeId: srcNode.id,
           },
         };
 
-        setNodes(nds => [...nds, newOutputNode]);
-        setEdges(eds => [...eds, {
-          id: `edge-${customAgentNodeId}-${savedOutputNode.id}`,
-          source: customAgentNodeId,
-          target: savedOutputNode.id,
-          type: 'custom',
-          data: { output: finalResult },
-          animated: true,
-        }]);
+        setNodes(nds => {
+          // Remove old output node for this agent if it exists
+          const filtered = nds.filter(n =>
+            !(n.type === 'outputNode' && n.data?.sourceAgentNodeId === srcNode.id)
+          );
+          return [...filtered, newOutputNode];
+        });
 
-        setNodes(nds =>
-          nds.map(n =>
-            n.id === customAgentNodeId
-              ? { ...n, data: { ...n.data, currentOutputNodeId: savedOutputNode.id, lastExecutedAt: savedOutputNode.createdAt } }
-              : n
-          )
-        );
+        setEdges(eds => [
+          ...eds,
+          {
+            id: `edge-${srcNode.id}-${savedOutputNode.id}`,
+            source: srcNode.id,
+            target: savedOutputNode.id,
+            type: 'custom',
+            data: { output: srcResult },
+            animated: true,
+          },
+        ]);
       }
 
-      toast.closeAll();
-      toast({
-        title: 'Agent completed',
-        description: `${agentName} finished with auto-collected data`,
-        status: 'success',
-        duration: 5000,
-        isClosable: true,
-      });
-
-      if (onSuccess) {
-        onSuccess({ nodeId: customAgentNodeId, result: finalResult, agentName, currentNodes: getNodes() });
-      }
-
-      // Note: refetchHorizon intentionally NOT called here — it would replace canvas
-      // state and destroy auto-created edges. Nodes are already persisted to DB with
-      // parentId, so edges will regenerate on next full page load.
-    } catch (err) {
-      console.error(`[useRunAgent] Re-execution of custom agent failed:`, err);
-      toast.closeAll();
-      toast({
-        title: 'Re-execution failed',
-        description: err.message,
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
+      // Update edges with animation for this agent's outgoing edges
+      setEdges(eds =>
+        eds.map(e =>
+          e.source === srcNode.id
+            ? { ...e, data: { ...e.data, output: srcResult }, animated: true }
+            : e
+        )
+      );
     }
   };
 
   const mutation = useMutation({
     mutationFn: async ({ nodeId }) => {
-      const currentNodes = getNodes();
+      // Shallow-clone nodes so cascade mutations don't directly affect React state
       const currentEdges = getEdges();
+      const currentNodes = getNodes().map(n => ({ ...n, data: { ...n.data } }));
 
       const node = currentNodes.find((n) => n.id === nodeId);
       if (!node) {
@@ -472,6 +418,9 @@ export const useRunAgent = ({
         );
       }
 
+      // Run backward cascade — execute any unexecuted upstream agents first
+      await ensureUpstreamData(nodeId, currentEdges, currentNodes, new Set());
+
       // Build customAgentConfig for agents that have their own systemPrompt
       const customAgentConfig = agent?.systemPrompt
         ? {
@@ -485,6 +434,7 @@ export const useRunAgent = ({
       console.log('[useRunAgent] Total nodes:', currentNodes.length);
       console.log('[useRunAgent] Total edges:', currentEdges.length);
 
+      // Use the (now-populated) nodes snapshot for input data
       const inputData = getAgentInputData(node, currentEdges, currentNodes);
 
       // Build execution context for backend auto-save
@@ -512,13 +462,36 @@ export const useRunAgent = ({
     },
     onMutate: async ({ nodeId }) => {
       const currentNodes = getNodes();
+      const currentEdges = getEdges();
       const node = currentNodes.find((n) => n.id === nodeId);
       const agentName = node?.data?.agent?.name || 'agent';
 
+      // Detect upstream agents that need to run (no output yet)
+      const upstreamWithoutOutput = [];
+      const countVisited = new Set();
+      const countUpstream = (nid) => {
+        if (countVisited.has(nid)) return;
+        countVisited.add(nid);
+        const incoming = currentEdges.filter(e => e.target === nid);
+        for (const edge of incoming) {
+          const src = currentNodes.find(n => n.id === edge.source);
+          if (!src || src.type !== 'agentNode') continue;
+          if (!src.data.output) upstreamWithoutOutput.push(src.data.agent?.name || src.id);
+          countUpstream(src.id);
+        }
+      };
+      countUpstream(nodeId);
+
+      const isCascade = upstreamWithoutOutput.length > 0;
+      const title = isCascade ? 'Running agent cascade' : 'Running agent';
+      const description = isCascade
+        ? `Executing ${upstreamWithoutOutput.length} upstream agent(s), then ${agentName}...`
+        : `Executing ${agentName}...`;
+
       // Show loading toast
       const loadingToastId = toast({
-        title: 'Running agent',
-        description: `Executing ${agentName}...`,
+        title,
+        description,
         status: 'info',
         duration: null,
         isClosable: false,
