@@ -417,7 +417,7 @@ function CustomPortfolioNode({ data, id, selected }) {
   );
 }
 
-function CustomEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, data }) {
+function CustomEdge({ id, source, target, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, data }) {
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
     sourceY,
@@ -428,11 +428,25 @@ function CustomEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, ta
   });
 
   const [showOutput, setShowOutput] = useState(false);
+  const { getNode } = useReactFlow();
+
+  const sourceNode = getNode(source);
+  const targetNode = getNode(target);
+  const isDataToAnalyzer =
+    sourceNode?.data?.agent?.system === 'data' &&
+    targetNode?.data?.agent?.system === 'analyzer';
+
+  const hasOutput = !!data?.output;
 
   const handleInspect = (e) => {
     e.stopPropagation();
+    if (isDataToAnalyzer && !hasOutput) return;
     setShowOutput(!showOutput);
   };
+
+  const iconColorScheme = isDataToAnalyzer && !hasOutput ? 'gray' : 'teal';
+  const iconOpacity = isDataToAnalyzer && !hasOutput ? 0.3 : 1;
+  const iconCursor = isDataToAnalyzer && !hasOutput ? 'default' : 'pointer';
 
   return (
     <>
@@ -448,13 +462,15 @@ function CustomEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, ta
           <IconButton
             icon={<Icon as={MdArticle} />}
             size="xs"
-            colorScheme="teal"
+            colorScheme={iconColorScheme}
             variant="solid"
             borderRadius="full"
             aria-label="Inspect data"
             onClick={handleInspect}
             boxShadow="md"
-            _hover={{ transform: 'scale(1.2)' }}
+            opacity={iconOpacity}
+            cursor={iconCursor}
+            _hover={{ transform: isDataToAnalyzer && !hasOutput ? 'none' : 'scale(1.2)' }}
           />
           {showOutput && data?.output && (
             <Box

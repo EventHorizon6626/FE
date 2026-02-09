@@ -26,6 +26,16 @@ export const useRunAgent = ({
 }) => {
   const toast = useToast();
 
+  // Check if a data agent is wired to an analyzer (skip output node if so)
+  const isDataAgentWiredToAnalyzer = (nodeId, edges, nodes) => {
+    const node = nodes.find(n => n.id === nodeId);
+    if (node?.data?.agent?.system !== 'data') return false;
+    return edges.some(e =>
+      e.source === nodeId &&
+      nodes.find(n => n.id === e.target)?.data?.agent?.system === 'analyzer'
+    );
+  };
+
   // Traverse edges backward to find the connected portfolio node
   const findConnectedPortfolio = (nodeId, edges, nodes) => {
     const incomingEdges = edges.filter(e => e.target === nodeId);
@@ -83,7 +93,7 @@ export const useRunAgent = ({
     }
 
     // Save to DB via nodeApi — include parentId so buildEdgesFromNodes() generates edges on refetch
-    const savedNode = await nodeApi.create({
+    const response = await nodeApi.create({
       horizonId,
       type: 'agentNode',
       position,
@@ -91,7 +101,8 @@ export const useRunAgent = ({
       parentId: portfolioNode.id,
     });
 
-    const nodeId = savedNode._id || savedNode.id;
+    const savedNode = response.data || response;
+    const nodeId = savedNode.id || savedNode._id;
 
     // Build ReactFlow node for the canvas
     const reactFlowNode = {
@@ -350,8 +361,9 @@ export const useRunAgent = ({
       );
 
       // Handle _outputNode from backend (same logic as onSuccess)
+      // Skip output node creation if this data agent is wired to an analyzer
       const savedOutputNode = srcResult?._outputNode;
-      if (savedOutputNode) {
+      if (savedOutputNode && !isDataAgentWiredToAnalyzer(srcNode.id, edges, nodes)) {
         const agentPos = srcNode.position || { x: 0, y: 0 };
         const newOutputNode = {
           id: savedOutputNode.id,
@@ -582,9 +594,10 @@ export const useRunAgent = ({
       console.log(`[${agentName}] Output:`, result);
 
       // Handle backend-saved outputNode
+      // Skip output node creation if this data agent is wired to an analyzer
       const savedOutputNode = result?._outputNode;
 
-      if (savedOutputNode) {
+      if (savedOutputNode && !isDataAgentWiredToAnalyzer(nodeId, currentEdges, currentNodes)) {
         console.log('[useRunAgent] Backend saved outputNode:', savedOutputNode);
 
         // Remove old outputNode from canvas (if exists)
