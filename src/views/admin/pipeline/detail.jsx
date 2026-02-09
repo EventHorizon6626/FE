@@ -38,7 +38,7 @@ import {
   useToast,
   VStack
 } from '@chakra-ui/react';
-import { Component, useCallback, useEffect, useState } from 'react';
+import { Component, useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 // useMutation removed - now used in CustomAgentNode component
@@ -736,10 +736,10 @@ function PipelineBuilderInner() {
           change.type === 'select' && change.selected === true
         );
 
-        if (selectionChanges.length > 0) {
-          // If a node is being selected, deselect all others first
+        if (selectionChanges.length === 1) {
+          // Single click — keep single-select behavior
           const selectedNodeId = selectionChanges[0].id;
-          
+
           setNodes((nds) =>
             nds.map((node) => ({
               ...node,
@@ -747,7 +747,7 @@ function PipelineBuilderInner() {
             }))
           );
         } else {
-          // Apply changes normally
+          // Multi-select (Shift+drag box) or no selection changes — let React Flow handle it natively
           onNodesChangeDefault(changes);
         }
       } catch (error) {
@@ -1028,6 +1028,12 @@ function PipelineBuilderInner() {
           );
           
           if (deletableNodes.length > 0) {
+            // Track locally-deleted IDs to prevent ghost nodes
+            deletableNodes.forEach(n => deletedNodeIdsRef.current.add(n.id));
+
+            // Remove from local React Flow state immediately
+            setNodes((nds) => nds.filter(n => !deletableNodes.some(d => d.id === n.id)));
+
             // Delete nodes via backend API (wait for all to complete)
             Promise.all(
               deletableNodes.map(async (node) => {
@@ -1226,11 +1232,15 @@ function PipelineBuilderInner() {
 
   const handleNodeDelete = useCallback(async (nodeId) => {
     try {
+      deletedNodeIdsRef.current.add(nodeId);
+      // Remove from local state immediately for responsiveness
+      setNodes((nds) => nds.filter(n => n.id !== nodeId));
+
       await nodeApi.delete(nodeId);
-      
+
       // Refetch horizon data to get updated nodes with cleaned parentId references
       await refetchHorizon();
-      
+
       toast({
         title: 'Node deleted',
         description: 'The node has been removed',
@@ -1239,6 +1249,8 @@ function PipelineBuilderInner() {
         isClosable: true,
       });
     } catch (error) {
+      // Rollback tracking on failure
+      deletedNodeIdsRef.current.delete(nodeId);
       console.error('Failed to delete node:', error);
       toast({
         title: 'Failed to delete node',
@@ -1248,7 +1260,7 @@ function PipelineBuilderInner() {
         isClosable: true,
       });
     }
-  }, [refetchHorizon, toast]);
+  }, [refetchHorizon, toast, setNodes]);
 
 
   // Add a child node from the "+" button on a node's outbound side
@@ -2680,6 +2692,30 @@ function PipelineBuilderInner() {
     }
   };
 
+  // Track locally-deleted node IDs to prevent ghost nodes reappearing from stale backend data
+  const deletedNodeIdsRef = useRef(new Set());
+
+  // Refs for callbacks used in horizonData processing — avoids re-running the effect when callbacks change
+  const handleNodeDeleteRef = useRef(handleNodeDelete);
+  const refetchHorizonRef = useRef(refetchHorizon);
+  const handleAddChildNodeRef = useRef(handleAddChildNode);
+  const handleAddToBlockRef = useRef(handleAddToBlock);
+  const handleDropToBlockRef = useRef(handleDropToBlock);
+  const handleRemoveFromBlockRef = useRef(handleRemoveFromBlock);
+  const handleConfigChildNodeRef = useRef(handleConfigChildNode);
+  const handleExtractAndDragRef = useRef(handleExtractAndDrag);
+
+  useEffect(() => {
+    handleNodeDeleteRef.current = handleNodeDelete;
+    refetchHorizonRef.current = refetchHorizon;
+    handleAddChildNodeRef.current = handleAddChildNode;
+    handleAddToBlockRef.current = handleAddToBlock;
+    handleDropToBlockRef.current = handleDropToBlock;
+    handleRemoveFromBlockRef.current = handleRemoveFromBlock;
+    handleConfigChildNodeRef.current = handleConfigChildNode;
+    handleExtractAndDragRef.current = handleExtractAndDrag;
+  });
+
   // Process horizon data when it changes
   useEffect(() => {
     if (horizonData) {
@@ -2740,15 +2776,15 @@ function PipelineBuilderInner() {
               childNodes: childNodesData, // Pass actual node objects for rendering
             } : {}),
             horizonId: horizonData.id,
-            onDelete: handleNodeDelete,
-            refetchHorizon: refetchHorizon,
-            onAddChildNode: handleAddChildNode,
-            ...(node.type === 'block' ? { 
-              onAddToBlock: handleAddToBlock,
-              onDropToBlock: handleDropToBlock,
-              onRemoveFromBlock: handleRemoveFromBlock,
-              onConfigChildNode: handleConfigChildNode,
-              onExtractAndDrag: handleExtractAndDrag,
+            onDelete: handleNodeDeleteRef.current,
+            refetchHorizon: refetchHorizonRef.current,
+            onAddChildNode: handleAddChildNodeRef.current,
+            ...(node.type === 'block' ? {
+              onAddToBlock: handleAddToBlockRef.current,
+              onDropToBlock: handleDropToBlockRef.current,
+              onRemoveFromBlock: handleRemoveFromBlockRef.current,
+              onConfigChildNode: handleConfigChildNodeRef.current,
+              onExtractAndDrag: handleExtractAndDragRef.current,
               isHighlighted: false,
             } : {}),
           }
@@ -2761,11 +2797,22 @@ function PipelineBuilderInner() {
       console.log('[PipelineDetail] Processed nodes (including hidden):', 
         nodesWithHorizonId.map(n => ({ id: n.id, type: n.type, parentId: n.parentId, blockId: n.blockId }))
       );
-      console.log('[PipelineDetail] Visible nodes (excluding children in blocks):', 
+      console.log('[PipelineDetail] Visible nodes (excluding children in blocks):',
         visibleNodes.map(n => ({ id: n.id, type: n.type }))
       );
-      
-      setNodes(visibleNodes);
+
+      // Clean up confirmed deletions (nodes the backend no longer returns)
+      const backendNodeIds = new Set((horizonData.nodes || []).map(n => n.id));
+      for (const deletedId of deletedNodeIdsRef.current) {
+        if (!backendNodeIds.has(deletedId)) {
+          deletedNodeIdsRef.current.delete(deletedId);
+        }
+      }
+
+      // Filter out locally-deleted nodes that backend hasn't caught up with yet
+      const finalNodes = visibleNodes.filter(n => !deletedNodeIdsRef.current.has(n.id));
+
+      setNodes(finalNodes);
       setEdges(prevEdges => {
         const newEdges = horizonData.edges || [];
         const prevEdgeMap = new Map(prevEdges.map(e => [e.id, e]));
@@ -2796,7 +2843,8 @@ function PipelineBuilderInner() {
       setCurrentHorizonId(horizonData.id);
       setPortfolios(horizonData.portfolios || []);
     }
-  }, [horizonData, id, handleNodeDelete, refetchHorizon, handleAddChildNode, handleAddToBlock, handleDropToBlock, handleRemoveFromBlock, handleConfigChildNode, handleExtractAndDrag]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [horizonData, id]);
 
   // Update block nodes highlight state when dragging
   useEffect(() => {
@@ -3363,8 +3411,10 @@ function PipelineBuilderInner() {
             minZoom={0.1}
             maxZoom={2}
             panOnDrag={true}
-            selectionKeyCode={null}
-            multiSelectionKeyCode={null}
+            selectionKeyCode="Shift"
+            multiSelectionKeyCode="Shift"
+            selectionMode="partial"
+            deleteKeyCode={null}
           >
             <Controls />
             <MiniMap />
