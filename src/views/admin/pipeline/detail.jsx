@@ -38,7 +38,7 @@ import {
   useToast,
   VStack
 } from '@chakra-ui/react';
-import { useCallback, useEffect, useState } from 'react';
+import { Component, useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 // useMutation removed - now used in CustomAgentNode component
@@ -92,6 +92,7 @@ import portfolioApi from 'lib/portfolioApi';
 import horizonAgentApi from 'lib/horizonAgentApi';
 import nodeApi from 'lib/nodeApi';
 import { CustomAgentNode } from 'components/pipeline/CustomAgentNode';
+import { CustomBlockNode } from 'components/pipeline/CustomBlockNode';
 import { RobotHead } from 'components/pipeline/RobotHead';
 import Chart from 'react-apexcharts';
 import StockAnalysisCard from 'views/admin/portfolio/components/StockAnalysisCard';
@@ -658,17 +659,108 @@ const nodeTypes = {
   agentNode: CustomAgentNode,
   portfolioNode: CustomPortfolioNode,
   outputNode: CustomOutputNode,
+  block: CustomBlockNode,
 };
 
 const edgeTypes = {
   custom: CustomEdge,
 };
+
+// Error Boundary to catch React Flow errors
+class ReactFlowErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    // Check if it's the parentNode error
+    if (error?.message?.includes('Parent node') && error?.message?.includes('not found')) {
+      console.warn('[ReactFlowErrorBoundary] Caught orphaned parentId error:', error.message);
+      // Trigger refetch to clean data
+      return { hasError: true, error };
+    }
+    // Let other errors bubble up
+    throw error;
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('[ReactFlowErrorBoundary] Error caught:', error, errorInfo);
+    
+    // Auto-recover by refetching
+    if (this.props.onError) {
+      this.props.onError(error);
+    }
+  }
+
+  componentDidUpdate(prevProps) {
+    // Reset error state when nodes change (after refetch)
+    if (this.state.hasError && prevProps.nodes !== this.props.nodes) {
+      this.setState({ hasError: false, error: null });
+    }
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <Box h="100vh" display="flex" alignItems="center" justifyContent="center" bg="gray.50">
+          <VStack spacing="20px">
+            <Icon as={MdWarning} boxSize="64px" color="orange.500" />
+            <Text fontSize="xl" fontWeight="600" color="gray.700">
+              Refreshing canvas...
+            </Text>
+            <Spinner size="lg" color="teal.500" />
+          </VStack>
+        </Box>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 function PipelineBuilderInner() {
   const { id } = useParams(); // Get horizon ID from URL
   const navigate = useNavigate();
   
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const [nodes, setNodes, onNodesChangeDefault] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChangeDefault] = useEdgesState(initialEdges);
+  const [reactFlowError, setReactFlowError] = useState(null);
+  
+  // Custom onNodesChange to ensure only one node is selected at a time
+  const onNodesChange = useCallback(
+    (changes) => {
+      try {
+        // Check if any selection changes
+        const selectionChanges = changes.filter(change => 
+          change.type === 'select' && change.selected === true
+        );
+
+        if (selectionChanges.length > 0) {
+          // If a node is being selected, deselect all others first
+          const selectedNodeId = selectionChanges[0].id;
+          
+          setNodes((nds) =>
+            nds.map((node) => ({
+              ...node,
+              selected: node.id === selectedNodeId,
+            }))
+          );
+        } else {
+          // Apply changes normally
+          onNodesChangeDefault(changes);
+        }
+      } catch (error) {
+        if (error?.message?.includes('Parent node') && error?.message?.includes('not found')) {
+          console.warn('[onNodesChange] Caught orphaned parentId error, triggering refetch:', error.message);
+          setReactFlowError(error);
+        } else {
+          throw error;
+        }
+      }
+    },
+    [onNodesChangeDefault, setNodes]
+  );
   
   // Custom onEdgesChange to handle edge deletion
   const onEdgesChange = useCallback(
@@ -756,10 +848,18 @@ function PipelineBuilderInner() {
     systemPrompt: '',
   });
 
+  const { getNodes, getEdges, fitView } = useReactFlow();
   // State for drag and drop
   const [isDragging, setIsDragging] = useState(false);
   const [draggedItem, setDraggedItem] = useState(null);
   const [dragPreviewNodeId, setDragPreviewNodeId] = useState(null);
+
+  // State for block node
+  const [selectedBlockId, setSelectedBlockId] = useState(null);
+  const [isAddingToBlock, setIsAddingToBlock] = useState(false);
+  const [draggingNodeId, setDraggingNodeId] = useState(null);
+  const [highlightedBlockId, setHighlightedBlockId] = useState(null);
+  const [extractingChild, setExtractingChild] = useState(null); // { blockId, childNodeId, childNode }
 
   // State for right sidebar to show output node data
   const [selectedOutputNode, setSelectedOutputNode] = useState(null);
@@ -795,6 +895,15 @@ function PipelineBuilderInner() {
     enabled: !!id,
   });
 
+  // Auto-refetch when ReactFlow encounters orphaned parentId error
+  useEffect(() => {
+    if (reactFlowError) {
+      console.log('[PipelineDetail] ReactFlow error detected, refetching horizon...');
+      refetchHorizon();
+      setReactFlowError(null);
+    }
+  }, [reactFlowError, refetchHorizon]);
+
   // Handle horizon loading error
   useEffect(() => {
     if (horizonError) {
@@ -818,19 +927,20 @@ function PipelineBuilderInner() {
 
     const saveTimeout = setTimeout(async () => {
       try {
+        // Only save horizon name, not nodes (nodes are saved individually via nodeApi)
         await request.put(`/horizons/${currentHorizonId}`, {
           name: currentHorizonName,
-          nodes,
-          // edges are auto-generated from nodes' parentId, no need to save
+          // Don't send nodes array - it causes duplicate key errors
+          // Nodes are managed individually through nodeApi.update/create/delete
         });
-        console.log('[Auto-save] Horizon saved successfully');
+        console.log('[Auto-save] Horizon name saved successfully');
       } catch (error) {
         console.error('[Auto-save] Failed to sync horizon to backend:', error);
       }
     }, 1000);
 
     return () => clearTimeout(saveTimeout);
-  }, [nodes, currentHorizonName, currentHorizonId, isLoading]);
+  }, [currentHorizonName, currentHorizonId, isLoading]); // Removed 'nodes' from dependencies
 
   // Add a child node from the "+" button on a node's outbound side
   const onConnect = useCallback(
@@ -857,6 +967,9 @@ function PipelineBuilderInner() {
         });
         
         console.log(`[onConnect] Updated node ${params.target} with parentId: ${params.source}`);
+        
+        // Refetch horizon to update UI
+        await refetchHorizon();
       } catch (error) {
         console.error('[onConnect] Failed to update node relationship:', error);
         toast({
@@ -868,7 +981,7 @@ function PipelineBuilderInner() {
         });
       }
     },
-    [setEdges, toast]
+    [toast, refetchHorizon]
   );
 
   // Config panel is shown only on double-click (see handleNodeDoubleClick)
@@ -876,8 +989,20 @@ function PipelineBuilderInner() {
 
   useEffect(() => {
     const handleKeyDown = (event) => {
-      // Escape closes any open config panel
+      // Escape closes any open config panel or cancels block selection mode
       if (event.key === 'Escape') {
+        if (isAddingToBlock) {
+          setIsAddingToBlock(false);
+          setSelectedBlockId(null);
+          toast({
+            title: 'Cancelled',
+            description: 'Block selection mode cancelled',
+            status: 'info',
+            duration: 2000,
+            isClosable: true,
+          });
+          return;
+        }
         setSelectedNode(null);
         setNodes((nds) =>
           nds.map((n) => ({ ...n, selected: false }))
@@ -903,16 +1028,35 @@ function PipelineBuilderInner() {
           );
           
           if (deletableNodes.length > 0) {
-            const nodeIds = deletableNodes.map((n) => n.id);
-            setNodes((nds) => nds.filter((node) => !nodeIds.includes(node.id)));
-            setEdges((eds) => eds.filter((edge) => 
-              !nodeIds.includes(edge.source) && !nodeIds.includes(edge.target)
-            ));
-            toast({
-              title: `${deletableNodes.length} node(s) deleted`,
-              status: 'info',
-              duration: 2000,
-              isClosable: true,
+            // Delete nodes via backend API (wait for all to complete)
+            Promise.all(
+              deletableNodes.map(async (node) => {
+                try {
+                  await nodeApi.delete(node.id);
+                  console.log(`[KeyboardDelete] Deleted node: ${node.id}`);
+                } catch (error) {
+                  console.error(`[KeyboardDelete] Failed to delete node ${node.id}:`, error);
+                  toast({
+                    title: 'Delete failed',
+                    description: `Could not delete node`,
+                    status: 'error',
+                    duration: 2000,
+                    isClosable: true,
+                  });
+                }
+              })
+            ).then(() => {
+              // Refetch to get updated data after all deletes complete
+              if (refetchHorizon) {
+                refetchHorizon();
+              }
+              toast({
+                title: 'Nodes deleted',
+                description: `${deletableNodes.length} node(s) removed`,
+                status: 'success',
+                duration: 2000,
+                isClosable: true,
+              });
             });
           }
         }
@@ -921,7 +1065,7 @@ function PipelineBuilderInner() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [nodes, setNodes, setEdges, toast]);
+  }, [nodes, toast, isAddingToBlock, refetchHorizon]);
 
   const handleNodeDoubleClick = useCallback((event, node) => {
     if (node.type === 'agentNode') {
@@ -944,7 +1088,88 @@ function PipelineBuilderInner() {
     }
   }, []);
 
+  
+  // Add node to block
+  const handleNodeClickForBlock = useCallback(async (nodeId) => {
+    if (!isAddingToBlock || !selectedBlockId) return;
+
+    const currentNodes = getNodes();
+    const currentEdges = getEdges();
+    
+    // Check if node is disconnected (no edges)
+    const hasConnection = currentEdges.some(
+      e => e.source === nodeId || e.target === nodeId
+    );
+
+    if (hasConnection) {
+      toast({
+        title: 'Cannot add connected node',
+        description: 'Only disconnected nodes can be added to a block',
+        status: 'warning',
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    const nodeToAdd = currentNodes.find(n => n.id === nodeId);
+    if (!nodeToAdd || nodeToAdd.type === 'block' || nodeToAdd.type === 'outputNode') {
+      toast({
+        title: 'Invalid node',
+        description: 'Cannot add this type of node to block',
+        status: 'warning',
+        duration: 2000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    try {
+      const blockNode = currentNodes.find(n => n.id === selectedBlockId);
+      const currentChildNodeIds = blockNode?.data?.childNodeIds || [];
+
+      // Add this node ID to block's childNodeIds array
+      const updatedChildNodeIds = [...currentChildNodeIds, nodeId];
+
+      // Update block node in backend - add child ID to array
+      await nodeApi.update(selectedBlockId, {
+        childNodeIds: updatedChildNodeIds,
+      });
+
+      // Update the node itself - set its blockId
+      await nodeApi.update(nodeId, {
+        blockId: selectedBlockId,
+      });
+
+      // Refetch to get updated data
+      await refetchHorizon();
+
+      toast({
+        title: 'Node added to block',
+        description: 'Continue selecting nodes or press ESC to finish',
+        status: 'success',
+        duration: 2000,
+        isClosable: true,
+      });
+    } catch (error) {
+      console.error('Failed to add node to block:', error);
+      toast({
+        title: 'Failed to add node',
+        description: error.message,
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+    }
+  }, [isAddingToBlock, selectedBlockId, getNodes, getEdges, setNodes, toast]);
+
   const handleNodeClick = useCallback(async (event, node) => {
+    // Handle block selection mode
+    if (isAddingToBlock && node.type !== 'block' && node.type !== 'outputNode') {
+      handleNodeClickForBlock(node.id);
+      return;
+    }
+
     if (node.type === 'outputNode') {
       setSelectedOutputNode(node);
       setSidebarView(SIDEBAR_VIEW.LIST); // Always show list view first
@@ -997,37 +1222,34 @@ function PipelineBuilderInner() {
         setIsLoadingRevisions(false);
       }
     }
-  }, [toast, setNodes, currentHorizonId]);
+  }, [toast, setNodes, currentHorizonId, isAddingToBlock, handleNodeClickForBlock]);
 
   const handleNodeDelete = useCallback(async (nodeId) => {
     try {
-      await request.delete(`/nodes/${nodeId}`);
+      await nodeApi.delete(nodeId);
       
-      setNodes((nds) => nds.filter((node) => node.id !== nodeId));
-      setEdges((eds) => eds.filter((edge) => 
-        edge.source !== nodeId && edge.target !== nodeId
-      ));
+      // Refetch horizon data to get updated nodes with cleaned parentId references
+      await refetchHorizon();
       
       toast({
-        title: 'Node disabled',
-        description: 'The node has been marked as inactive',
+        title: 'Node deleted',
+        description: 'The node has been removed',
         status: 'info',
         duration: 2000,
         isClosable: true,
       });
     } catch (error) {
-      console.error('Failed to disable node:', error);
+      console.error('Failed to delete node:', error);
       toast({
-        title: 'Failed to disable node',
+        title: 'Failed to delete node',
         description: error.message,
         status: 'error',
         duration: 3000,
         isClosable: true,
       });
     }
-  }, [setNodes, setEdges, toast]);
+  }, [refetchHorizon, toast]);
 
-  const { getNodes, getEdges, fitView } = useReactFlow();
 
   // Add a child node from the "+" button on a node's outbound side
   const handleAddChildNode = useCallback(async (sourceNodeId, agentTemplate) => {
@@ -1059,28 +1281,9 @@ function PipelineBuilderInner() {
       });
 
       const savedNode = response.data;
-      const newNode = {
-        id: savedNode.id,
-        type: 'agentNode',
-        position,
-        data: {
-          agent: agentTemplate,
-          horizonId: currentHorizonId,
-          onDelete: handleNodeDelete,
-          refetchHorizon: refetchHorizon,
-          onAddChildNode: handleAddChildNode,
-          config: savedNode.data.config,
-        },
-      };
-
-      setNodes(nds => nds.concat(newNode));
-      setEdges(eds => [...eds, {
-        id: `edge-${sourceNodeId}-${savedNode.id}`,
-        source: sourceNodeId,
-        target: savedNode.id,
-        type: 'custom',
-        data: { output: null },
-      }]);
+      
+      // Refetch horizon to get updated data
+      await refetchHorizon();
 
       toast({
         title: 'Node added',
@@ -1253,17 +1456,587 @@ function PipelineBuilderInner() {
     setTimeout(() => fitView({ padding: 0.15, duration: 400 }), 50);
   }, [getNodes, getEdges, setNodes, fitView]);
 
+  // Check if two nodes overlap based on position and size
+  const checkNodeOverlap = useCallback((node1, node2) => {
+    // Get node dimensions (use measured width/height or defaults)
+    const node1Width = node1.width || 250;
+    const node1Height = node1.height || 120;
+    const node2Width = node2.width || 300;
+    const node2Height = node2.height || 150;
+
+    // Calculate boundaries
+    const node1Left = node1.position.x;
+    const node1Right = node1.position.x + node1Width;
+    const node1Top = node1.position.y;
+    const node1Bottom = node1.position.y + node1Height;
+
+    const node2Left = node2.position.x;
+    const node2Right = node2.position.x + node2Width;
+    const node2Top = node2.position.y;
+    const node2Bottom = node2.position.y + node2Height;
+
+    // Check overlap
+    return !(node1Right < node2Left || 
+             node1Left > node2Right || 
+             node1Bottom < node2Top || 
+             node1Top > node2Bottom);
+  }, []);
+
+  // Handle node drag (while dragging) to highlight blocks
+  const handleNodeDrag = useCallback((event, node) => {
+    // Track which node is being dragged
+    setDraggingNodeId(node.id);
+
+    // Set dragged node as the only selected node
+    setNodes((nds) =>
+      nds.map((n) => ({
+        ...n,
+        selected: n.id === node.id,
+      }))
+    );
+
+    // Skip if dragging a block or output node
+    if (node.type === 'block' || node.type === 'outputNode') {
+      setHighlightedBlockId(null);
+      return;
+    }
+
+    // Check if node has connections
+    const currentEdges = getEdges();
+    const hasConnection = currentEdges.some(
+      e => e.source === node.id || e.target === node.id
+    );
+
+    if (hasConnection) {
+      // Can't add to block if it has connections
+      setHighlightedBlockId(null);
+      return;
+    }
+
+    // Find all block nodes
+    const currentNodes = getNodes();
+    const blockNodes = currentNodes.filter(n => n.type === 'block');
+
+    // Check if currently overlapping with any block
+    let overlappingBlock = null;
+    for (const blockNode of blockNodes) {
+      if (checkNodeOverlap(node, blockNode)) {
+        overlappingBlock = blockNode;
+        break;
+      }
+    }
+
+    setHighlightedBlockId(overlappingBlock ? overlappingBlock.id : null);
+  }, [getNodes, getEdges, checkNodeOverlap, setNodes]);
+
   // Save node position to backend when drag stops
   const handleNodeDragStop = useCallback(async (event, node) => {
+    // Clear dragging state
+    setDraggingNodeId(null);
+    setHighlightedBlockId(null);
+
     try {
-      await nodeApi.update(node.id, {
-        position: node.position,
-      });
-      console.log(`[NodeDrag] Saved position for node ${node.id}:`, node.position);
+      // Check if node was dropped onto a block
+      const currentNodes = getNodes();
+      const currentEdges = getEdges();
+
+      // Skip if this is a block node or output node
+      if (node.type === 'block' || node.type === 'outputNode') {
+        await nodeApi.update(node.id, {
+          position: node.position,
+        });
+        return;
+      }
+
+      // Check if node has connections
+      const hasConnection = currentEdges.some(
+        e => e.source === node.id || e.target === node.id
+      );
+
+      if (hasConnection) {
+        // Node has connections, just save position
+        await nodeApi.update(node.id, {
+          position: node.position,
+        });
+        return;
+      }
+
+      // Find all block nodes
+      const blockNodes = currentNodes.filter(n => n.type === 'block');
+
+      // Check if dropped node overlaps with any block
+      let targetBlock = null;
+      for (const blockNode of blockNodes) {
+        if (checkNodeOverlap(node, blockNode)) {
+          targetBlock = blockNode;
+          break;
+        }
+      }
+
+      if (targetBlock) {
+        // Node was dropped onto a block - add it to the block using new design
+        console.log(`[DragDrop] Node ${node.id} dropped onto block ${targetBlock.id}`);
+        
+        const currentChildNodeIds = targetBlock.data?.childNodeIds || [];
+
+        // Check if node is already in this block
+        if (currentChildNodeIds.includes(node.id)) {
+          // Just update position
+          await nodeApi.update(node.id, {
+            position: node.position,
+          });
+          return;
+        }
+
+        const updatedChildNodeIds = [...currentChildNodeIds, node.id];
+
+        // Update block node with new child ID
+        await nodeApi.update(targetBlock.id, {
+          childNodeIds: updatedChildNodeIds,
+        });
+
+        // Update node to set its blockId
+        await nodeApi.update(node.id, {
+          blockId: targetBlock.id,
+          position: node.position,
+        });
+
+        // Refetch horizon to get updated data
+        await refetchHorizon();
+
+        toast({
+          title: 'Node added to block',
+          description: `Successfully moved node into block container`,
+          status: 'success',
+          duration: 2000,
+          isClosable: true,
+        });
+      } else {
+        // Normal drag - just save position
+        await nodeApi.update(node.id, {
+          position: node.position,
+        });
+        console.log(`[NodeDrag] Saved position for node ${node.id}:`, node.position);
+      }
     } catch (error) {
       console.error('Failed to save node position:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to save node position',
+        status: 'error',
+        duration: 2000,
+        isClosable: true,
+      });
     }
-  }, []);
+  }, [getNodes, getEdges, checkNodeOverlap, setNodes, toast]);
+
+  // Start adding nodes to block
+  const handleAddToBlock = useCallback((blockId) => {
+    setSelectedBlockId(blockId);
+    setIsAddingToBlock(true);
+    toast({
+      title: 'Select nodes to add',
+      description: 'Click on disconnected nodes to add them to the block. Press ESC to cancel.',
+      status: 'info',
+      duration: 5000,
+      isClosable: true,
+    });
+  }, [toast]);
+
+  // Handle drop node to block (drag & drop)
+  const handleDropToBlock = useCallback(async (blockId, nodeId) => {
+    const currentNodes = getNodes();
+    const currentEdges = getEdges();
+    
+    // Check if node is disconnected (no edges)
+    const hasConnection = currentEdges.some(
+      e => e.source === nodeId || e.target === nodeId
+    );
+
+    if (hasConnection) {
+      toast({
+        title: 'Cannot add connected node',
+        description: 'Only disconnected nodes can be added to a block',
+        status: 'warning',
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    const nodeToAdd = currentNodes.find(n => n.id === nodeId);
+    if (!nodeToAdd || nodeToAdd.type === 'block' || nodeToAdd.type === 'outputNode') {
+      toast({
+        title: 'Invalid node',
+        description: 'Cannot add this type of node to block',
+        status: 'warning',
+        duration: 2000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    try {
+      const blockNode = currentNodes.find(n => n.id === blockId);
+      const currentChildNodeIds = blockNode?.data?.childNodeIds || [];
+
+      // Check if node is already in this block
+      if (currentChildNodeIds.includes(nodeId)) {
+        toast({
+          title: 'Node already in block',
+          description: 'This node is already part of the block',
+          status: 'info',
+          duration: 2000,
+          isClosable: true,
+        });
+        return;
+      }
+
+      const updatedChildNodeIds = [...currentChildNodeIds, nodeId];
+
+      // Update block node with new child ID
+      await nodeApi.update(blockId, {
+        childNodeIds: updatedChildNodeIds,
+      });
+
+      // Update node to set its blockId
+      await nodeApi.update(nodeId, {
+        blockId: blockId,
+      });
+
+      // Refetch horizon to get updated data
+      await refetchHorizon();
+
+      toast({
+        title: 'Node added to block',
+        status: 'success',
+        duration: 2000,
+        isClosable: true,
+      });
+    } catch (error) {
+      console.error('Failed to add node to block:', error);
+      toast({
+        title: 'Failed to add node',
+        description: error.message,
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+    }
+  }, [getNodes, getEdges, setNodes, toast]);
+
+  // Remove a child node from block
+  const handleRemoveFromBlock = useCallback(async (blockId, childNodeId) => {
+    try {
+      const currentNodes = getNodes();
+      const blockNode = currentNodes.find(n => n.id === blockId);
+      
+      if (!blockNode || !blockNode.data.childNodeIds) {
+        return;
+      }
+
+      const childNodeIds = blockNode.data.childNodeIds;
+      
+      // Check if child node exists in block
+      if (!childNodeIds.includes(childNodeId)) {
+        return;
+      }
+
+      const updatedChildNodeIds = childNodeIds.filter(id => id !== childNodeId);
+
+      // Update block in backend - remove child ID
+      await nodeApi.update(blockId, {
+        childNodeIds: updatedChildNodeIds,
+      });
+
+      // Calculate new position for extracted node (to the right of block)
+      const newNodePosition = {
+        x: blockNode.position.x + 350,
+        y: blockNode.position.y + (updatedChildNodeIds.length * 50),
+      };
+
+      // Update the child node - clear blockId and set new position
+      await nodeApi.update(childNodeId, {
+        blockId: null,
+        position: newNodePosition,
+      });
+
+      // Refetch horizon to get updated data
+      await refetchHorizon();
+
+      toast({
+        title: 'Node removed from block',
+        description: 'Node has been extracted and placed outside',
+        status: 'success',
+        duration: 2000,
+        isClosable: true,
+      });
+    } catch (error) {
+      console.error('Failed to remove node from block:', error);
+      toast({
+        title: 'Failed to remove node',
+        description: error.message,
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+    }
+  }, [getNodes, toast, refetchHorizon]);
+
+  // Handle double-click on child node to edit
+  const handleEditChildNode = useCallback(async (blockId, childNodeId) => {
+    console.log(`[EditChildNode] Block: ${blockId}, Child: ${childNodeId}`);
+    
+    try {
+      const currentNodes = getNodes();
+      const blockNode = currentNodes.find(n => n.id === blockId);
+      
+      if (!blockNode || !blockNode.data.childNodeIds) {
+        return;
+      }
+
+      const childNodeIds = blockNode.data.childNodeIds;
+      
+      // Check if child node exists in block
+      if (!childNodeIds.includes(childNodeId)) {
+        return;
+      }
+
+      // Find the child node data
+      const childNode = currentNodes.find(n => n.id === childNodeId);
+      if (!childNode) {
+        return;
+      }
+      
+      // First, extract the node from block by removing from childNodeIds
+      const updatedChildNodeIds = childNodeIds.filter(id => id !== childNodeId);
+
+      // Update block in backend
+      await nodeApi.update(blockId, {
+        childNodeIds: updatedChildNodeIds,
+      });
+
+      // Calculate new position for extracted node
+      const newNodePosition = {
+        x: blockNode.position.x + 350,
+        y: blockNode.position.y + (updatedChildNodeIds.length * 50),
+      };
+
+      // Update the child node - clear blockId and set new position
+      await nodeApi.update(childNodeId, {
+        blockId: null,
+        position: newNodePosition,
+      });
+
+      // Refetch horizon to get updated data
+      await refetchHorizon();
+
+      // Now open the config panel for the node
+      setTimeout(() => {
+        const nodeToEdit = {
+          id: childNodeId,
+          type: childNode.type,
+          data: childNode.data,
+        };
+
+        if (childNode.type === 'agentNode') {
+          setSelectedNode(nodeToEdit);
+          setNodeConfig({
+            name: childNode.data?.config?.name || childNode.data?.agent?.name || '',
+            description: childNode.data?.config?.description || childNode.data?.agent?.description || '',
+            model: childNode.data?.config?.model || 'gpt-4',
+            temperature: childNode.data?.config?.temperature || 0.7,
+            maxTokens: childNode.data?.config?.maxTokens || 2000,
+            systemPrompt: childNode.data?.agent?.systemPrompt || '',
+          });
+        } else if (childNode.type === 'portfolioNode') {
+          setSelectedNode(nodeToEdit);
+          setPortfolioConfig({
+            name: childNode.data?.portfolio?.name || '',
+            description: childNode.data?.portfolio?.description || '',
+          });
+          setSelectedStocks(childNode.data?.portfolio?.stocks || []);
+        }
+      }, 100);
+
+      toast({
+        title: 'Editing node',
+        description: 'Node extracted from block for editing',
+        status: 'success',
+        duration: 2000,
+        isClosable: true,
+      });
+    } catch (error) {
+      console.error('Failed to edit child node:', error);
+      toast({
+        title: 'Failed to edit node',
+        description: error.message,
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+    }
+  }, [getNodes, toast, refetchHorizon, setSelectedNode, setNodeConfig, setPortfolioConfig, setSelectedStocks]);
+
+  // Handle config button click on child node (edit in-place without extraction)
+  const handleConfigChildNode = useCallback((blockId, childNodeId) => {
+    console.log(`[ConfigChildNode] Block: ${blockId}, Child: ${childNodeId}`);
+    
+    const currentNodes = getNodes();
+    const blockNode = currentNodes.find(n => n.id === blockId);
+    
+    if (!blockNode || !blockNode.data.childNodeIds) {
+      return;
+    }
+
+    const childNodeIds = blockNode.data.childNodeIds;
+    
+    // Check if child node exists in block
+    if (!childNodeIds.includes(childNodeId)) {
+      return;
+    }
+
+    // Find the actual child node
+    const childNode = currentNodes.find(n => n.id === childNodeId);
+    if (!childNode) {
+      return;
+    }
+    
+    // Create a temporary node object for config panel
+    const tempNode = {
+      id: childNodeId, // Use actual node ID
+      type: childNode.type,
+      data: childNode.data,
+      // Store block reference for saving later
+      _isChildNode: true,
+      _blockId: blockId,
+    };
+
+    // Open config panel based on node type
+    if (childNode.type === 'agentNode') {
+      setSelectedNode(tempNode);
+      setNodeConfig({
+        name: childNode.data?.config?.name || childNode.data?.agent?.name || '',
+        description: childNode.data?.config?.description || childNode.data?.agent?.description || '',
+        model: childNode.data?.config?.model || 'gpt-4',
+        temperature: childNode.data?.config?.temperature || 0.7,
+        maxTokens: childNode.data?.config?.maxTokens || 2000,
+        systemPrompt: childNode.data?.agent?.systemPrompt || '',
+      });
+    } else if (childNode.type === 'portfolioNode') {
+      setSelectedNode(tempNode);
+      setPortfolioConfig({
+        name: childNode.data?.portfolio?.name || '',
+        description: childNode.data?.portfolio?.description || '',
+      });
+      setSelectedStocks(childNode.data?.portfolio?.stocks || []);
+    }
+
+    toast({
+      title: 'Configure child node',
+      description: 'Edit the node configuration',
+      status: 'info',
+      duration: 2000,
+      isClosable: true,
+    });
+  }, [getNodes, setSelectedNode, setNodeConfig, setPortfolioConfig, setSelectedStocks, toast]);
+
+  // Handle extract and drag child node out of block (start drag operation)
+  const handleExtractAndDrag = useCallback((blockId, childNodeId, mouseEvent) => {
+    console.log(`[ExtractAndDrag] Block: ${blockId}, Child: ${childNodeId}`);
+    
+    const currentNodes = getNodes();
+    const blockNode = currentNodes.find(n => n.id === blockId);
+    
+    if (!blockNode || !blockNode.data.childNodeIds) {
+      return;
+    }
+
+    const childNodeIds = blockNode.data.childNodeIds;
+    
+    // Check if child node exists in block
+    if (!childNodeIds.includes(childNodeId)) {
+      return;
+    }
+
+    // Find the child node
+    const childNode = currentNodes.find(n => n.id === childNodeId);
+    if (!childNode) {
+      return;
+    }
+
+    // Get cursor position in flow coordinates
+    const position = screenToFlowPosition({
+      x: mouseEvent.clientX,
+      y: mouseEvent.clientY,
+    });
+
+    // Create preview node
+    const previewNodeId = `preview-extract-${Date.now()}`;
+    const previewNode = {
+      id: previewNodeId,
+      type: childNode.type,
+      position,
+      data: childNode.data,
+      draggable: false,
+      style: { opacity: 0.6 }, // Preview style
+    };
+
+    setNodes((nds) => nds.concat(previewNode));
+    setDragPreviewNodeId(previewNodeId);
+    setExtractingChild({ blockId, childNodeId, childNode });
+    setIsDragging(true);
+
+    toast({
+      title: 'Extracting node',
+      description: 'Move to desired position and release',
+      status: 'info',
+      duration: 2000,
+      isClosable: true,
+    });
+  }, [getNodes, screenToFlowPosition, setNodes, toast]);
+
+  // Create a new block node
+  const handleCreateBlock = useCallback(async () => {
+    if (!currentHorizonId) return;
+
+    try {
+      const position = {
+        x: 100,
+        y: 100,
+      };
+
+      const response = await nodeApi.create({
+        horizonId: currentHorizonId,
+        type: 'block',
+        position,
+        data: {},
+        childNodeIds: [], // Use childNodeIds instead of childNodes
+      });
+
+      const savedNode = response.data;
+      
+      // Refetch horizon to get updated data
+      await refetchHorizon();
+
+      toast({
+        title: 'Block created',
+        description: 'Drag disconnected nodes into the block or use the + button',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
+    } catch (error) {
+      console.error('Failed to create block:', error);
+      toast({
+        title: 'Failed to create block',
+        description: error.message || 'Could not create block',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+    }
+  }, [currentHorizonId, setNodes, toast, handleNodeDelete, handleAddToBlock, handleDropToBlock, handleRemoveFromBlock, handleConfigChildNode, handleExtractAndDrag]);
 
   const handleAgentMouseDown = useCallback((event, agent) => {
     event.preventDefault();
@@ -1361,8 +2134,51 @@ function PipelineBuilderInner() {
       // Remove preview node
       setNodes((nds) => nds.filter((n) => n.id !== dragPreviewNodeId));
 
-      // Create actual node in backend
-      if (draggedItem) {
+      // Handle extracting child from block
+      if (extractingChild) {
+        try {
+          const { blockId, childNodeId, childNode } = extractingChild;
+          const currentNodes = getNodes();
+          const blockNode = currentNodes.find(n => n.id === blockId);
+
+          if (blockNode && blockNode.data.childNodeIds) {
+            const updatedChildNodeIds = blockNode.data.childNodeIds.filter(id => id !== childNodeId);
+
+            // Update block in backend - remove child ID
+            await nodeApi.update(blockId, {
+              childNodeIds: updatedChildNodeIds,
+            });
+
+            // Update the child node - clear blockId and set new position
+            await nodeApi.update(childNodeId, {
+              blockId: null,
+              position: finalPosition,
+            });
+
+            // Refetch horizon to get updated data
+            await refetchHorizon();
+
+            toast({
+              title: 'Node extracted',
+              description: 'Node successfully removed from block',
+              status: 'success',
+              duration: 2000,
+              isClosable: true,
+            });
+          }
+        } catch (error) {
+          console.error('Failed to extract node:', error);
+          toast({
+            title: 'Failed to extract node',
+            description: error.message,
+            status: 'error',
+            duration: 3000,
+            isClosable: true,
+          });
+        }
+      }
+      // Create actual node in backend (for sidebar drag)
+      else if (draggedItem) {
         try {
           if (draggedItem.type === 'agent') {
             const response = await nodeApi.create({
@@ -1382,21 +2198,9 @@ function PipelineBuilderInner() {
             });
 
             const savedNode = response.data;
-            const newNode = {
-              id: savedNode.id,
-              type: 'agentNode',
-              position: finalPosition,
-              data: {
-                agent: draggedItem.data,
-                horizonId: currentHorizonId,
-                onDelete: handleNodeDelete,
-                refetchHorizon: refetchHorizon,
-                onAddChildNode: handleAddChildNode,
-                config: savedNode.data.config,
-              },
-            };
-
-            setNodes((nds) => nds.concat(newNode));
+            
+            // Refetch horizon to get updated data
+            await refetchHorizon();
 
             toast({
               title: 'Agent added',
@@ -1416,19 +2220,9 @@ function PipelineBuilderInner() {
             });
 
             const savedNode = response.data;
-            const newNode = {
-              id: savedNode.id,
-              type: 'portfolioNode',
-              position: finalPosition,
-              data: {
-                portfolio: draggedItem.data,
-                onDelete: handleNodeDelete,
-                refetchHorizon: refetchHorizon,
-                onAddChildNode: handleAddChildNode,
-              },
-            };
-
-            setNodes((nds) => nds.concat(newNode));
+            
+            // Refetch horizon to get updated data
+            await refetchHorizon();
 
             toast({
               title: 'Portfolio added',
@@ -1454,6 +2248,7 @@ function PipelineBuilderInner() {
       setIsDragging(false);
       setDraggedItem(null);
       setDragPreviewNodeId(null);
+      setExtractingChild(null);
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -1463,7 +2258,7 @@ function PipelineBuilderInner() {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDragging, dragPreviewNodeId, draggedItem, screenToFlowPosition, setNodes, getNodes, currentHorizonId, handleNodeDelete, refetchHorizon, toast]);
+  }, [isDragging, dragPreviewNodeId, draggedItem, extractingChild, screenToFlowPosition, setNodes, getNodes, currentHorizonId, handleNodeDelete, refetchHorizon, handleAddChildNode, toast]);
 
   // Create custom agent
   const handleCreateAgent = async () => {
@@ -1683,35 +2478,102 @@ function PipelineBuilderInner() {
     onRenameOpen();
   };
 
-  const handleSaveNodeConfig = () => {
+  const handleSaveNodeConfig = async () => {
     if (!selectedNode) return;
 
-    setNodes((nds) =>
-      nds.map((node) => {
-        if (node.id === selectedNode.id) {
-          return {
-            ...node,
-            selected: false,
-            data: {
-              ...node.data,
-              config: nodeConfig,
-              agent: { ...node.data.agent, name: nodeConfig.name, description: nodeConfig.description, systemPrompt: nodeConfig.systemPrompt },
-            },
-          };
-        }
-        return { ...node, selected: false };
-      })
-    );
+    // Check if this is a child node being edited (inside a block)
+    if (selectedNode._isChildNode) {
+      const { _blockId } = selectedNode;
+      const childNodeId = selectedNode.id; // Use actual node ID
+      
+      try {
+        // Update the child node directly in backend
+        await nodeApi.update(childNodeId, {
+          data: {
+            config: nodeConfig,
+            agent: selectedNode.data.agent ? {
+              ...selectedNode.data.agent,
+              name: nodeConfig.name,
+              description: nodeConfig.description,
+              systemPrompt: nodeConfig.systemPrompt
+            } : selectedNode.data.agent,
+            portfolio: selectedNode.data.portfolio ? {
+              ...selectedNode.data.portfolio,
+              name: portfolioConfig.name,
+              description: portfolioConfig.description,
+              stocks: selectedStocks,
+            } : selectedNode.data.portfolio,
+          },
+        });
 
-    setSelectedNode(null);
+        // Refetch horizon to update UI
+        await refetchHorizon();
 
-    toast({
-      title: 'Configuration saved',
-      description: 'Node configuration updated successfully',
-      status: 'success',
-      duration: 2000,
-      isClosable: true,
-    });
+        setSelectedNode(null);
+        
+        toast({
+          title: 'Configuration saved',
+          description: 'Child node configuration updated',
+          status: 'success',
+          duration: 2000,
+          isClosable: true,
+        });
+      } catch (error) {
+        console.error('Failed to save child node config:', error);
+        toast({
+          title: 'Failed to save',
+          description: error.message,
+          status: 'error',
+          duration: 3000,
+          isClosable: true,
+        });
+      }
+      return;
+    }
+
+    // Normal node (not child node) - save to backend
+    try {
+      await nodeApi.update(selectedNode.id, {
+        data: {
+          ...selectedNode.data,
+          config: nodeConfig,
+          agent: selectedNode.data.agent ? {
+            ...selectedNode.data.agent,
+            name: nodeConfig.name,
+            description: nodeConfig.description,
+            systemPrompt: nodeConfig.systemPrompt
+          } : selectedNode.data.agent,
+          portfolio: selectedNode.data.portfolio ? {
+            ...selectedNode.data.portfolio,
+            name: portfolioConfig.name,
+            description: portfolioConfig.description,
+            stocks: selectedStocks,
+          } : selectedNode.data.portfolio,
+        },
+      });
+
+      // Refetch horizon to update UI
+      await refetchHorizon();
+
+      setSelectedNode(null);
+
+      toast({
+        title: 'Configuration saved',
+        description: 'Node configuration updated successfully',
+        status: 'success',
+        duration: 2000,
+        isClosable: true,
+      });
+    } catch (error) {
+      console.error('Failed to save node config:', error);
+      toast({
+        title: 'Failed to save',
+        description: error.message,
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+    }
   };
 
   const handleSaveHorizonName = async () => {
@@ -1763,19 +2625,86 @@ function PipelineBuilderInner() {
       console.log('[PipelineDetail] Loaded horizon:', horizonData);
       console.log('[PipelineDetail] Horizon ID:', horizonData.id, 'URL ID:', id);
       
-      // Add horizonId and refetch to all nodes for useRunAgent
-      const nodesWithHorizonId = (horizonData.nodes || []).map(node => ({
-        ...node,
-        data: {
-          ...node.data,
-          horizonId: horizonData.id,
-          onDelete: handleNodeDelete,
-          refetchHorizon: refetchHorizon,
-          onAddChildNode: handleAddChildNode,
-        }
-      }));
+      // Debug: Log all nodes and their parentIds
+      console.log('[PipelineDetail] Nodes received from backend:', 
+        horizonData.nodes.map(n => ({ id: n.id, type: n.type, parentId: n.parentId }))
+      );
       
-      setNodes(nodesWithHorizonId);
+      // Create a set of valid node IDs for quick lookup
+      const validNodeIds = new Set((horizonData.nodes || []).map(node => node.id));
+      
+      // Debug: Find orphaned parentIds
+      const orphanedNodes = horizonData.nodes.filter(n => n.parentId && !validNodeIds.has(n.parentId));
+      if (orphanedNodes.length > 0) {
+        console.warn('[PipelineDetail] Found nodes with orphaned parentIds (backend failed to clean):', 
+          orphanedNodes.map(n => ({ id: n.id, parentId: n.parentId }))
+        );
+      }
+      
+      // Add horizonId and refetch to all nodes for useRunAgent
+      // Also validate and clean parentId references
+      // For block nodes, load child nodes from childNodeIds
+      const allNodes = horizonData.nodes || [];
+      
+      const nodesWithHorizonId = allNodes.map(node => {
+        // Check if parentId exists and points to a valid node
+        const hasValidParent = node.parentId && validNodeIds.has(node.parentId);
+        
+        if (node.parentId && !hasValidParent) {
+          console.warn(`[PipelineDetail] Removing orphaned parentId ${node.parentId} from node ${node.id}`);
+        }
+        
+        // For block nodes, load child nodes based on childNodeIds
+        let childNodesData = [];
+        if (node.type === 'block' && node.childNodeIds && node.childNodeIds.length > 0) {
+          // Find all child nodes
+          childNodesData = node.childNodeIds
+            .map(childId => allNodes.find(n => n.id === childId))
+            .filter(Boolean); // Remove undefined entries
+          
+          console.log(`[PipelineDetail] Block ${node.id} has ${childNodesData.length} children:`, 
+            childNodesData.map(n => ({ id: n.id, type: n.type }))
+          );
+        }
+        
+        return {
+          ...node,
+          // Remove parentId if it points to non-existent node (React Flow validation)
+          parentId: hasValidParent ? node.parentId : undefined,
+          data: {
+            ...node.data,
+            // For block nodes, include childNodeIds and loaded childNodes in data
+            ...(node.type === 'block' ? { 
+              childNodeIds: node.childNodeIds || [],
+              childNodes: childNodesData, // Pass actual node objects for rendering
+            } : {}),
+            horizonId: horizonData.id,
+            onDelete: handleNodeDelete,
+            refetchHorizon: refetchHorizon,
+            onAddChildNode: handleAddChildNode,
+            ...(node.type === 'block' ? { 
+              onAddToBlock: handleAddToBlock,
+              onDropToBlock: handleDropToBlock,
+              onRemoveFromBlock: handleRemoveFromBlock,
+              onConfigChildNode: handleConfigChildNode,
+              onExtractAndDrag: handleExtractAndDrag,
+              isHighlighted: false,
+            } : {}),
+          }
+        };
+      });
+      
+      // Filter out nodes that have blockId (they are rendered inside blocks)
+      const visibleNodes = nodesWithHorizonId.filter(node => !node.blockId);
+      
+      console.log('[PipelineDetail] Processed nodes (including hidden):', 
+        nodesWithHorizonId.map(n => ({ id: n.id, type: n.type, parentId: n.parentId, blockId: n.blockId }))
+      );
+      console.log('[PipelineDetail] Visible nodes (excluding children in blocks):', 
+        visibleNodes.map(n => ({ id: n.id, type: n.type }))
+      );
+      
+      setNodes(visibleNodes);
       setEdges(horizonData.edges || []);
       
       // System 1: Data Agents - Merge builtin + library-activated + custom
@@ -1795,7 +2724,25 @@ function PipelineBuilderInner() {
       setCurrentHorizonId(horizonData.id);
       setPortfolios(horizonData.portfolios || []);
     }
-  }, [horizonData, id]);
+  }, [horizonData, id, handleNodeDelete, refetchHorizon, handleAddChildNode, handleAddToBlock, handleDropToBlock, handleRemoveFromBlock, handleConfigChildNode, handleExtractAndDrag]);
+
+  // Update block nodes highlight state when dragging
+  useEffect(() => {
+    setNodes((nds) =>
+      nds.map((node) => {
+        if (node.type === 'block') {
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              isHighlighted: node.id === highlightedBlockId,
+            },
+          };
+        }
+        return node;
+      })
+    );
+  }, [highlightedBlockId, setNodes]);
 
   // Show loading state
   if (isLoading) {
@@ -2292,59 +3239,92 @@ function PipelineBuilderInner() {
             </Box>
           )}
         </Box>
+
+        {/* 5. Create Block Button */}
+        <Tooltip label="Create Block Container" placement="right" hasArrow>
+          <HStack
+            bg="whiteAlpha.900"
+            backdropFilter="blur(10px)"
+            borderRadius="12px"
+            px="12px"
+            py="8px"
+            spacing="8px"
+            border="1px solid"
+            borderColor="whiteAlpha.400"
+            boxShadow="md"
+            cursor="pointer"
+            _hover={{ borderColor: 'purple.400', boxShadow: 'lg', transform: 'translateY(-2px)' }}
+            transition="all 0.2s"
+            onClick={handleCreateBlock}
+          >
+            <Icon as={MdAccountTree} color="purple.600" boxSize="24px" />
+            <Text fontSize="sm" fontWeight="600" color="gray.800">
+              Create Block
+            </Text>
+          </HStack>
+        </Tooltip>
       </VStack>
 
       {/* Main Canvas */}
       <Box h="100%" position="relative" transition="all 0.3s">
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          onNodeClick={handleNodeClick}
-          onNodeDoubleClick={handleNodeDoubleClick}
-          onNodeDragStop={handleNodeDragStop}
-          nodeTypes={nodeTypes}
-          edgeTypes={edgeTypes}
-          defaultViewport={{ x: 0, y: 0, zoom: 0.9 }}
-          minZoom={0.1}
-          maxZoom={2}
-          panOnDrag={true}
-          selectionKeyCode="Shift"
-          multiSelectionKeyCode="Shift"
+        <ReactFlowErrorBoundary 
+          nodes={nodes} 
+          onError={(error) => {
+            console.log('[ReactFlowErrorBoundary] Error handler called, triggering refetch');
+            setReactFlowError(error);
+          }}
         >
-          <Controls />
-          <MiniMap />
-          <Background variant="dots" gap={16} size={1} />
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            onNodeClick={handleNodeClick}
+            onNodeDoubleClick={handleNodeDoubleClick}
+            onNodeDrag={handleNodeDrag}
+            onNodeDragStop={handleNodeDragStop}
+            nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
+            defaultViewport={{ x: 0, y: 0, zoom: 0.9 }}
+            minZoom={0.1}
+            maxZoom={2}
+            panOnDrag={true}
+            selectionKeyCode={null}
+            multiSelectionKeyCode={null}
+          >
+            <Controls />
+            <MiniMap />
+            <Background variant="dots" gap={16} size={1} />
 
-          <Panel position="top-right">
-            <HStack spacing={2}>
-              <Tooltip label="Auto Layout" placement="left" hasArrow>
-                <IconButton
-                  icon={<Icon as={MdAccountTree} />}
-                  size="md"
-                  colorScheme="purple"
-                  variant="solid"
-                  aria-label="Auto layout"
-                  onClick={handleAutoLayout}
-                  boxShadow="lg"
-                />
-              </Tooltip>
-              <Tooltip label="Back to Horizons" placement="left" hasArrow>
-                <IconButton
-                  icon={<Icon as={MdHome} />}
-                  size="md"
-                  colorScheme="teal"
-                  variant="solid"
-                  aria-label="Back to horizons"
-                  onClick={() => navigate('/pipeline')}
-                  boxShadow="lg"
-                />
-              </Tooltip>
-            </HStack>
-          </Panel>
-        </ReactFlow>
+            <Panel position="top-right">
+              <HStack spacing={2}>
+                <Tooltip label="Auto Layout" placement="left" hasArrow>
+                  <IconButton
+                    icon={<Icon as={MdAccountTree} />}
+                    size="md"
+                    colorScheme="purple"
+                    variant="solid"
+                    aria-label="Auto layout"
+                    onClick={handleAutoLayout}
+                    boxShadow="lg"
+                  />
+                </Tooltip>
+                <Tooltip label="Back to Horizons" placement="left" hasArrow>
+                  <IconButton
+                    icon={<Icon as={MdHome} />}
+                    size="md"
+                    colorScheme="teal"
+                    variant="solid"
+                    aria-label="Back to horizons"
+                    onClick={() => navigate('/pipeline')}
+                    boxShadow="lg"
+                  />
+                </Tooltip>
+              </HStack>
+            </Panel>
+          </ReactFlow>
+        </ReactFlowErrorBoundary>
       </Box>
 
       {/* Floating Agent Configuration Panel */}
