@@ -343,7 +343,7 @@ function AgentCard({ agent, system, isBuiltIn, isActivated, isCustom, onToggle, 
               </MenuList>
             </Menu>
           )}
-          {!isBuiltIn && !isCustom && (
+          {!isBuiltIn && (
             <Button
               size="sm"
               fontSize="12px"
@@ -456,6 +456,9 @@ export default function Library() {
         const response = await horizonAgentApi.create(undefined, agentData);
         if (response.success) {
           setCustomAgents([...customAgents, response.data]);
+          // Auto-activate the newly created agent
+          const newIds = toggleAgentActivation(response.data.id);
+          setActivatedIds(newIds);
           toast({ title: 'Agent created', description: `${response.data.name} added to library`, status: 'success', duration: 2000, isClosable: true });
         }
       }
@@ -484,6 +487,12 @@ export default function Library() {
     try {
       await horizonAgentApi.delete(agent.id);
       setCustomAgents(customAgents.filter(a => a.id !== agent.id));
+      // Remove from activated list if present
+      const currentIds = getActivatedAgentIds();
+      if (currentIds.includes(agent.id)) {
+        const newIds = toggleAgentActivation(agent.id);
+        setActivatedIds(newIds);
+      }
       toast({ title: 'Agent deleted', description: `${agent.name} removed`, status: 'info', duration: 2000, isClosable: true });
     } catch (error) {
       toast({ title: 'Failed to delete', description: error.message, status: 'error', duration: 3000, isClosable: true });
@@ -551,7 +560,8 @@ export default function Library() {
                 agent={agent}
                 system="Data"
                 isCustom
-                isActivated
+                isActivated={activatedIds.includes(agent.id)}
+                onToggle={() => handleToggle(agent.id)}
                 onEdit={handleEditAgent}
                 onDelete={handleDeleteAgent}
               />
@@ -589,7 +599,8 @@ export default function Library() {
                 agent={agent}
                 system="Analyzer"
                 isCustom
-                isActivated
+                isActivated={activatedIds.includes(agent.id)}
+                onToggle={() => handleToggle(agent.id)}
                 onEdit={handleEditAgent}
                 onDelete={handleDeleteAgent}
               />
