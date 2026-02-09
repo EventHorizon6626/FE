@@ -63,7 +63,8 @@ import {
   MdSmartToy,
   MdSpeed,
   MdTrendingUp,
-  MdWarning
+  MdWarning,
+  MdAccountTree
 } from 'react-icons/md';
 import ReactFlow, {
   addEdge,
@@ -81,6 +82,7 @@ import ReactFlow, {
   EdgeLabelRenderer,
   getBezierPath,
 } from 'reactflow';
+import dagre from 'dagre';
 import 'reactflow/dist/style.css';
 import '../../../assets/css/ReactFlowCustom.css';
 import { searchSecurities, SECURITIES } from 'data/securities';
@@ -222,14 +224,110 @@ const initialEdges = [];
 
 function CustomPortfolioNode({ data, id, selected }) {
   const { hasCopied, onCopy } = useClipboard(id);
+  const [showAddOptions, setShowAddOptions] = useState(false);
 
   return (
-    <Box position="relative" className="custom-portfolio-node">
+    <Box position="relative" className={`custom-portfolio-node${showAddOptions ? ' add-options-open' : ''}`}>
       <Handle
         type="source"
         position={Position.Right}
         style={{ background: '#38A169', width: '12px', height: '12px' }}
       />
+
+      {/* Add child node button — invisible hover zone near right edge */}
+      {data.onAddChildNode && (
+        <Box className="add-node-zone nopan nodrag" onPointerDown={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+          <IconButton
+            className={`add-node-btn${showAddOptions ? ' add-node-btn--open' : ''}`}
+            icon={<Icon as={showAddOptions ? MdClose : MdAdd} />}
+            size="xs"
+            colorScheme="green"
+            variant="solid"
+            borderRadius="full"
+            position="absolute"
+            right="6px"
+            top="50%"
+            transform="translateY(-50%)"
+            zIndex="10"
+            boxShadow="md"
+            aria-label="Add connected node"
+            onPointerDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowAddOptions(!showAddOptions);
+            }}
+            _hover={{ transform: 'translateY(-50%) scale(1.15)' }}
+          />
+          {showAddOptions && (
+            <VStack
+              className="nopan nodrag"
+              position="absolute"
+              left="100%"
+              top="50%"
+              transform="translateY(-50%)"
+              ml="8px"
+              zIndex="10"
+              spacing="6px"
+              onPointerDown={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              <Box
+                as="button"
+                display="flex"
+                alignItems="center"
+                gap="6px"
+                px="12px"
+                py="6px"
+                bg="blue.50"
+                border="2px solid"
+                borderColor="blue.300"
+                borderRadius="12px"
+                cursor="pointer"
+                boxShadow="sm"
+                _hover={{ bg: 'blue.100', borderColor: 'blue.400', transform: 'translateY(-1px)', boxShadow: 'md' }}
+                transition="all 0.2s"
+                onPointerDown={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  data.onAddChildNode(id, { name: 'Data Agent', type: 'custom_agent', system: 'data', color: 'blue', description: 'Custom data retrieval agent' });
+                  setShowAddOptions(false);
+                }}
+              >
+                <RobotHead description="Custom data retrieval agent" size={18} />
+                <Text fontSize="xs" fontWeight="600" color="blue.700" whiteSpace="nowrap">Data Agent</Text>
+              </Box>
+              <Box
+                as="button"
+                display="flex"
+                alignItems="center"
+                gap="6px"
+                px="12px"
+                py="6px"
+                bg="purple.50"
+                border="2px solid"
+                borderColor="purple.300"
+                borderRadius="12px"
+                cursor="pointer"
+                boxShadow="sm"
+                _hover={{ bg: 'purple.100', borderColor: 'purple.400', transform: 'translateY(-1px)', boxShadow: 'md' }}
+                transition="all 0.2s"
+                onPointerDown={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  data.onAddChildNode(id, { name: 'Analyzer', type: 'custom_agent', system: 'analyzer', color: 'purple', description: 'Analysis agent' });
+                  setShowAddOptions(false);
+                }}
+              >
+                <RobotHead description="Analysis agent" size={18} />
+                <Text fontSize="xs" fontWeight="600" color="purple.700" whiteSpace="nowrap">Analyzer</Text>
+              </Box>
+            </VStack>
+          )}
+        </Box>
+      )}
 
       <Box
         p="16px"
@@ -715,6 +813,7 @@ function PipelineBuilderInner() {
     return () => clearTimeout(saveTimeout);
   }, [nodes, currentHorizonName, currentHorizonId, isLoading]);
 
+  // Add a child node from the "+" button on a node's outbound side
   const onConnect = useCallback(
     async (params) => {
       console.log('[onConnect] Connection params:', params);
@@ -909,7 +1008,151 @@ function PipelineBuilderInner() {
     }
   }, [setNodes, setEdges, toast]);
 
-  const { getNodes, getEdges } = useReactFlow();
+  const { getNodes, getEdges, fitView } = useReactFlow();
+
+  // Add a child node from the "+" button on a node's outbound side
+  const handleAddChildNode = useCallback(async (sourceNodeId, agentTemplate) => {
+    const sourceNode = getNodes().find(n => n.id === sourceNodeId);
+    if (!sourceNode || !currentHorizonId) return;
+
+    const sourceW = sourceNode.width || 250;
+    const position = {
+      x: sourceNode.position.x + sourceW + 80,
+      y: sourceNode.position.y,
+    };
+
+    try {
+      const response = await nodeApi.create({
+        horizonId: currentHorizonId,
+        type: 'agentNode',
+        position,
+        data: {
+          agent: agentTemplate,
+          config: {
+            name: agentTemplate.name,
+            description: agentTemplate.description || '',
+            model: 'gpt-4',
+            temperature: 0.7,
+            maxTokens: 2000,
+          },
+        },
+        parentId: sourceNodeId,
+      });
+
+      const savedNode = response.data;
+      const newNode = {
+        id: savedNode.id,
+        type: 'agentNode',
+        position,
+        data: {
+          agent: agentTemplate,
+          horizonId: currentHorizonId,
+          onDelete: handleNodeDelete,
+          refetchHorizon: refetchHorizon,
+          onAddChildNode: handleAddChildNode,
+          config: savedNode.data.config,
+        },
+      };
+
+      setNodes(nds => nds.concat(newNode));
+      setEdges(eds => [...eds, {
+        id: `edge-${sourceNodeId}-${savedNode.id}`,
+        source: sourceNodeId,
+        target: savedNode.id,
+        type: 'custom',
+        data: { output: null },
+      }]);
+
+      toast({
+        title: 'Node added',
+        description: `${agentTemplate.name} connected to pipeline`,
+        status: 'success',
+        duration: 2000,
+        isClosable: true,
+      });
+    } catch (error) {
+      console.error('Failed to add child node:', error);
+      toast({
+        title: 'Failed to add node',
+        description: error.message || 'Could not create node',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+    }
+  }, [getNodes, currentHorizonId, setNodes, setEdges, toast, handleNodeDelete, refetchHorizon]);
+
+  // Auto-layout: arrange connected nodes as a tree, push disconnected nodes off to the side
+  const handleAutoLayout = useCallback(() => {
+    const currentNodes = getNodes();
+    const currentEdges = getEdges();
+    if (currentNodes.length === 0) return;
+
+    // Separate connected vs disconnected
+    const connectedIds = new Set();
+    currentEdges.forEach(e => { connectedIds.add(e.source); connectedIds.add(e.target); });
+
+    // Use dagre for the connected graph (handles DAGs, multiple parents, etc.)
+    const g = new dagre.graphlib.Graph();
+    g.setDefaultEdgeLabel(() => ({}));
+    g.setGraph({
+      rankdir: 'LR',
+      nodesep: 40,
+      ranksep: 80,
+      edgesep: 20,
+      ranker: 'tight-tree',
+    });
+
+    // Use actual rendered node dimensions (ReactFlow measures them after render)
+    currentNodes.forEach(node => {
+      if (connectedIds.has(node.id)) {
+        const w = node.width || 250;
+        const h = node.height || 120;
+        g.setNode(node.id, { width: w, height: h });
+      }
+    });
+    currentEdges.forEach(edge => {
+      if (connectedIds.has(edge.source) && connectedIds.has(edge.target)) {
+        g.setEdge(edge.source, edge.target);
+      }
+    });
+
+    dagre.layout(g);
+
+    // Apply positions using each node's actual size
+    let maxTreeY = 0;
+    const finalNodes = currentNodes.map(node => {
+      if (connectedIds.has(node.id)) {
+        const dn = g.node(node.id);
+        const w = node.width || 250;
+        const h = node.height || 120;
+        const pos = {
+          x: Math.round(dn.x - w / 2),
+          y: Math.round(dn.y - h / 2),
+        };
+        maxTreeY = Math.max(maxTreeY, pos.y + h);
+        return { ...node, position: pos };
+      }
+      return node;
+    });
+
+    // Disconnected nodes in a row below
+    let dx = 0;
+    const result = finalNodes.map(node => {
+      if (!connectedIds.has(node.id)) {
+        const pos = { x: dx, y: maxTreeY + 100 };
+        dx += 260;
+        return { ...node, position: pos };
+      }
+      return node;
+    });
+
+    setNodes(result);
+    result.forEach(node => {
+      nodeApi.update(node.id, { position: node.position }).catch(() => {});
+    });
+    setTimeout(() => fitView({ padding: 0.15, duration: 400 }), 50);
+  }, [getNodes, getEdges, setNodes, fitView]);
 
   // Save node position to backend when drag stops
   const handleNodeDragStop = useCallback(async (event, node) => {
@@ -1080,43 +1323,11 @@ function PipelineBuilderInner() {
         // Add NEW outputNode to canvas (use id from backend)
         const agentNodePosition = currentNodes.find(n => n.id === nodeId)?.position || { x: 0, y: 0 };
 
-        // Find a good position for the output node (close to source, right-aligned)
-        const outputNodeWidth = 280; // Approximate width of output node
-        const outputNodeHeight = 150; // Approximate height of output node
-        const spacing = 30; // Minimum spacing between nodes
-        const horizontalDistance = 200; // Distance from source node (closer now)
-
-        // Try positions: right-aligned first (same Y), then slight vertical offsets
-        const tryPositions = [
-          { x: agentNodePosition.x + horizontalDistance, y: agentNodePosition.y }, // Right, same Y
-          { x: agentNodePosition.x + horizontalDistance, y: agentNodePosition.y + 50 }, // Right, slightly below
-          { x: agentNodePosition.x + horizontalDistance, y: agentNodePosition.y - 50 }, // Right, slightly above
-          { x: agentNodePosition.x + horizontalDistance, y: agentNodePosition.y + 100 }, // Right, more below
-          { x: agentNodePosition.x + horizontalDistance, y: agentNodePosition.y - 100 }, // Right, more above
-        ];
-
-        // Check if a position collides with existing nodes (excluding old output node)
-        const hasCollision = (pos) => {
-          return currentNodes.some(n => {
-            if (n.id === nodeId) return false; // Skip source node
-            if (n.type === 'outputNode' && n.data?.sourceAgentNodeId === nodeId) return false; // Skip old output
-            const nodeWidth = 280;
-            const nodeHeight = 150;
-            const dx = Math.abs((pos.x + outputNodeWidth / 2) - (n.position.x + nodeWidth / 2));
-            const dy = Math.abs((pos.y + outputNodeHeight / 2) - (n.position.y + nodeHeight / 2));
-            return dx < (outputNodeWidth + nodeWidth) / 2 + spacing &&
-                   dy < (outputNodeHeight + nodeHeight) / 2 + spacing;
-          });
+        // Place output node close to the right of the parent agent node
+        const outputPosition = {
+          x: agentNodePosition.x + 50,
+          y: agentNodePosition.y,
         };
-
-        // Find first non-colliding position (always to the right)
-        let outputPosition = tryPositions[0]; // Default: right-aligned
-        for (const pos of tryPositions) {
-          if (!hasCollision(pos)) {
-            outputPosition = pos;
-            break;
-          }
-        }
 
         const newOutputNode = {
           id: savedOutputNode.id, // Use _id from backend
@@ -1317,6 +1528,7 @@ function PipelineBuilderInner() {
                 horizonId: currentHorizonId,
                 onDelete: handleNodeDelete,
                 refetchHorizon: refetchHorizon,
+                onAddChildNode: handleAddChildNode,
                 config: savedNode.data.config,
               },
             };
@@ -1349,6 +1561,7 @@ function PipelineBuilderInner() {
                 portfolio: draggedItem.data,
                 onDelete: handleNodeDelete,
                 refetchHorizon: refetchHorizon,
+                onAddChildNode: handleAddChildNode,
               },
             };
 
@@ -1619,7 +1832,7 @@ function PipelineBuilderInner() {
             data: {
               ...node.data,
               config: nodeConfig,
-              agent: { ...node.data.agent, systemPrompt: nodeConfig.systemPrompt },
+              agent: { ...node.data.agent, name: nodeConfig.name, description: nodeConfig.description, systemPrompt: nodeConfig.systemPrompt },
             },
           };
         }
@@ -1695,6 +1908,7 @@ function PipelineBuilderInner() {
           horizonId: horizonData.id,
           onDelete: handleNodeDelete,
           refetchHorizon: refetchHorizon,
+          onAddChildNode: handleAddChildNode,
         }
       }));
       
@@ -2232,17 +2446,30 @@ function PipelineBuilderInner() {
           <Background variant="dots" gap={16} size={1} />
 
           <Panel position="top-right">
-            <Tooltip label="Back to Horizons" placement="left" hasArrow>
-              <IconButton
-                icon={<Icon as={MdHome} />}
-                size="md"
-                colorScheme="teal"
-                variant="solid"
-                aria-label="Back to horizons"
-                onClick={() => navigate('/pipeline')}
-                boxShadow="lg"
-              />
-            </Tooltip>
+            <HStack spacing={2}>
+              <Tooltip label="Auto Layout" placement="left" hasArrow>
+                <IconButton
+                  icon={<Icon as={MdAccountTree} />}
+                  size="md"
+                  colorScheme="purple"
+                  variant="solid"
+                  aria-label="Auto layout"
+                  onClick={handleAutoLayout}
+                  boxShadow="lg"
+                />
+              </Tooltip>
+              <Tooltip label="Back to Horizons" placement="left" hasArrow>
+                <IconButton
+                  icon={<Icon as={MdHome} />}
+                  size="md"
+                  colorScheme="teal"
+                  variant="solid"
+                  aria-label="Back to horizons"
+                  onClick={() => navigate('/pipeline')}
+                  boxShadow="lg"
+                />
+              </Tooltip>
+            </HStack>
           </Panel>
         </ReactFlow>
       </Box>
@@ -2353,6 +2580,9 @@ function PipelineBuilderInner() {
                         leftIcon={<Icon as={MdRefresh} />}
                         variant="outline"
                         colorScheme="purple"
+                        isLoading={isGeneratingPrompt}
+                        loadingText="Generating..."
+                        isDisabled={isGeneratingPrompt}
                         onClick={async () => {
                           if (!nodeConfig.name || !nodeConfig.description) {
                             toast({
@@ -2364,6 +2594,7 @@ function PipelineBuilderInner() {
                             });
                             return;
                           }
+                          setIsGeneratingPrompt(true);
                           try {
                             const response = await generateAgentSystemPrompt(
                               nodeConfig.name,
@@ -2390,6 +2621,8 @@ function PipelineBuilderInner() {
                               duration: 3000,
                               isClosable: true,
                             });
+                          } finally {
+                            setIsGeneratingPrompt(false);
                           }
                         }}
                       >

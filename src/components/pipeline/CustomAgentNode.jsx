@@ -9,7 +9,8 @@ import {
   useClipboard,
   VStack,
 } from '@chakra-ui/react';
-import { MdPlayArrow, MdContentCopy } from 'react-icons/md';
+import { useState } from 'react';
+import { MdPlayArrow, MdContentCopy, MdAdd, MdClose } from 'react-icons/md';
 import { Handle, Position, useReactFlow } from 'reactflow';
 import { useRunAgent } from '../../hooks/useRunAgent';
 import { RobotHead } from './RobotHead';
@@ -18,6 +19,7 @@ import { IDshorten } from '../../utils';
 export const CustomAgentNode = ({ data, id, selected }) => {
   const { setNodes, setEdges, getNodes, getEdges } = useReactFlow();
   const { onCopy } = useClipboard(id);
+  const [showAddOptions, setShowAddOptions] = useState(false);
 
   const runAgentMutation = useRunAgent({
     setNodes,
@@ -50,7 +52,7 @@ export const CustomAgentNode = ({ data, id, selected }) => {
   };
 
   return (
-    <Box position="relative" className="custom-agent-node">
+    <Box position="relative" className={`custom-agent-node${showAddOptions ? ' add-options-open' : ''}`}>
       <Handle
         type="target"
         position={Position.Left}
@@ -62,6 +64,7 @@ export const CustomAgentNode = ({ data, id, selected }) => {
         style={{ background: '#555', width: '12px', height: '12px' }}
       />
 
+      {/* Play button */}
       <Box
         position="absolute"
         top="-8px"
@@ -83,6 +86,75 @@ export const CustomAgentNode = ({ data, id, selected }) => {
           isDisabled={runAgentMutation.isPending}
         />
       </Box>
+
+      {/* Add child analyzer node button — invisible hover zone near right edge */}
+      {data.onAddChildNode && (
+        <Box className="add-node-zone nopan nodrag" onPointerDown={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+          <IconButton
+            className={`add-node-btn${showAddOptions ? ' add-node-btn--open' : ''}`}
+            icon={<Icon as={showAddOptions ? MdClose : MdAdd} />}
+            size="xs"
+            colorScheme="purple"
+            variant="solid"
+            borderRadius="full"
+            position="absolute"
+            right="6px"
+            top="50%"
+            transform="translateY(-50%)"
+            zIndex="10"
+            boxShadow="md"
+            aria-label="Add analyzer node"
+            onPointerDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowAddOptions(!showAddOptions);
+            }}
+            _hover={{ transform: 'translateY(-50%) scale(1.15)' }}
+          />
+          {showAddOptions && (
+            <Box
+              as="button"
+              className="nopan nodrag"
+              position="absolute"
+              left="100%"
+              top="50%"
+              transform="translateY(-50%)"
+              ml="8px"
+              display="flex"
+              alignItems="center"
+              gap="6px"
+              px="12px"
+              py="6px"
+              bg="purple.50"
+              border="2px solid"
+              borderColor="purple.300"
+              borderRadius="12px"
+              cursor="pointer"
+              boxShadow="sm"
+              zIndex="10"
+              _hover={{ bg: 'purple.100', borderColor: 'purple.400', transform: 'translateY(-50%) translateY(-1px)', boxShadow: 'md' }}
+              transition="all 0.2s"
+              onPointerDown={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                data.onAddChildNode(id, {
+                  name: 'Analyzer',
+                  type: 'custom_agent',
+                  system: 'analyzer',
+                  color: 'purple',
+                  description: 'Analysis agent',
+                });
+                setShowAddOptions(false);
+              }}
+            >
+              <RobotHead description="Analysis agent" size={18} />
+              <Text fontSize="xs" fontWeight="600" color="purple.700" whiteSpace="nowrap">Analyzer</Text>
+            </Box>
+          )}
+        </Box>
+      )}
 
       <Box
         p="20px"

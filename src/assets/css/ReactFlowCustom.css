@@ -108,6 +108,30 @@
   box-shadow: none !important;
 }
 
+/* Raise z-index when add-options popover is open so buttons aren't clipped by sibling nodes */
+.react-flow__node:has(.add-options-open) {
+  z-index: 1000 !important;
+  overflow: visible !important;
+}
+
+/* Invisible hover zone near the right edge of the node to reveal "+" button */
+.add-node-zone {
+  position: absolute;
+  right: -50px;
+  top: 0;
+  bottom: 0;
+  width: 60px;
+  z-index: 9;
+}
+.add-node-zone .add-node-btn {
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.add-node-zone:hover .add-node-btn,
+.add-node-zone .add-node-btn--open {
+  opacity: 1;
+}
+
 /* Custom agent node - improve rendering */
 .custom-agent-node {
   -webkit-font-smoothing: antialiased;
