@@ -1,6 +1,8 @@
 import { useMutation } from '@tanstack/react-query';
 import { useToast } from '@chakra-ui/react';
-import { runAgent, getAgentInputData, runCustomAgentApi } from 'lib/agentApi';
+import { runAgent, getAgentInputData,
+  //  runCustomAgentApi
+   } from 'lib/agentApi';
 import nodeApi from 'lib/nodeApi';
 import { horizonAgentApi } from 'lib/horizonAgentApi';
 
@@ -108,22 +110,22 @@ export const useRunAgent = ({
 
   // Execute a data agent — route standard EH pipeline agents to their endpoints,
   // custom/exotic agents to the custom agent endpoint
-  const executeDataAgent = async (nodeId, agentSpec, stocks, executionContext) => {
-    let result;
-    if (agentSpec.source === 'eh_pipeline') {
-      // Standard EH data agent — use the specific endpoint (candlestick, earnings, etc.)
-      result = await runAgent(agentSpec.name, { stocks, data: null }, null, executionContext);
-    } else {
-      // Custom/exotic data agent — run via custom agent endpoint with fetch mode
-      result = await runCustomAgentApi(
-        stocks,
-        agentSpec.system_prompt,
-        null,
-        { ...executionContext, execution_mode: 'fetch_data' },
-      );
-    }
-    return { name: agentSpec.name, nodeId, result };
-  };
+  // const executeDataAgent = async (nodeId, agentSpec, stocks, executionContext) => {
+  //   let result;
+  //   if (agentSpec.source === 'eh_pipeline') {
+  //     // Standard EH data agent — use the specific endpoint (candlestick, earnings, etc.)
+  //     result = await runAgent(agentSpec.name, { stocks, data: null }, null, executionContext);
+  //   } else {
+  //     // Custom/exotic data agent — run via custom agent endpoint with fetch mode
+  //     result = await runCustomAgentApi(
+  //       stocks,
+  //       agentSpec.system_prompt,
+  //       null,
+  //       { ...executionContext, execution_mode: 'fetch_data' },
+  //     );
+  //   }
+  //   return { name: agentSpec.name, nodeId, result };
+  // };
 
   // Main orchestrator: create agents, execute them, re-run custom agent
   const handleNeedsData = async ({ customAgentNodeId, requiredAgents, currentNodes, currentEdges, node, agentName, agentType }) => {
