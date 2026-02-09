@@ -82,9 +82,11 @@ export const useRunAgent = ({
       isBuiltin: isStandard,
     };
 
-    // Standard built-in agents: add descriptive read-only prompt
+    // Standard built-in agents: DON'T set systemPrompt.
+    // Their execution routes to dedicated endpoints, not the custom/thinking path.
+    // A systemPrompt here would cause runAgent() to misroute them to /agents/custom.
     if (isStandard && details) {
-      agentData.systemPrompt = `Built-in ${details.name} data pipeline agent.\n\nRetrieves ${details.description.toLowerCase()} for the given stocks using the standard EH data pipeline.\n\nThis agent uses a pre-configured endpoint and does not require a custom system prompt.`;
+      agentData.description = `Built-in ${details.name} pipeline — ${details.description.toLowerCase()}`;
     }
 
     // Exotic agents: use the LLM-generated system prompt from EH

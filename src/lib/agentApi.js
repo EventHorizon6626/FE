@@ -220,7 +220,13 @@ export const runAgent = async (agentType, inputData, customAgentConfig = null, e
   const context = executionContext || {};
 
   // Handle custom agents with optional thinking mode
-  if (customAgentConfig && customAgentConfig.systemPrompt) {
+  // BUT skip for built-in data agents — they have their own dedicated endpoints
+  const BUILTIN_DATA_AGENTS = new Set([
+    'candlestick', 'data_retriever', 'earnings', 'news', 'news_agent',
+    'technical', 'technical_agent', 'fundamentals', 'financial_metrics',
+  ]);
+
+  if (customAgentConfig && customAgentConfig.systemPrompt && !BUILTIN_DATA_AGENTS.has(agentType)) {
     // Check if thinking mode is enabled
     if (customAgentConfig.enableThinking) {
       return await runThinkingAgent(
