@@ -312,8 +312,7 @@ export const runAgent = async (agentType, inputData, customAgentConfig = null, e
       return await runResearchManagerAgent(data?.bullThesis, data?.bearThesis, context);
 
     case 'bull_bear_analyzer':
-      // Use 120 second timeout for bull-bear analyzer (Stage 2/3 processing + debate)
-      return await request.withTimeout(120000).post('/ai/agents/bull-bear-analyzer', {
+      return await request.withTimeout(600000).post('/ai/agents/bull-bear-analyzer', {
         stocks,
         raw_data: data,
         ...context,
