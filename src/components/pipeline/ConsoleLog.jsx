@@ -7,12 +7,12 @@ import {
   Tooltip,
   VStack
 } from '@chakra-ui/react';
-import { forwardRef, useImperativeHandle, useState } from 'react';
+import { forwardRef, useImperativeHandle, useState, useRef, useEffect } from 'react';
 import { MdDelete, MdTerminal } from 'react-icons/md';
 
 const ConsoleLog = forwardRef((props, ref) => {
-  const [logEntries, setLogEntries] = useState([
-  ]);
+  const [logEntries, setLogEntries] = useState([]);
+  const logBodyRef = useRef(null);
 
   // Expose addLog function to parent via ref
   useImperativeHandle(ref, () => ({
@@ -33,6 +33,13 @@ const ConsoleLog = forwardRef((props, ref) => {
       setLogEntries([]);
     }
   }));
+
+  // Auto-scroll to bottom when new log is added
+  useEffect(() => {
+    if (logBodyRef.current) {
+      logBodyRef.current.scrollTop = logBodyRef.current.scrollHeight;
+    }
+  }, [logEntries]);
 
   return (
     <Box
@@ -81,6 +88,7 @@ const ConsoleLog = forwardRef((props, ref) => {
 
       {/* Log Body */}
       <Box
+        ref={logBodyRef}
         flex="1"
         overflowY="auto"
         p="12px"
