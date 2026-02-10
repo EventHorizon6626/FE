@@ -9,7 +9,7 @@ const aiApi = axios.create({
     'Content-Type': 'application/json',
     Accept: 'application/json',
   },
-  timeout: 60000, // 60 seconds for AI processing
+  timeout: 240000, // 240 seconds for AI processing
 });
 
 // Request interceptor for logging

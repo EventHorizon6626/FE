@@ -208,8 +208,8 @@ export const runTraderAgent = async (stocks, data, context = {}) => {
 // ===== Thinking Agent (ReAct-style iterative reasoning) =====
 
 export const runThinkingAgent = async (stocks, systemPrompt, inputData = null, maxIterations = 5) => {
-  // Use 60 second timeout for thinking agent (iterative reasoning with multiple tool calls can take longer)
-  const response = await request.withTimeout(60000).post('/ai/agents/think', {
+  // Use 240 second timeout for thinking agent (iterative reasoning with multiple tool calls can take longer)
+  const response = await request.withTimeout(240000).post('/ai/agents/think', {
     stocks,
     system_prompt: systemPrompt,
     input_data: inputData,
