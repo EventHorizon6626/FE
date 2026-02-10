@@ -437,7 +437,7 @@ function CustomEdge({ id, source, target, sourceX, sourceY, targetX, targetY, so
   const targetNode = getNode(target);
   const isDataToAnalyzer =
     sourceNode?.data?.agent?.system === 'data' &&
-    targetNode?.data?.agent?.system === 'analyzer';
+    (targetNode?.data?.agent?.system === 'analyzer' || sourceNode?.data?.agent?.isAutoCreated);
 
   const hasOutput = !!data?.output;
 
