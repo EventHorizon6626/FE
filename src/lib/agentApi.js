@@ -39,8 +39,8 @@ export const generateAgentSystemPrompt = async (name, description, category) => 
 // ===== Custom Agent Execution =====
 
 export const runCustomAgentApi = async (stocks, systemPrompt, userPrompt = null, context = {}) => {
-  // Use 180 second timeout for custom AI agent execution (thinking loop with tool calls needs time)
-  const response = await request.withTimeout(180000).post('/ai/agents/custom', {
+  // Use 240 second timeout for custom AI agent execution (thinking loop with tool calls needs time)
+  const response = await request.withTimeout(240000).post('/ai/agents/custom', {
     stocks,
     system_prompt: systemPrompt,
     user_prompt: userPrompt,
