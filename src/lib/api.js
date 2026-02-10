@@ -9,7 +9,7 @@ const api = axios.create({
     'Content-Type': 'application/json',
     Accept: 'application/json',
   },
-  timeout: 90000, // 90 seconds for AI generation
+  timeout: 240000, // 240 seconds for AI generation
 });
 
 export function getToken() {
