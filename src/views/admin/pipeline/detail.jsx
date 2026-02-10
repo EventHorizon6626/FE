@@ -1615,14 +1615,8 @@ function PipelineBuilderInner() {
 
         // Refetch horizon to get updated data
         await refetchHorizon();
-
-        toast({
-          title: 'Node added to block',
-          description: `Successfully moved node into block container`,
-          status: 'success',
-          duration: 2000,
-          isClosable: true,
-        });
+        consoleLogRef.current?.addLog('success', `Node added to block ${targetBlock.data?.name || targetBlock.id}`);
+        
       } else {
         // Normal drag - just save position
         await nodeApi.update(node.id, {
@@ -1694,13 +1688,7 @@ function PipelineBuilderInner() {
 
       // Refetch horizon to get updated data
       await refetchHorizon();
-
-      toast({
-        title: 'Node added to block',
-        status: 'success',
-        duration: 2000,
-        isClosable: true,
-      });
+      consoleLogRef.current?.addLog('success', `Node added to block ${blockNode.data?.name || blockNode.id} via drag & drop`);
     } catch (error) {
       console.error('Failed to add node to block:', error);
       toast({
@@ -1876,25 +1864,34 @@ function PipelineBuilderInner() {
     const currentNodes = getNodes();
     const blockNode = currentNodes.find(n => n.id === blockId);
     
+    console.log('[ConfigChildNode] blockNode:', blockNode);
+    
     if (!blockNode || !blockNode.data.childNodeIds) {
-      console.warn('[ConfigChildNode] Block not found or has no childNodeIds');
+      console.log('[ConfigChildNode] Early return: no blockNode or childNodeIds');
       return;
     }
 
     const childNodeIds = blockNode.data.childNodeIds;
     
+    console.log('[ConfigChildNode] childNodeIds:', childNodeIds);
+    
     // Check if child node exists in block
     if (!childNodeIds.includes(childNodeId)) {
-      console.warn('[ConfigChildNode] Child node not in block childNodeIds');
+      console.log('[ConfigChildNode] Early return: childNodeId not in block');
       return;
     }
 
-    // Find the actual child node from block's childNodes data
+    // Find the child node from blockNode.data.childNodes (not from currentNodes!)
     const childNode = blockNode.data.childNodes?.find(n => n.id === childNodeId);
+
+    console.log('[ConfigChildNode] childNode:', childNode);
+
     if (!childNode) {
-      console.warn('[ConfigChildNode] Child node not found in block.data.childNodes');
+      console.log('[ConfigChildNode] Early return: childNode not found in block.data.childNodes');
       return;
     }
+    
+    console.log('[ConfigChildNode] childNode.type:', childNode.type);
     
     // Create a temporary node object for config panel
     const tempNode = {
@@ -1908,6 +1905,7 @@ function PipelineBuilderInner() {
 
     // Open config panel based on node type
     if (childNode.type === 'agentNode') {
+      console.log('[ConfigChildNode] Opening agentNode config');
       setSelectedNode(tempNode);
       setNodeConfig({
         name: childNode.data?.config?.name || childNode.data?.agent?.name || '',
@@ -1918,6 +1916,7 @@ function PipelineBuilderInner() {
         systemPrompt: childNode.data?.agent?.systemPrompt || '',
       });
     } else if (childNode.type === 'portfolioNode') {
+      console.log('[ConfigChildNode] Opening portfolioNode config');
       setSelectedNode(tempNode);
       setPortfolioConfig({
         name: childNode.data?.portfolio?.name || '',
@@ -1942,23 +1941,30 @@ function PipelineBuilderInner() {
     const currentNodes = getNodes();
     const blockNode = currentNodes.find(n => n.id === blockId);
     
+    console.log('[ExtractAndDrag] blockNode:', blockNode);
+    
     if (!blockNode || !blockNode.data.childNodeIds) {
-      console.warn('[ExtractAndDrag] Block not found or has no childNodeIds');
+      console.log('[ExtractAndDrag] Early return: no blockNode or childNodeIds');
       return;
     }
 
     const childNodeIds = blockNode.data.childNodeIds;
     
+    console.log('[ExtractAndDrag] childNodeIds:', childNodeIds);
+    
     // Check if child node exists in block
     if (!childNodeIds.includes(childNodeId)) {
-      console.warn('[ExtractAndDrag] Child node not in block childNodeIds');
+      console.log('[ExtractAndDrag] Early return: childNodeId not in block');
       return;
     }
 
-    // Find the child node from block's childNodes data (not from visible nodes)
+    // Find the child node from blockNode.data.childNodes (not from currentNodes!)
     const childNode = blockNode.data.childNodes?.find(n => n.id === childNodeId);
+
+    console.log('[ExtractAndDrag] childNode:', childNode);
+
     if (!childNode) {
-      console.warn('[ExtractAndDrag] Child node not found in block.data.childNodes');
+      console.log('[ExtractAndDrag] Early return: childNode not found in block.data.childNodes');
       return;
     }
 
@@ -1967,6 +1973,8 @@ function PipelineBuilderInner() {
       x: mouseEvent.clientX,
       y: mouseEvent.clientY,
     });
+
+    console.log('[ExtractAndDrag] position:', position);
 
     // Create preview node
     const previewNodeId = `preview-extract-${Date.now()}`;
@@ -1979,19 +1987,21 @@ function PipelineBuilderInner() {
       style: { opacity: 0.6 }, // Preview style
     };
 
+    console.log('[ExtractAndDrag] Creating preview node:', previewNode);
+
     setNodes((nds) => nds.concat(previewNode));
     setDragPreviewNodeId(previewNodeId);
     setExtractingChild({ blockId, childNodeId, childNode });
     dragStartPosRef.current = { x: mouseEvent.clientX, y: mouseEvent.clientY };
     setIsDragging(true);
 
-    toast({
-      title: 'Extracting node',
-      description: 'Move to desired position and release',
-      status: 'info',
-      duration: 2000,
-      isClosable: true,
-    });
+    // toast({
+    //   title: 'Extracting node',
+    //   description: 'Move to desired position and release',
+    //   status: 'info',
+    //   duration: 2000,
+    //   isClosable: true,
+    // });
   }, [getNodes, screenToFlowPosition, setNodes, toast]);
 
   // Create a new block node (OLD - now using drag from sidebar)
@@ -2216,14 +2226,7 @@ function PipelineBuilderInner() {
 
             // Refetch horizon to get updated data
             await refetchHorizon();
-
-            toast({
-              title: 'Node extracted',
-              description: 'Node successfully removed from block',
-              status: 'success',
-              duration: 2000,
-              isClosable: true,
-            });
+            consoleLogRef.current?.addLog('success', `Node extracted from block ${blockNode.data?.name || blockNode.id}`);
           }
         } catch (error) {
           console.error('Failed to extract node:', error);
@@ -2296,14 +2299,7 @@ function PipelineBuilderInner() {
             
             // Refetch horizon to get updated data
             await refetchHorizon();
-
-            toast({
-              title: 'Block added',
-              description: 'Block container created',
-              status: 'success',
-              duration: 2000,
-              isClosable: true,
-            });
+            consoleLogRef.current?.addLog('success', 'Block node created');
           }
         } catch (error) {
           console.error('Failed to create node:', error);

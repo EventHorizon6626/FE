@@ -74,49 +74,61 @@ function ChildNodeDisplay({ child, index, onExtractAndDrag, onConfig }) {
       position="relative"
       _hover={{ boxShadow: 'md', transform: 'translateY(-2px)' }}
       transition="all 0.2s"
-      className="nopan nodrag"
+      className="nodrag"
     >
       {/* Action buttons row */}
-      <HStack
+      <Box
         position="absolute"
         right="4px"
         top="4px"
-        spacing="2px"
+        zIndex="999"
+        pointerEvents="auto"
+        className="nodrag nopan"
       >
-        {/* Config button */}
-        <Tooltip label="Configure node" placement="top" hasArrow>
-          <IconButton
-            icon={<Icon as={MdSettings} />}
-            size="xs"
-            colorScheme="purple"
-            variant="ghost"
-            aria-label="Configure node"
-            onClick={handleConfigClick}
-            borderRadius="full"
-            _hover={{ bg: 'purple.100', transform: 'scale(1.1)' }}
-            transition="all 0.2s"
-            className="nodrag"
-          />
-        </Tooltip>
+        <HStack spacing="2px">
+          {/* Config button */}
+          <Tooltip label="Configure node" placement="top" hasArrow>
+            <Box className="nodrag nopan">
+              <IconButton
+                icon={<Icon as={MdSettings} />}
+                size="xs"
+                colorScheme="purple"
+                variant="ghost"
+                aria-label="Configure node"
+                onClick={handleConfigClick}
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                }}
+                borderRadius="full"
+                _hover={{ bg: 'purple.100', transform: 'scale(1.1)' }}
+                transition="all 0.2s"
+                className="nodrag nopan"
+              />
+            </Box>
+          </Tooltip>
 
-        {/* Drag/Extract button */}
-        <Tooltip label="Hold to drag out" placement="top" hasArrow>
-          <IconButton
-            icon={<Icon as={MdPanTool} />}
-            size="xs"
-            colorScheme="blue"
-            variant="ghost"
-            aria-label="Drag to extract"
-            onMouseDown={handleMouseDown}
-            cursor="grab"
-            _active={{ cursor: 'grabbing' }}
-            borderRadius="full"
-            _hover={{ bg: 'blue.100', transform: 'scale(1.1)' }}
-            transition="all 0.2s"
-            className="nodrag"
-          />
-        </Tooltip>
-      </HStack>
+          {/* Drag/Extract button */}
+          <Tooltip label="Hold to drag out" placement="top" hasArrow>
+            <Box className="nodrag nopan">
+              <IconButton
+                icon={<Icon as={MdPanTool} />}
+                size="xs"
+                colorScheme="blue"
+                variant="ghost"
+                aria-label="Drag to extract"
+                onMouseDown={handleMouseDown}
+                cursor="grab"
+                _active={{ cursor: 'grabbing' }}
+                borderRadius="full"
+                _hover={{ bg: 'blue.100', transform: 'scale(1.1)' }}
+                transition="all 0.2s"
+                className="nodrag nopan"
+              />
+            </Box>
+          </Tooltip>
+        </HStack>
+      </Box>
 
       {/* Node content */}
       <VStack align="start" spacing="4px" pr="60px">
