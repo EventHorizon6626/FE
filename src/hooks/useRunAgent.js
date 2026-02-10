@@ -334,6 +334,11 @@ export const useRunAgent = ({
 
       if (srcType === 'custom_agent' && srcAgent?.system === 'data') {
         srcContext.execution_mode = 'fetch_data';
+        // Exotic (analyzer-spawned) data agents only need web_search —
+        // standard tools are already fetched by dedicated pipeline agents
+        if (srcAgent.isAutoCreated && !srcAgent.isBuiltin) {
+          srcContext.available_tools = ['web_search'];
+        }
       }
 
       // Skip BE outputNode save if this data agent is wired to an analyzer
@@ -480,6 +485,11 @@ export const useRunAgent = ({
       // Custom DATA agents should only fetch data, not enter discovery/thinking loop
       if (agentType === 'custom_agent' && agent?.system === 'data') {
         executionContext.execution_mode = 'fetch_data';
+        // Exotic (analyzer-spawned) data agents only need web_search —
+        // standard tools are already fetched by dedicated pipeline agents
+        if (agent.isAutoCreated && !agent.isBuiltin) {
+          executionContext.available_tools = ['web_search'];
+        }
       }
 
       // Skip BE outputNode save if this data agent is wired to an analyzer
