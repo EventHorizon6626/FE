@@ -6,7 +6,6 @@ import {
   Badge,
   Box,
   Button,
-  Collapse,
   Divider,
   FormControl,
   FormLabel,
@@ -26,10 +25,8 @@ import {
   ModalHeader,
   ModalOverlay,
   Progress,
-  Select,
   SimpleGrid,
   Spinner,
-  Switch,
   Text,
   Textarea,
   Tooltip,
@@ -38,38 +35,49 @@ import {
   useToast,
   VStack
 } from '@chakra-ui/react';
-import { Component, useCallback, useEffect, useRef, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { Component, useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 // useMutation removed - now used in CustomAgentNode component
+import ConsoleLog from 'components/pipeline/ConsoleLog';
+import { CustomAgentNode } from 'components/pipeline/CustomAgentNode';
+import { CustomBlockNode } from 'components/pipeline/CustomBlockNode';
+import { RobotHead } from 'components/pipeline/RobotHead';
+import { getActivatedAgentIds, getActivatedAnalyzerAgents, getActivatedDataAgents } from 'data/libraryAgents';
+import { searchSecurities, SECURITIES } from 'data/securities';
+import { generateAgentSystemPrompt, getJobByNode, pollJobUntilComplete } from 'lib/agentApi';
+import { request } from 'lib/api';
+import horizonAgentApi from 'lib/horizonAgentApi';
+import nodeApi from 'lib/nodeApi';
+import portfolioApi from 'lib/portfolioApi';
+import Chart from 'react-apexcharts';
 import {
   MdAccountBalance,
+  MdAccountTree,
   MdAdd,
   MdArticle,
   MdClose,
   MdContentCopy,
   MdDelete,
   MdEdit,
-  MdGroups,
   MdHome,
   MdHub,
   MdMoreVert,
-  MdLightbulb,
-  MdPlayArrow,
   MdPsychology,
   MdRefresh,
   MdSave,
   MdShowChart,
   MdSmartToy,
   MdSpeed,
-  MdTrendingUp,
-  MdWarning,
-  MdAccountTree
+  MdWarning
 } from 'react-icons/md';
 import ReactFlow, {
   addEdge,
   Background,
+  BaseEdge,
   Controls,
+  EdgeLabelRenderer,
+  getBezierPath,
   Handle,
   MiniMap,
   Panel,
@@ -79,27 +87,10 @@ import ReactFlow, {
   useEdgesState,
   useNodesState,
   useReactFlow,
-  BaseEdge,
-  EdgeLabelRenderer,
-  getBezierPath,
 } from 'reactflow';
-import dagre from 'dagre';
 import 'reactflow/dist/style.css';
-import '../../../assets/css/ReactFlowCustom.css';
-import { searchSecurities, SECURITIES } from 'data/securities';
-import { runAgent, getAgentInputData, generateAgentSystemPrompt } from 'lib/agentApi';
-import { request } from 'lib/api';
-import portfolioApi from 'lib/portfolioApi';
-import horizonAgentApi from 'lib/horizonAgentApi';
-import nodeApi from 'lib/nodeApi';
-import { CustomAgentNode } from 'components/pipeline/CustomAgentNode';
-import { CustomBlockNode } from 'components/pipeline/CustomBlockNode';
-import { RobotHead } from 'components/pipeline/RobotHead';
-import ConsoleLog from 'components/pipeline/ConsoleLog';
-import Chart from 'react-apexcharts';
-import StockAnalysisCard from 'views/admin/portfolio/components/StockAnalysisCard';
 import { IDshorten } from 'utils';
-import { getActivatedDataAgents, getActivatedAnalyzerAgents, getActivatedAgentIds } from 'data/libraryAgents';
+import '../../../assets/css/ReactFlowCustom.css';
 
 // Sidebar view modes
 const SIDEBAR_VIEW = {
@@ -194,13 +185,13 @@ const extractDataBySymbol = (result) => {
 
   // Try known agent-specific fields first
   const knownField = result.chart_data_by_symbol ||
-         result.earnings_data_by_symbol ||
-         result.news_data_by_symbol ||
-         result.technical_data_by_symbol ||
-         result.fundamentals_data_by_symbol ||
-         result.chart_data ||
-         result.data?.chart_data_by_symbol ||
-         result.result?.chart_data_by_symbol;
+    result.earnings_data_by_symbol ||
+    result.news_data_by_symbol ||
+    result.technical_data_by_symbol ||
+    result.fundamentals_data_by_symbol ||
+    result.chart_data ||
+    result.data?.chart_data_by_symbol ||
+    result.result?.chart_data_by_symbol;
 
   if (knownField && typeof knownField === 'object') return knownField;
 
@@ -353,8 +344,8 @@ function CustomPortfolioNode({ data, id, selected }) {
           </HStack>
 
           {/* ID Section with Tooltip and Copy Button */}
-          <Tooltip 
-            label={id} 
+          <Tooltip
+            label={id}
             placement="bottom"
             hasArrow
             bg="gray.700"
@@ -362,10 +353,10 @@ function CustomPortfolioNode({ data, id, selected }) {
             fontSize="xs"
             p="8px"
           >
-            <HStack 
-              spacing="6px" 
-              bg="gray.50" 
-              p="6px 8px" 
+            <HStack
+              spacing="6px"
+              bg="gray.50"
+              p="6px 8px"
               borderRadius="6px"
               _hover={{ bg: 'gray.100' }}
               transition="all 0.2s"
@@ -570,8 +561,8 @@ function CustomOutputNode({ data, id, selected }) {
           </HStack>
 
           {/* ID Section with Tooltip and Copy Button */}
-          <Tooltip 
-            label={id} 
+          <Tooltip
+            label={id}
             placement="bottom"
             hasArrow
             bg="gray.700"
@@ -579,10 +570,10 @@ function CustomOutputNode({ data, id, selected }) {
             fontSize="xs"
             p="8px"
           >
-            <HStack 
-              spacing="6px" 
-              bg="gray.50" 
-              p="6px 8px" 
+            <HStack
+              spacing="6px"
+              bg="gray.50"
+              p="6px 8px"
               borderRadius="6px"
               _hover={{ bg: 'gray.100' }}
               transition="all 0.2s"
@@ -688,7 +679,7 @@ class ReactFlowErrorBoundary extends Component {
 
   componentDidCatch(error, errorInfo) {
     console.error('[ReactFlowErrorBoundary] Error caught:', error, errorInfo);
-    
+
     // Auto-recover by refetching
     if (this.props.onError) {
       this.props.onError(error);
@@ -724,7 +715,7 @@ class ReactFlowErrorBoundary extends Component {
 function PipelineBuilderInner() {
   const { id } = useParams(); // Get horizon ID from URL
   const navigate = useNavigate();
-  
+
   // Suppress ResizeObserver warnings
   useEffect(() => {
     const resizeObserverErrHandler = (e) => {
@@ -737,11 +728,11 @@ function PipelineBuilderInner() {
     window.addEventListener('error', resizeObserverErrHandler);
     return () => window.removeEventListener('error', resizeObserverErrHandler);
   }, []);
-  
+
   const [nodes, setNodes, onNodesChangeDefault] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChangeDefault] = useEdgesState(initialEdges);
   const [reactFlowError, setReactFlowError] = useState(null);
-  
+
   // Custom onNodesChange to ensure only one node is selected at a time (unless Shift is held)
   const shiftHeldRef = useRef(false);
   useEffect(() => {
@@ -785,7 +776,7 @@ function PipelineBuilderInner() {
     },
     [onNodesChangeDefault, setNodes]
   );
-  
+
   // Custom onEdgesChange to handle edge deletion
   const onEdgesChange = useCallback(
     async (changes) => {
@@ -794,11 +785,11 @@ function PipelineBuilderInner() {
 
       // Check if any edge was removed
       const removedEdges = changes.filter(change => change.type === 'remove');
-      
+
       if (removedEdges.length > 0) {
         // Find the edge details before it's removed
         const currentEdges = edges;
-        
+
         for (const change of removedEdges) {
           const edge = currentEdges.find(e => e.id === change.id);
           if (edge) {
@@ -892,10 +883,13 @@ function PipelineBuilderInner() {
   const [selectedRevisionIndex, setSelectedRevisionIndex] = useState(0);
   const [isLoadingRevisions, setIsLoadingRevisions] = useState(false);
   const [sidebarView, setSidebarView] = useState(SIDEBAR_VIEW.LIST);
-  
+
   // Ref for Console Log
   const consoleLogRef = useRef(null);
-  
+
+  // Track running jobs for nodes (nodeId -> jobId mapping)
+  const runningJobsRef = useRef(new Map());
+
   useEffect(() => {
     if (editingPortfolio) {
       setSelectedStocks(editingPortfolio.stocks || []);
@@ -908,7 +902,7 @@ function PipelineBuilderInner() {
 
   const toast = useToast();
   const { screenToFlowPosition } = useReactFlow();
-  
+
   // Load horizon data from backend using React Query
   const { isLoading, data: horizonData, error: horizonError, refetch: refetchHorizon } = useQuery({
     queryKey: ['horizon', id],
@@ -947,7 +941,7 @@ function PipelineBuilderInner() {
       navigate('/pipeline');
     }
   }, [horizonError, toast, navigate]);
-  
+
   // loadingNodes state removed - now managed internally by CustomAgentNode with useMutation
 
   useEffect(() => {
@@ -974,7 +968,7 @@ function PipelineBuilderInner() {
   const onConnect = useCallback(
     async (params) => {
       console.log('[onConnect] Connection params:', params);
-      
+
       // Add edge to canvas immediately
       setEdges((eds) => {
         const newEdge = {
@@ -993,9 +987,9 @@ function PipelineBuilderInner() {
         await nodeApi.update(params.target, {
           parentId: params.source,
         });
-        
+
         console.log(`[onConnect] Updated node ${params.target} with parentId: ${params.source}`);
-        
+
         // Refetch horizon to update UI
         await refetchHorizon();
       } catch (error) {
@@ -1040,9 +1034,9 @@ function PipelineBuilderInner() {
 
       const target = event.target;
       const isInputField = target.tagName === 'INPUT' ||
-                          target.tagName === 'TEXTAREA' ||
-                          target.isContentEditable ||
-                          target.closest('[contenteditable="true"]');
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable ||
+        target.closest('[contenteditable="true"]');
 
       if (isInputField) {
         return;
@@ -1054,7 +1048,7 @@ function PipelineBuilderInner() {
           const deletableNodes = selectedNodes.filter(
             (node) => !['data-pipeline', 'team1', 'team2', 'team3', 'team4'].includes(node.id)
           );
-          
+
           if (deletableNodes.length > 0) {
             // Track locally-deleted IDs to prevent ghost nodes
             deletableNodes.forEach(n => deletedNodeIdsRef.current.add(n.id));
@@ -1123,14 +1117,14 @@ function PipelineBuilderInner() {
     }
   }, []);
 
-  
+
   // Add node to block
   const handleNodeClickForBlock = useCallback(async (nodeId) => {
     if (!isAddingToBlock || !selectedBlockId) return;
 
     const currentNodes = getNodes();
     const currentEdges = getEdges();
-    
+
     // Check if node is disconnected (no edges)
     const hasConnection = currentEdges.some(
       e => e.source === nodeId || e.target === nodeId
@@ -1222,12 +1216,12 @@ function PipelineBuilderInner() {
           nds.map((n) =>
             n.id === node.id
               ? {
-                  ...n,
-                  data: {
-                    ...n.data,
-                    revisionCount: loadedOutputs.length,
-                  },
-                }
+                ...n,
+                data: {
+                  ...n.data,
+                  revisionCount: loadedOutputs.length,
+                },
+              }
               : n
           )
         );
@@ -1299,7 +1293,7 @@ function PipelineBuilderInner() {
       });
 
       const savedNode = response.data;
-      
+
       // Refetch horizon to get updated data
       await refetchHorizon();
 
@@ -1457,7 +1451,7 @@ function PipelineBuilderInner() {
 
     setNodes(result);
     result.forEach(node => {
-      nodeApi.update(node.id, { position: node.position }).catch(() => {});
+      nodeApi.update(node.id, { position: node.position }).catch(() => { });
     });
     setTimeout(() => fitView({ padding: 0.15, duration: 400 }), 50);
   }, [getNodes, getEdges, setNodes, fitView]);
@@ -1482,10 +1476,10 @@ function PipelineBuilderInner() {
     const node2Bottom = node2.position.y + node2Height;
 
     // Check overlap
-    return !(node1Right < node2Left || 
-             node1Left > node2Right || 
-             node1Bottom < node2Top || 
-             node1Top > node2Bottom);
+    return !(node1Right < node2Left ||
+      node1Left > node2Right ||
+      node1Bottom < node2Top ||
+      node1Top > node2Bottom);
   }, []);
 
   // Handle node drag (while dragging) to highlight blocks
@@ -1588,7 +1582,7 @@ function PipelineBuilderInner() {
       if (targetBlock) {
         // Node was dropped onto a block - add it to the block using new design
         console.log(`[DragDrop] Node ${node.id} dropped onto block ${targetBlock.id}`);
-        
+
         const currentChildNodeIds = targetBlock.data?.childNodeIds || [];
 
         // Check if node is already in this block
@@ -1616,7 +1610,7 @@ function PipelineBuilderInner() {
         // Refetch horizon to get updated data
         await refetchHorizon();
         consoleLogRef.current?.addLog('success', `Node added to block ${targetBlock.data?.name || targetBlock.id}`);
-        
+
       } else {
         // Normal drag - just save position
         await nodeApi.update(node.id, {
@@ -1641,7 +1635,7 @@ function PipelineBuilderInner() {
   const handleDropToBlock = useCallback(async (blockId, nodeId) => {
     const currentNodes = getNodes();
     const currentEdges = getEdges();
-    
+
     // Check if node is disconnected (no edges)
     const hasConnection = currentEdges.some(
       e => e.source === nodeId || e.target === nodeId
@@ -1706,13 +1700,13 @@ function PipelineBuilderInner() {
     try {
       const currentNodes = getNodes();
       const blockNode = currentNodes.find(n => n.id === blockId);
-      
+
       if (!blockNode || !blockNode.data.childNodeIds) {
         return;
       }
 
       const childNodeIds = blockNode.data.childNodeIds;
-      
+
       // Check if child node exists in block
       if (!childNodeIds.includes(childNodeId)) {
         return;
@@ -1762,18 +1756,18 @@ function PipelineBuilderInner() {
   // Handle double-click on child node to edit
   const handleEditChildNode = useCallback(async (blockId, childNodeId) => {
     console.log(`[EditChildNode] Block: ${blockId}, Child: ${childNodeId}`);
-    
+
     try {
       const currentNodes = getNodes();
       const blockNode = currentNodes.find(n => n.id === blockId);
-      
+
       if (!blockNode || !blockNode.data.childNodeIds) {
         console.warn('[EditChildNode] Block not found or has no childNodeIds');
         return;
       }
 
       const childNodeIds = blockNode.data.childNodeIds;
-      
+
       // Check if child node exists in block
       if (!childNodeIds.includes(childNodeId)) {
         console.warn('[EditChildNode] Child node not in block childNodeIds');
@@ -1786,7 +1780,7 @@ function PipelineBuilderInner() {
         console.warn('[EditChildNode] Child node not found in block.data.childNodes');
         return;
       }
-      
+
       // First, extract the node from block by removing from childNodeIds
       const updatedChildNodeIds = childNodeIds.filter(id => id !== childNodeId);
 
@@ -1860,21 +1854,21 @@ function PipelineBuilderInner() {
   // Handle config button click on child node (edit in-place without extraction)
   const handleConfigChildNode = useCallback((blockId, childNodeId) => {
     console.log(`[ConfigChildNode] Block: ${blockId}, Child: ${childNodeId}`);
-    
+
     const currentNodes = getNodes();
     const blockNode = currentNodes.find(n => n.id === blockId);
-    
+
     console.log('[ConfigChildNode] blockNode:', blockNode);
-    
+
     if (!blockNode || !blockNode.data.childNodeIds) {
       console.log('[ConfigChildNode] Early return: no blockNode or childNodeIds');
       return;
     }
 
     const childNodeIds = blockNode.data.childNodeIds;
-    
+
     console.log('[ConfigChildNode] childNodeIds:', childNodeIds);
-    
+
     // Check if child node exists in block
     if (!childNodeIds.includes(childNodeId)) {
       console.log('[ConfigChildNode] Early return: childNodeId not in block');
@@ -1890,9 +1884,9 @@ function PipelineBuilderInner() {
       console.log('[ConfigChildNode] Early return: childNode not found in block.data.childNodes');
       return;
     }
-    
+
     console.log('[ConfigChildNode] childNode.type:', childNode.type);
-    
+
     // Create a temporary node object for config panel
     const tempNode = {
       id: childNodeId, // Use actual node ID
@@ -1937,21 +1931,21 @@ function PipelineBuilderInner() {
   // Handle extract and drag child node out of block (start drag operation)
   const handleExtractAndDrag = useCallback((blockId, childNodeId, mouseEvent) => {
     console.log(`[ExtractAndDrag] Block: ${blockId}, Child: ${childNodeId}`);
-    
+
     const currentNodes = getNodes();
     const blockNode = currentNodes.find(n => n.id === blockId);
-    
+
     console.log('[ExtractAndDrag] blockNode:', blockNode);
-    
+
     if (!blockNode || !blockNode.data.childNodeIds) {
       console.log('[ExtractAndDrag] Early return: no blockNode or childNodeIds');
       return;
     }
 
     const childNodeIds = blockNode.data.childNodeIds;
-    
+
     console.log('[ExtractAndDrag] childNodeIds:', childNodeIds);
-    
+
     // Check if child node exists in block
     if (!childNodeIds.includes(childNodeId)) {
       console.log('[ExtractAndDrag] Early return: childNodeId not in block');
@@ -2066,7 +2060,7 @@ function PipelineBuilderInner() {
       data: {
         agent: agent,
         horizonId: currentHorizonId,
-        onDelete: () => {},
+        onDelete: () => { },
         refetchHorizon: refetchHorizon,
         config: {
           name: agent.name,
@@ -2104,7 +2098,7 @@ function PipelineBuilderInner() {
       position,
       data: {
         portfolio: portfolio,
-        onDelete: () => {},
+        onDelete: () => { },
         refetchHorizon: refetchHorizon,
       },
       draggable: false,
@@ -2137,12 +2131,12 @@ function PipelineBuilderInner() {
         childNodeIds: [],
         childNodes: [],
         horizonId: currentHorizonId,
-        onDelete: () => {},
-        onAddToBlock: () => {},
-        onDropToBlock: () => {},
-        onRemoveFromBlock: () => {},
-        onConfigChildNode: () => {},
-        onExtractAndDrag: () => {},
+        onDelete: () => { },
+        onAddToBlock: () => { },
+        onDropToBlock: () => { },
+        onRemoveFromBlock: () => { },
+        onConfigChildNode: () => { },
+        onExtractAndDrag: () => { },
         isHighlighted: false,
       },
       draggable: false,
@@ -2260,7 +2254,7 @@ function PipelineBuilderInner() {
             });
 
             const savedNode = response.data;
-            
+
             // Refetch horizon to get updated data
             await refetchHorizon();
             consoleLogRef.current?.addLog('info', `Added agent node: ${draggedItem.data.name}`);
@@ -2275,7 +2269,7 @@ function PipelineBuilderInner() {
             });
 
             const savedNode = response.data;
-            
+
             // Refetch horizon to get updated data
             await refetchHorizon();
 
@@ -2296,7 +2290,7 @@ function PipelineBuilderInner() {
             });
 
             const savedNode = response.data;
-            
+
             // Refetch horizon to get updated data
             await refetchHorizon();
             consoleLogRef.current?.addLog('success', 'Block node created');
@@ -2397,7 +2391,7 @@ function PipelineBuilderInner() {
       if (editingAgent) {
         // Update existing agent via API
         const response = await horizonAgentApi.update(editingAgent.id, agentData);
-        
+
         if (response.success) {
           const updatedAgent = response.data;
 
@@ -2476,10 +2470,10 @@ function PipelineBuilderInner() {
   const handleDeletePortfolio = async (portfolioId) => {
     try {
       await portfolioApi.delete(portfolioId);
-      
+
       // Remove from local state (use 'id' not '_id' since backend returns 'id')
       setPortfolios(portfolios.filter(p => p.id !== portfolioId));
-      
+
       // Remove any nodes using this portfolio
       setNodes((nds) => nds.filter(node => {
         if (node.type === 'dataSource' && node.data?.portfolioId === portfolioId) {
@@ -2554,7 +2548,7 @@ function PipelineBuilderInner() {
     if (selectedNode._isChildNode) {
       const { _blockId } = selectedNode;
       const childNodeId = selectedNode.id; // Use actual node ID
-      
+
       try {
         // Update the child node directly in backend
         await nodeApi.update(childNodeId, {
@@ -2579,7 +2573,7 @@ function PipelineBuilderInner() {
         await refetchHorizon();
 
         setSelectedNode(null);
-        
+
         toast({
           title: 'Configuration saved',
           description: 'Child node configuration updated',
@@ -2665,7 +2659,7 @@ function PipelineBuilderInner() {
 
       if (result.success && result.data) {
         setCurrentHorizonName(newName);
-        
+
         toast({
           title: 'Horizon renamed',
           description: `Renamed to "${newName}"`,
@@ -2712,41 +2706,121 @@ function PipelineBuilderInner() {
     handleExtractAndDragRef.current = handleExtractAndDrag;
   });
 
+  // Check and resume pending/processing jobs after page reload
+  const checkAndResumePendingJobs = async (nodes) => {
+    try {
+      console.log('[Jobs] Checking for pending/processing jobs...');
+      console.log('[Jobs] Agent nodes to check:', nodes.filter(n => n.type === 'agentNode' || n.type === 'customNode').map(n => ({ id: n.id, type: n.type })));
+
+      // For each agent node, check if it has an active job
+      const agentNodes = nodes.filter(n => n.type === 'agentNode' || n.type === 'customNode');
+      let resumedCount = 0;
+
+      for (const node of agentNodes) {
+        // Use new API to get job by node ID
+        const job = await getJobByNode(node.id);
+
+        if (job) {
+          console.log(`[Jobs] Found active job for node ${node.id}:`, job);
+          console.log(`[Jobs] Resuming job ${job.jobId} for node ${node.id} (${job.agentType}, status: ${job.status})`);
+
+          // Store in running jobs tracker
+          runningJobsRef.current.set(node.id, job.jobId);
+
+          // Update node UI to show running state
+          setNodes(nds => nds.map(n =>
+            n.id === node.id
+              ? { ...n, data: { ...n.data, isRunning: true } }
+              : n
+          ));
+
+          // Add log
+          consoleLogRef.current?.addLog('info', `Resuming job for ${job.agentType} (${job.status})`);
+
+          resumedCount++;
+
+          // Start polling in background
+          pollJobUntilComplete(job.jobId, 2000, 300)
+            .then(result => {
+              console.log(`[Jobs] Job ${job.jobId} completed for node ${node.id}`);
+              runningJobsRef.current.delete(node.id);
+
+              // Update node UI to remove running state
+              setNodes(nds => nds.map(n =>
+                n.id === node.id
+                  ? { ...n, data: { ...n.data, isRunning: false } }
+                  : n
+              ));
+
+              consoleLogRef.current?.addLog('success', `Job completed for ${job.agentType}`);
+
+              // Refetch horizon to update output node
+              refetchHorizon();
+            })
+            .catch(error => {
+              console.error(`[Jobs] Job ${job.jobId} failed for node ${node.id}:`, error);
+              runningJobsRef.current.delete(node.id);
+
+              // Update node UI to remove running state
+              setNodes(nds => nds.map(n =>
+                n.id === node.id
+                  ? { ...n, data: { ...n.data, isRunning: false } }
+                  : n
+              ));
+
+              consoleLogRef.current?.addLog('error', `Job failed for ${job.agentType}: ${error.message}`);
+            });
+        }
+      }
+
+      if (resumedCount > 0) {
+        console.log(`[Jobs] Resumed ${resumedCount} active job(s)`);
+        consoleLogRef.current?.addLog('info', `Resumed ${resumedCount} active job(s)`);
+      } else {
+        console.log('[Jobs] No active jobs found');
+      }
+
+    } catch (error) {
+      console.error('[Jobs] Error checking pending jobs:', error);
+      consoleLogRef.current?.addLog('error', `Failed to check pending jobs: ${error.message}`);
+    }
+  };
+
   // Process horizon data when it changes
   useEffect(() => {
     if (horizonData) {
       console.log('[PipelineDetail] Loaded horizon:', horizonData);
       console.log('[PipelineDetail] Horizon ID:', horizonData.id, 'URL ID:', id);
-      
+
       // Debug: Log all nodes and their parentIds
-      console.log('[PipelineDetail] Nodes received from backend:', 
+      console.log('[PipelineDetail] Nodes received from backend:',
         horizonData.nodes.map(n => ({ id: n.id, type: n.type, parentId: n.parentId }))
       );
-      
+
       // Create a set of valid node IDs for quick lookup
       const validNodeIds = new Set((horizonData.nodes || []).map(node => node.id));
-      
+
       // Debug: Find orphaned parentIds
       const orphanedNodes = horizonData.nodes.filter(n => n.parentId && !validNodeIds.has(n.parentId));
       if (orphanedNodes.length > 0) {
-        console.warn('[PipelineDetail] Found nodes with orphaned parentIds (backend failed to clean):', 
+        console.warn('[PipelineDetail] Found nodes with orphaned parentIds (backend failed to clean):',
           orphanedNodes.map(n => ({ id: n.id, parentId: n.parentId }))
         );
       }
-      
+
       // Add horizonId and refetch to all nodes for useRunAgent
       // Also validate and clean parentId references
       // For block nodes, load child nodes from childNodeIds
       const allNodes = horizonData.nodes || [];
-      
+
       const nodesWithHorizonId = allNodes.map(node => {
         // Check if parentId exists and points to a valid node
         const hasValidParent = node.parentId && validNodeIds.has(node.parentId);
-        
+
         if (node.parentId && !hasValidParent) {
           console.warn(`[PipelineDetail] Removing orphaned parentId ${node.parentId} from node ${node.id}`);
         }
-        
+
         // For block nodes, load child nodes based on childNodeIds
         let childNodesData = [];
         if (node.type === 'block' && node.childNodeIds && node.childNodeIds.length > 0) {
@@ -2754,12 +2828,12 @@ function PipelineBuilderInner() {
           childNodesData = node.childNodeIds
             .map(childId => allNodes.find(n => n.id === childId))
             .filter(Boolean); // Remove undefined entries
-          
-          console.log(`[PipelineDetail] Block ${node.id} has ${childNodesData.length} children:`, 
+
+          console.log(`[PipelineDetail] Block ${node.id} has ${childNodesData.length} children:`,
             childNodesData.map(n => ({ id: n.id, type: n.type }))
           );
         }
-        
+
         return {
           ...node,
           // Remove parentId if it points to non-existent node (React Flow validation)
@@ -2767,7 +2841,7 @@ function PipelineBuilderInner() {
           data: {
             ...node.data,
             // For block nodes, include childNodeIds and loaded childNodes in data
-            ...(node.type === 'block' ? { 
+            ...(node.type === 'block' ? {
               childNodeIds: node.childNodeIds || [],
               childNodes: childNodesData, // Pass actual node objects for rendering
             } : {}),
@@ -2786,11 +2860,11 @@ function PipelineBuilderInner() {
           }
         };
       });
-      
+
       // Filter out nodes that have blockId (they are rendered inside blocks)
       const visibleNodes = nodesWithHorizonId.filter(node => !node.blockId);
-      
-      console.log('[PipelineDetail] Processed nodes (including hidden):', 
+
+      console.log('[PipelineDetail] Processed nodes (including hidden):',
         nodesWithHorizonId.map(n => ({ id: n.id, type: n.type, parentId: n.parentId, blockId: n.blockId }))
       );
       console.log('[PipelineDetail] Visible nodes (excluding children in blocks):',
@@ -2809,6 +2883,10 @@ function PipelineBuilderInner() {
       const finalNodes = visibleNodes.filter(n => !deletedNodeIdsRef.current.has(n.id));
 
       setNodes(finalNodes);
+
+      // Check for pending/processing jobs and resume polling
+      checkAndResumePendingJobs(finalNodes);
+
       setEdges(prevEdges => {
         const newEdges = horizonData.edges || [];
         const prevEdgeMap = new Map(prevEdges.map(e => [e.id, e]));
@@ -2821,7 +2899,7 @@ function PipelineBuilderInner() {
           return newEdge;
         });
       });
-      
+
       // System 1 & 2: Merge builtin + library-activated + activated custom agents
       // Custom agents from horizonData only includes agents saved to THIS horizon.
       // We also need to fetch global library custom agents so they appear on new horizons too.
@@ -2863,13 +2941,13 @@ function PipelineBuilderInner() {
         setAvailableAgents([...BUILTIN_AGENTS, ...getActivatedDataAgents(), ...activatedCustomData]);
         setAnalyzerAgents([...DEFAULT_ANALYZERS, ...getActivatedAnalyzerAgents(), ...activatedCustomAnalyzers]);
       });
-      
+
       setCustomAgents(horizonData.customAgents || []);
       setCurrentHorizonName(horizonData.name);
       setCurrentHorizonId(horizonData.id);
       setPortfolios(horizonData.portfolios || []);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [horizonData, id]);
 
   // Update block nodes highlight state when dragging
@@ -3004,77 +3082,77 @@ function PipelineBuilderInner() {
                   </Text>
                 ) : (
                   portfolios.map((portfolio) => (
-                  <HStack
-                    key={portfolio.id}
-                    p="10px"
-                    bg="white"
-                    borderRadius="8px"
-                    border="1px solid"
-                    borderColor="gray.200"
-                    _hover={{ bg: 'green.50', borderColor: 'green.400', boxShadow: 'sm' }}
-                    w="full"
-                    spacing="8px"
-                  >
-                    <Box
-                      flex="1"
-                      cursor="grab"
-                      _active={{ cursor: 'grabbing' }}
-                      onMouseDown={(e) => {
-                        // Drag portfolio as a data source node
-                        handlePortfolioMouseDown(e, portfolio);
-                      }}
+                    <HStack
+                      key={portfolio.id}
+                      p="10px"
+                      bg="white"
+                      borderRadius="8px"
+                      border="1px solid"
+                      borderColor="gray.200"
+                      _hover={{ bg: 'green.50', borderColor: 'green.400', boxShadow: 'sm' }}
+                      w="full"
+                      spacing="8px"
                     >
-                      <VStack align="start" spacing="4px">
-                        <HStack spacing="8px" w="full" justify="space-between">
-                          <Text fontSize="sm" fontWeight="600">
-                            {portfolio.name}
+                      <Box
+                        flex="1"
+                        cursor="grab"
+                        _active={{ cursor: 'grabbing' }}
+                        onMouseDown={(e) => {
+                          // Drag portfolio as a data source node
+                          handlePortfolioMouseDown(e, portfolio);
+                        }}
+                      >
+                        <VStack align="start" spacing="4px">
+                          <HStack spacing="8px" w="full" justify="space-between">
+                            <Text fontSize="sm" fontWeight="600">
+                              {portfolio.name}
+                            </Text>
+                            <Badge colorScheme="green" fontSize="xs">
+                              {portfolio.stocks.length}
+                            </Badge>
+                          </HStack>
+                          <Text fontSize="xs" color="gray.600" noOfLines={1}>
+                            {portfolio.stocks.join(', ') || 'Empty'}
                           </Text>
-                          <Badge colorScheme="green" fontSize="xs">
-                            {portfolio.stocks.length}
-                          </Badge>
-                        </HStack>
-                        <Text fontSize="xs" color="gray.600" noOfLines={1}>
-                          {portfolio.stocks.join(', ') || 'Empty'}
-                        </Text>
-                      </VStack>
-                    </Box>
-                    
-                    <Menu>
-                      <MenuButton
-                        as={IconButton}
-                        icon={<Icon as={MdMoreVert} />}
-                        size="sm"
-                        variant="ghost"
-                        aria-label="Portfolio options"
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                      <MenuList>
-                        <MenuItem
-                          icon={<Icon as={MdEdit} />}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEditingPortfolio(portfolio);
-                            setSelectedStocks([...portfolio.stocks]);
-                            onPortfolioOpen();
-                          }}
-                        >
-                          Edit
-                        </MenuItem>
-                        <MenuItem
-                          icon={<Icon as={MdDelete} />}
-                          color="red.600"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (window.confirm(`Delete portfolio "${portfolio.name}"?`)) {
-                              handleDeletePortfolio(portfolio.id);
-                            }
-                          }}
-                        >
-                          Delete
-                        </MenuItem>
-                      </MenuList>
-                    </Menu>
-                  </HStack>
+                        </VStack>
+                      </Box>
+
+                      <Menu>
+                        <MenuButton
+                          as={IconButton}
+                          icon={<Icon as={MdMoreVert} />}
+                          size="sm"
+                          variant="ghost"
+                          aria-label="Portfolio options"
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                        <MenuList>
+                          <MenuItem
+                            icon={<Icon as={MdEdit} />}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingPortfolio(portfolio);
+                              setSelectedStocks([...portfolio.stocks]);
+                              onPortfolioOpen();
+                            }}
+                          >
+                            Edit
+                          </MenuItem>
+                          <MenuItem
+                            icon={<Icon as={MdDelete} />}
+                            color="red.600"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (window.confirm(`Delete portfolio "${portfolio.name}"?`)) {
+                                handleDeletePortfolio(portfolio.id);
+                              }
+                            }}
+                          >
+                            Delete
+                          </MenuItem>
+                        </MenuList>
+                      </Menu>
+                    </HStack>
                   ))
                 )}
               </VStack>
@@ -3143,87 +3221,87 @@ function PipelineBuilderInner() {
                 maxH="400px"
                 overflowY="auto"
               >
-              {availableAgents.map((agent) => (
-                <HStack
-                  key={agent.id}
-                  p="10px"
-                  bg="white"
-                  borderRadius="8px"
-                  border="1px solid"
-                  borderColor="gray.200"
-                  _hover={{ bg: 'blue.50', borderColor: 'blue.400', boxShadow: 'sm' }}
-                  w="full"
-                  spacing="8px"
-                >
+                {availableAgents.map((agent) => (
                   <HStack
-                    flex="1"
-                    spacing="10px"
-                    cursor="grab"
-                    _active={{ cursor: 'grabbing' }}
-                    onMouseDown={(e) => handleAgentMouseDown(e, agent)}
+                    key={agent.id}
+                    p="10px"
+                    bg="white"
+                    borderRadius="8px"
+                    border="1px solid"
+                    borderColor="gray.200"
+                    _hover={{ bg: 'blue.50', borderColor: 'blue.400', boxShadow: 'sm' }}
+                    w="full"
+                    spacing="8px"
                   >
-                    <RobotHead description={agent.description || agent.name} size={24} />
-                    <Text fontSize="sm" fontWeight="600" flex="1">
-                      {agent.name}
-                    </Text>
-                    {agent.isBuiltin && (
-                      <Badge colorScheme="blue" fontSize="xs">
-                        Built-in
-                      </Badge>
-                    )}
-                    {agent.isLibrary && (
-                      <Badge colorScheme="teal" fontSize="xs">
-                        Library
-                      </Badge>
+                    <HStack
+                      flex="1"
+                      spacing="10px"
+                      cursor="grab"
+                      _active={{ cursor: 'grabbing' }}
+                      onMouseDown={(e) => handleAgentMouseDown(e, agent)}
+                    >
+                      <RobotHead description={agent.description || agent.name} size={24} />
+                      <Text fontSize="sm" fontWeight="600" flex="1">
+                        {agent.name}
+                      </Text>
+                      {agent.isBuiltin && (
+                        <Badge colorScheme="blue" fontSize="xs">
+                          Built-in
+                        </Badge>
+                      )}
+                      {agent.isLibrary && (
+                        <Badge colorScheme="teal" fontSize="xs">
+                          Library
+                        </Badge>
+                      )}
+                    </HStack>
+
+                    {!agent.isBuiltin && !agent.isLibrary && (
+                      <Menu>
+                        <MenuButton
+                          as={IconButton}
+                          icon={<Icon as={MdMoreVert} />}
+                          size="sm"
+                          variant="ghost"
+                          aria-label="Agent options"
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                        <MenuList>
+                          <MenuItem
+                            icon={<Icon as={MdEdit} />}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingAgent(agent);
+                              setNewAgent({
+                                name: agent.name,
+                                description: agent.description,
+                                category: agent.category,
+                                system: agent.system,
+                                model: agent.model,
+                                systemPrompt: agent.systemPrompt || '',
+                              });
+                              onAgentOpen();
+                            }}
+                          >
+                            Edit
+                          </MenuItem>
+                          <MenuItem
+                            icon={<Icon as={MdDelete} />}
+                            color="red.600"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (window.confirm(`Delete agent "${agent.name}"?`)) {
+                                handleDeleteAgent(agent.id);
+                              }
+                            }}
+                          >
+                            Delete
+                          </MenuItem>
+                        </MenuList>
+                      </Menu>
                     )}
                   </HStack>
-
-                  {!agent.isBuiltin && !agent.isLibrary && (
-                    <Menu>
-                      <MenuButton
-                        as={IconButton}
-                        icon={<Icon as={MdMoreVert} />}
-                        size="sm"
-                        variant="ghost"
-                        aria-label="Agent options"
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                      <MenuList>
-                        <MenuItem
-                          icon={<Icon as={MdEdit} />}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEditingAgent(agent);
-                            setNewAgent({
-                              name: agent.name,
-                              description: agent.description,
-                              category: agent.category,
-                              system: agent.system,
-                              model: agent.model,
-                              systemPrompt: agent.systemPrompt || '',
-                            });
-                            onAgentOpen();
-                          }}
-                        >
-                          Edit
-                        </MenuItem>
-                        <MenuItem
-                          icon={<Icon as={MdDelete} />}
-                          color="red.600"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (window.confirm(`Delete agent "${agent.name}"?`)) {
-                              handleDeleteAgent(agent.id);
-                            }
-                          }}
-                        >
-                          Delete
-                        </MenuItem>
-                      </MenuList>
-                    </Menu>
-                  )}
-                </HStack>
-              ))}
+                ))}
               </VStack>
             </Box>
           )}
@@ -3419,8 +3497,8 @@ function PipelineBuilderInner() {
 
       {/* Main Canvas */}
       <Box h="100%" position="relative" transition="all 0.3s">
-        <ReactFlowErrorBoundary 
-          nodes={nodes} 
+        <ReactFlowErrorBoundary
+          nodes={nodes}
           onError={(error) => {
             console.log('[ReactFlowErrorBoundary] Error handler called, triggering refetch');
             setReactFlowError(error);
@@ -3447,8 +3525,8 @@ function PipelineBuilderInner() {
             selectionMode={SelectionMode.Partial}
             deleteKeyCode={null}
           >
-            <Controls style={{marginLeft: "220px"}} />
-            <MiniMap position='bottom-left'/>
+            <Controls style={{ marginLeft: "220px" }} />
+            <MiniMap position='bottom-left' />
             <Background variant="dots" gap={16} size={1} />
 
             <Panel position="top-right">
@@ -3484,509 +3562,509 @@ function PipelineBuilderInner() {
       {/* Floating Agent Configuration Panel */}
       {selectedNode && selectedNode.type === 'agentNode' && (
         <>
-        <Box
-          position="absolute"
-          top="0"
-          left="0"
-          w="100%"
-          h="100%"
-          bg="blackAlpha.400"
-          zIndex="19"
-          onClick={() => {
-            setSelectedNode(null);
-            setNodes((nds) =>
-              nds.map((n) => ({ ...n, selected: false }))
-            );
-          }}
-        />
-        <Box
-          position="absolute"
-          top="50%"
-          left="50%"
-          transform="translate(-50%, -50%)"
-          w="500px"
-          maxH="80vh"
-          bg="white"
-          borderRadius="20px"
-          overflowY="auto"
-          zIndex="20"
-          boxShadow="2xl"
-        >
-          <VStack spacing="0" align="stretch" h="full">
-            {/* Header */}
-            <Box
-              p="20px"
-              borderBottom="2px solid"
-              borderColor="gray.200"
-              bg="teal.50"
-              borderTopRadius="20px"
-            >
-              <HStack justify="space-between">
-                <HStack spacing="10px" flex="1">
-                  <Icon as={MdSmartToy} color="teal.600" boxSize="24px" />
-                  <Input
-                    value={nodeConfig.name}
-                    onChange={(e) =>
-                      setNodeConfig({ ...nodeConfig, name: e.target.value })
-                    }
-                    placeholder="Node Configuration"
-                    fontSize="lg"
-                    fontWeight="bold"
-                    color="teal.900"
-                    variant="unstyled"
-                    _placeholder={{ color: 'teal.400' }}
+          <Box
+            position="absolute"
+            top="0"
+            left="0"
+            w="100%"
+            h="100%"
+            bg="blackAlpha.400"
+            zIndex="19"
+            onClick={() => {
+              setSelectedNode(null);
+              setNodes((nds) =>
+                nds.map((n) => ({ ...n, selected: false }))
+              );
+            }}
+          />
+          <Box
+            position="absolute"
+            top="50%"
+            left="50%"
+            transform="translate(-50%, -50%)"
+            w="500px"
+            maxH="80vh"
+            bg="white"
+            borderRadius="20px"
+            overflowY="auto"
+            zIndex="20"
+            boxShadow="2xl"
+          >
+            <VStack spacing="0" align="stretch" h="full">
+              {/* Header */}
+              <Box
+                p="20px"
+                borderBottom="2px solid"
+                borderColor="gray.200"
+                bg="teal.50"
+                borderTopRadius="20px"
+              >
+                <HStack justify="space-between">
+                  <HStack spacing="10px" flex="1">
+                    <Icon as={MdSmartToy} color="teal.600" boxSize="24px" />
+                    <Input
+                      value={nodeConfig.name}
+                      onChange={(e) =>
+                        setNodeConfig({ ...nodeConfig, name: e.target.value })
+                      }
+                      placeholder="Node Configuration"
+                      fontSize="lg"
+                      fontWeight="bold"
+                      color="teal.900"
+                      variant="unstyled"
+                      _placeholder={{ color: 'teal.400' }}
+                    />
+                  </HStack>
+                  <IconButton
+                    icon={<Icon as={MdClose} />}
+                    size="sm"
+                    variant="ghost"
+                    colorScheme="gray"
+                    aria-label="Close panel"
+                    onClick={() => {
+                      setSelectedNode(null);
+                      setNodes((nds) =>
+                        nds.map((n) => ({ ...n, selected: false }))
+                      );
+                    }}
                   />
                 </HStack>
-                <IconButton
-                  icon={<Icon as={MdClose} />}
-                  size="sm"
-                  variant="ghost"
-                  colorScheme="gray"
-                  aria-label="Close panel"
-                  onClick={() => {
-                    setSelectedNode(null);
-                    setNodes((nds) =>
-                      nds.map((n) => ({ ...n, selected: false }))
-                    );
-                  }}
-                />
-              </HStack>
-            </Box>
+              </Box>
 
-            {/* Configuration Form */}
-            <Box flex="1" p="20px">
-              <VStack spacing="20px" align="stretch">
-                {/* Description */}
-                <FormControl>
-                  <FormLabel fontSize="sm" fontWeight="600">
-                    Description
-                  </FormLabel>
-                  <Textarea
-                    placeholder="What does this agent do?"
-                    value={nodeConfig.description}
-                    onChange={(e) =>
-                      setNodeConfig({
-                        ...nodeConfig,
-                        description: e.target.value,
-                      })
-                    }
-                    size="sm"
-                    rows={3}
-                  />
-                </FormControl>
-
-                {/* System Prompt - show for all agents */}
-                <FormControl>
-                  <HStack justify="space-between" mb="8px">
-                    <FormLabel fontSize="sm" fontWeight="600" mb="0">
-                      System Prompt
+              {/* Configuration Form */}
+              <Box flex="1" p="20px">
+                <VStack spacing="20px" align="stretch">
+                  {/* Description */}
+                  <FormControl>
+                    <FormLabel fontSize="sm" fontWeight="600">
+                      Description
                     </FormLabel>
-                    {selectedNode?.data?.agent && !selectedNode.data.agent.isBuiltin && !selectedNode.data.agent.isLibrary && (
-                      <Button
-                        size="xs"
-                        leftIcon={<Icon as={MdRefresh} />}
-                        variant="outline"
-                        colorScheme="purple"
-                        isLoading={isGeneratingPrompt}
-                        loadingText="Generating..."
-                        isDisabled={isGeneratingPrompt}
-                        onClick={async () => {
-                          if (!nodeConfig.name || !nodeConfig.description) {
-                            toast({
-                              title: 'Missing information',
-                              description: 'Please enter name and description first',
-                              status: 'warning',
-                              duration: 3000,
-                              isClosable: true,
-                            });
-                            return;
-                          }
-                          setIsGeneratingPrompt(true);
-                          try {
-                            const response = await generateAgentSystemPrompt(
-                              nodeConfig.name,
-                              nodeConfig.description,
-                              selectedNode.data.agent.stage || selectedNode.data.agent.category
-                            );
-                            if (response.success && response.data?.systemPrompt) {
-                              setNodeConfig({
-                                ...nodeConfig,
-                                systemPrompt: response.data.systemPrompt,
-                              });
+                    <Textarea
+                      placeholder="What does this agent do?"
+                      value={nodeConfig.description}
+                      onChange={(e) =>
+                        setNodeConfig({
+                          ...nodeConfig,
+                          description: e.target.value,
+                        })
+                      }
+                      size="sm"
+                      rows={3}
+                    />
+                  </FormControl>
+
+                  {/* System Prompt - show for all agents */}
+                  <FormControl>
+                    <HStack justify="space-between" mb="8px">
+                      <FormLabel fontSize="sm" fontWeight="600" mb="0">
+                        System Prompt
+                      </FormLabel>
+                      {selectedNode?.data?.agent && !selectedNode.data.agent.isBuiltin && !selectedNode.data.agent.isLibrary && (
+                        <Button
+                          size="xs"
+                          leftIcon={<Icon as={MdRefresh} />}
+                          variant="outline"
+                          colorScheme="purple"
+                          isLoading={isGeneratingPrompt}
+                          loadingText="Generating..."
+                          isDisabled={isGeneratingPrompt}
+                          onClick={async () => {
+                            if (!nodeConfig.name || !nodeConfig.description) {
                               toast({
-                                title: 'System prompt regenerated',
-                                status: 'success',
-                                duration: 2000,
+                                title: 'Missing information',
+                                description: 'Please enter name and description first',
+                                status: 'warning',
+                                duration: 3000,
                                 isClosable: true,
                               });
+                              return;
                             }
-                          } catch (error) {
-                            toast({
-                              title: 'Failed to regenerate',
-                              description: error.message,
-                              status: 'error',
-                              duration: 3000,
-                              isClosable: true,
-                            });
-                          } finally {
-                            setIsGeneratingPrompt(false);
-                          }
-                        }}
-                      >
-                        Regenerate
-                      </Button>
-                    )}
-                  </HStack>
-                  <Textarea
-                    value={nodeConfig.systemPrompt}
-                    onChange={(e) =>
-                      setNodeConfig({ ...nodeConfig, systemPrompt: e.target.value })
-                    }
-                    rows={6}
-                    fontSize="sm"
-                    placeholder={
-                      selectedNode?.data?.agent?.isBuiltin
-                        ? "Built-in agent — pre-configured system prompts"
+                            setIsGeneratingPrompt(true);
+                            try {
+                              const response = await generateAgentSystemPrompt(
+                                nodeConfig.name,
+                                nodeConfig.description,
+                                selectedNode.data.agent.stage || selectedNode.data.agent.category
+                              );
+                              if (response.success && response.data?.systemPrompt) {
+                                setNodeConfig({
+                                  ...nodeConfig,
+                                  systemPrompt: response.data.systemPrompt,
+                                });
+                                toast({
+                                  title: 'System prompt regenerated',
+                                  status: 'success',
+                                  duration: 2000,
+                                  isClosable: true,
+                                });
+                              }
+                            } catch (error) {
+                              toast({
+                                title: 'Failed to regenerate',
+                                description: error.message,
+                                status: 'error',
+                                duration: 3000,
+                                isClosable: true,
+                              });
+                            } finally {
+                              setIsGeneratingPrompt(false);
+                            }
+                          }}
+                        >
+                          Regenerate
+                        </Button>
+                      )}
+                    </HStack>
+                    <Textarea
+                      value={nodeConfig.systemPrompt}
+                      onChange={(e) =>
+                        setNodeConfig({ ...nodeConfig, systemPrompt: e.target.value })
+                      }
+                      rows={6}
+                      fontSize="sm"
+                      placeholder={
+                        selectedNode?.data?.agent?.isBuiltin
+                          ? "Built-in agent — pre-configured system prompts"
+                          : selectedNode?.data?.agent?.isLibrary
+                            ? "Library agent — pre-configured system prompts"
+                            : "Define the agent's behavior..."
+                      }
+                      isReadOnly={selectedNode?.data?.agent?.isBuiltin || selectedNode?.data?.agent?.isLibrary}
+                      bg={selectedNode?.data?.agent?.isBuiltin || selectedNode?.data?.agent?.isLibrary ? 'gray.50' : 'white'}
+                    />
+                    <Text fontSize="xs" color="gray.500" mt="4px">
+                      {selectedNode?.data?.agent?.isBuiltin
+                        ? 'Built-in agents have pre-configured system prompts (read-only)'
                         : selectedNode?.data?.agent?.isLibrary
-                        ? "Library agent — pre-configured system prompts"
-                        : "Define the agent's behavior..."
-                    }
-                    isReadOnly={selectedNode?.data?.agent?.isBuiltin || selectedNode?.data?.agent?.isLibrary}
-                    bg={selectedNode?.data?.agent?.isBuiltin || selectedNode?.data?.agent?.isLibrary ? 'gray.50' : 'white'}
-                  />
-                  <Text fontSize="xs" color="gray.500" mt="4px">
-                    {selectedNode?.data?.agent?.isBuiltin
-                      ? 'Built-in agents have pre-configured system prompts (read-only)'
-                      : selectedNode?.data?.agent?.isLibrary
-                      ? 'Library agents have pre-configured system prompts (read-only)'
-                      : 'The core instruction that defines this agent\'s behavior. Click "Regenerate" after changing the description.'}
-                  </Text>
-                </FormControl>
-              </VStack>
-            </Box>
+                          ? 'Library agents have pre-configured system prompts (read-only)'
+                          : 'The core instruction that defines this agent\'s behavior. Click "Regenerate" after changing the description.'}
+                    </Text>
+                  </FormControl>
+                </VStack>
+              </Box>
 
-            {/* Footer with Save Button */}
-            <Box
-              p="20px"
-              borderTop="2px solid"
-              borderColor="gray.200"
-              bg="gray.50"
-              borderBottomRadius="20px"
-            >
-              <Button
-                leftIcon={<Icon as={MdSave} />}
-                colorScheme="teal"
-                size="md"
-                w="full"
-                onClick={handleSaveNodeConfig}
-                fontWeight="600"
+              {/* Footer with Save Button */}
+              <Box
+                p="20px"
+                borderTop="2px solid"
+                borderColor="gray.200"
+                bg="gray.50"
+                borderBottomRadius="20px"
               >
-                Save Configuration
-              </Button>
-            </Box>
-          </VStack>
-        </Box>
+                <Button
+                  leftIcon={<Icon as={MdSave} />}
+                  colorScheme="teal"
+                  size="md"
+                  w="full"
+                  onClick={handleSaveNodeConfig}
+                  fontWeight="600"
+                >
+                  Save Configuration
+                </Button>
+              </Box>
+            </VStack>
+          </Box>
         </>
       )}
 
       {/* Floating Portfolio Configuration Panel */}
       {selectedNode && selectedNode.type === 'portfolioNode' && (
         <>
-        <Box
-          position="absolute"
-          top="0"
-          left="0"
-          w="100%"
-          h="100%"
-          bg="blackAlpha.400"
-          zIndex="19"
-          onClick={() => {
-            setSelectedNode(null);
-            setNodes((nds) =>
-              nds.map((n) => ({ ...n, selected: false }))
-            );
-          }}
-        />
-        <Box
-          position="absolute"
-          top="50%"
-          left="50%"
-          transform="translate(-50%, -50%)"
-          w="500px"
-          maxH="80vh"
-          bg="white"
-          borderRadius="20px"
-          overflowY="auto"
-          zIndex="20"
-          boxShadow="2xl"
-        >
-          <VStack spacing="0" align="stretch" h="full">
-            {/* Header */}
-            <Box
-              p="20px"
-              borderBottom="2px solid"
-              borderColor="gray.200"
-              bg="green.50"
-              borderTopRadius="20px"
-            >
-              <HStack justify="space-between">
-                <HStack spacing="10px" flex="1">
-                  <Icon as={MdShowChart} color="green.600" boxSize="24px" />
-                  <Input
-                    value={portfolioConfig.name}
-                    onChange={(e) =>
-                      setPortfolioConfig({ ...portfolioConfig, name: e.target.value })
-                    }
-                    placeholder="Portfolio Configuration"
-                    fontSize="lg"
-                    fontWeight="bold"
-                    color="green.900"
-                    variant="unstyled"
-                    _placeholder={{ color: 'green.400' }}
+          <Box
+            position="absolute"
+            top="0"
+            left="0"
+            w="100%"
+            h="100%"
+            bg="blackAlpha.400"
+            zIndex="19"
+            onClick={() => {
+              setSelectedNode(null);
+              setNodes((nds) =>
+                nds.map((n) => ({ ...n, selected: false }))
+              );
+            }}
+          />
+          <Box
+            position="absolute"
+            top="50%"
+            left="50%"
+            transform="translate(-50%, -50%)"
+            w="500px"
+            maxH="80vh"
+            bg="white"
+            borderRadius="20px"
+            overflowY="auto"
+            zIndex="20"
+            boxShadow="2xl"
+          >
+            <VStack spacing="0" align="stretch" h="full">
+              {/* Header */}
+              <Box
+                p="20px"
+                borderBottom="2px solid"
+                borderColor="gray.200"
+                bg="green.50"
+                borderTopRadius="20px"
+              >
+                <HStack justify="space-between">
+                  <HStack spacing="10px" flex="1">
+                    <Icon as={MdShowChart} color="green.600" boxSize="24px" />
+                    <Input
+                      value={portfolioConfig.name}
+                      onChange={(e) =>
+                        setPortfolioConfig({ ...portfolioConfig, name: e.target.value })
+                      }
+                      placeholder="Portfolio Configuration"
+                      fontSize="lg"
+                      fontWeight="bold"
+                      color="green.900"
+                      variant="unstyled"
+                      _placeholder={{ color: 'green.400' }}
+                    />
+                  </HStack>
+                  <IconButton
+                    icon={<Icon as={MdClose} />}
+                    size="sm"
+                    variant="ghost"
+                    colorScheme="gray"
+                    aria-label="Close panel"
+                    onClick={() => {
+                      setSelectedNode(null);
+                      setNodes((nds) =>
+                        nds.map((n) => ({ ...n, selected: false }))
+                      );
+                    }}
                   />
                 </HStack>
-                <IconButton
-                  icon={<Icon as={MdClose} />}
-                  size="sm"
-                  variant="ghost"
-                  colorScheme="gray"
-                  aria-label="Close panel"
-                  onClick={() => {
-                    setSelectedNode(null);
-                    setNodes((nds) =>
-                      nds.map((n) => ({ ...n, selected: false }))
-                    );
-                  }}
-                />
-              </HStack>
-            </Box>
+              </Box>
 
-            {/* Configuration Form */}
-            <Box flex="1" p="20px">
-              <VStack spacing="20px" align="stretch">
-                {/* Description */}
-                <FormControl>
-                  <FormLabel fontSize="sm" fontWeight="600">
-                    Description
-                  </FormLabel>
-                  <Textarea
-                    placeholder="Describe this portfolio..."
-                    value={portfolioConfig.description}
-                    onChange={(e) =>
-                      setPortfolioConfig({
-                        ...portfolioConfig,
-                        description: e.target.value,
-                      })
-                    }
-                    size="sm"
-                    rows={3}
-                  />
-                </FormControl>
-
-                <Divider />
-
-                {/* Stocks Management */}
-                <FormControl>
-                  <FormLabel fontSize="sm" fontWeight="600">
-                    Search Stocks / Assets
-                  </FormLabel>
-                  <Input
-                    placeholder="Search by ticker or name (e.g., AAPL, Apple)..."
-                    value={portfolioSearch}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setPortfolioSearch(value);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && portfolioSearch.trim()) {
-                        const ticker = portfolioSearch.trim().toUpperCase();
-                        if (!selectedStocks.includes(ticker)) {
-                          setSelectedStocks([...selectedStocks, ticker]);
-                          setPortfolioSearch('');
-                        }
+              {/* Configuration Form */}
+              <Box flex="1" p="20px">
+                <VStack spacing="20px" align="stretch">
+                  {/* Description */}
+                  <FormControl>
+                    <FormLabel fontSize="sm" fontWeight="600">
+                      Description
+                    </FormLabel>
+                    <Textarea
+                      placeholder="Describe this portfolio..."
+                      value={portfolioConfig.description}
+                      onChange={(e) =>
+                        setPortfolioConfig({
+                          ...portfolioConfig,
+                          description: e.target.value,
+                        })
                       }
-                    }}
-                    size="sm"
-                  />
-                </FormControl>
+                      size="sm"
+                      rows={3}
+                    />
+                  </FormControl>
 
-                {/* Suggestions - Badge style like Selected Stocks */}
-                <VStack spacing="8px" align="stretch">
-                  <Text fontSize="xs" fontWeight="600" color="gray.500">
-                    {portfolioSearch.length > 0 ? 'Search Results' : 'Popular Stocks'}
-                  </Text>
-                  <Box
-                    maxH="150px"
-                    overflowY="auto"
-                  >
-                    <Box display="flex" flexWrap="wrap" gap="4px" rowGap="4px">
-                      {(portfolioSearch.length > 0 
-                        ? searchSecurities(portfolioSearch) 
-                        : SECURITIES.slice(0, 20)
-                      ).map((security) => (
-                        <Box
-                          key={security.symbol}
-                          px="10px"
-                          py="6px"
-                          bg="white"
-                          border="1px solid"
-                          borderColor="gray.300"
-                          borderRadius="6px"
-                          fontSize="xs"
-                          fontWeight="600"
-                          cursor="pointer"
-                          _hover={{ 
-                            bg: 'green.50', 
-                            borderColor: 'green.400',
-                            transform: 'translateY(-1px)',
-                            boxShadow: 'sm'
-                          }}
-                          transition="all 0.2s"
-                          onClick={() => {
-                            if (!selectedStocks.includes(security.symbol)) {
-                              setSelectedStocks([...selectedStocks, security.symbol]);
-                            }
+                  <Divider />
+
+                  {/* Stocks Management */}
+                  <FormControl>
+                    <FormLabel fontSize="sm" fontWeight="600">
+                      Search Stocks / Assets
+                    </FormLabel>
+                    <Input
+                      placeholder="Search by ticker or name (e.g., AAPL, Apple)..."
+                      value={portfolioSearch}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setPortfolioSearch(value);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && portfolioSearch.trim()) {
+                          const ticker = portfolioSearch.trim().toUpperCase();
+                          if (!selectedStocks.includes(ticker)) {
+                            setSelectedStocks([...selectedStocks, ticker]);
                             setPortfolioSearch('');
-                          }}
-                        >
-                          {security.symbol}
-                        </Box>
-                      ))}
-                    </Box>
-                  </Box>
-                </VStack>
-
-                {/* Selected Stocks */}
-                {selectedStocks.length > 0 && (
-                  <VStack spacing="8px" align="stretch">
-                    <HStack justify="space-between">
-                      <Text fontSize="xs" fontWeight="600" color="gray.500">
-                        Selected Stocks ({selectedStocks.length})
-                      </Text>
-                      <Button
-                        size="xs"
-                        variant="ghost"
-                        colorScheme="red"
-                        onClick={() => setSelectedStocks([])}
-                      >
-                        Clear All
-                      </Button>
-                    </HStack>
-                    <HStack spacing="6px" flexWrap="wrap">
-                      {selectedStocks.map((stock) => (
-                        <Badge
-                          key={stock}
-                          colorScheme="green"
-                          fontSize="xs"
-                          px="10px"
-                          py="8px"
-                          borderRadius="4px"
-                          cursor="pointer"
-                          onClick={() => setSelectedStocks(selectedStocks.filter(s => s !== stock))}
-                        >
-                          {stock} ×
-                        </Badge>
-                      ))}
-                    </HStack>
-                  </VStack>
-                )}
-              </VStack>
-            </Box>
-
-            {/* Footer with Save Button */}
-            <Box
-              p="20px"
-              borderTop="2px solid"
-              borderColor="gray.200"
-              bg="gray.50"
-              borderBottomRadius="20px"
-            >
-              <Button
-                leftIcon={<Icon as={MdSave} />}
-                colorScheme="green"
-                size="md"
-                w="full"
-                isDisabled={!portfolioConfig.name.trim() || selectedStocks.length === 0}
-                onClick={async () => {
-                  try {
-                    const portfolioData = {
-                      name: portfolioConfig.name.trim(),
-                      description: portfolioConfig.description.trim(),
-                      stocks: [...selectedStocks],
-                    };
-
-                    // Check if portfolio exists in DB (has valid MongoDB ID)
-                    const existingPortfolio = selectedNode.data.portfolio;
-                    let savedPortfolio;
-
-                    if (existingPortfolio && existingPortfolio.id && String(existingPortfolio.id).match(/^[0-9a-fA-F]{24}$/)) {
-                      // Update existing portfolio in DB
-                      const response = await portfolioApi.update(existingPortfolio.id, portfolioData);
-                      if (response.success) {
-                        savedPortfolio = response.data;
-                        
-                        // Update portfolios list
-                        setPortfolios(portfolios.map(p => 
-                          p.id === existingPortfolio.id ? savedPortfolio : p
-                        ));
-                      }
-                    } else {
-                      // Create new portfolio in DB
-                      const response = await portfolioApi.create(currentHorizonId, portfolioData);
-                      if (response.success) {
-                        savedPortfolio = response.data;
-                        
-                        // Add to portfolios list
-                        setPortfolios([...portfolios, savedPortfolio]);
-                      }
-                    }
-
-                    // Update node with saved portfolio data
-                    setNodes((nds) =>
-                      nds.map((node) => {
-                        if (node.id === selectedNode.id) {
-                          return {
-                            ...node,
-                            data: {
-                              ...node.data,
-                              portfolio: savedPortfolio,
-                            },
-                          };
+                          }
                         }
-                        return node;
-                      })
-                    );
+                      }}
+                      size="sm"
+                    />
+                  </FormControl>
 
-                    toast({
-                      title: 'Portfolio configuration saved',
-                      description: `${portfolioData.name} with ${selectedStocks.length} stocks`,
-                      status: 'success',
-                      duration: 2000,
-                      isClosable: true,
-                    });
+                  {/* Suggestions - Badge style like Selected Stocks */}
+                  <VStack spacing="8px" align="stretch">
+                    <Text fontSize="xs" fontWeight="600" color="gray.500">
+                      {portfolioSearch.length > 0 ? 'Search Results' : 'Popular Stocks'}
+                    </Text>
+                    <Box
+                      maxH="150px"
+                      overflowY="auto"
+                    >
+                      <Box display="flex" flexWrap="wrap" gap="4px" rowGap="4px">
+                        {(portfolioSearch.length > 0
+                          ? searchSecurities(portfolioSearch)
+                          : SECURITIES.slice(0, 20)
+                        ).map((security) => (
+                          <Box
+                            key={security.symbol}
+                            px="10px"
+                            py="6px"
+                            bg="white"
+                            border="1px solid"
+                            borderColor="gray.300"
+                            borderRadius="6px"
+                            fontSize="xs"
+                            fontWeight="600"
+                            cursor="pointer"
+                            _hover={{
+                              bg: 'green.50',
+                              borderColor: 'green.400',
+                              transform: 'translateY(-1px)',
+                              boxShadow: 'sm'
+                            }}
+                            transition="all 0.2s"
+                            onClick={() => {
+                              if (!selectedStocks.includes(security.symbol)) {
+                                setSelectedStocks([...selectedStocks, security.symbol]);
+                              }
+                              setPortfolioSearch('');
+                            }}
+                          >
+                            {security.symbol}
+                          </Box>
+                        ))}
+                      </Box>
+                    </Box>
+                  </VStack>
 
-                    setSelectedNode(null);
-                    setNodes((nds) =>
-                      nds.map((n) => ({ ...n, selected: false }))
-                    );
-                  } catch (error) {
-                    console.error('[Portfolio] Save configuration error:', error);
-                    toast({
-                      title: 'Failed to save portfolio',
-                      description: error.message || 'An error occurred',
-                      status: 'error',
-                      duration: 3000,
-                      isClosable: true,
-                    });
-                  }
-                }}
-                fontWeight="600"
+                  {/* Selected Stocks */}
+                  {selectedStocks.length > 0 && (
+                    <VStack spacing="8px" align="stretch">
+                      <HStack justify="space-between">
+                        <Text fontSize="xs" fontWeight="600" color="gray.500">
+                          Selected Stocks ({selectedStocks.length})
+                        </Text>
+                        <Button
+                          size="xs"
+                          variant="ghost"
+                          colorScheme="red"
+                          onClick={() => setSelectedStocks([])}
+                        >
+                          Clear All
+                        </Button>
+                      </HStack>
+                      <HStack spacing="6px" flexWrap="wrap">
+                        {selectedStocks.map((stock) => (
+                          <Badge
+                            key={stock}
+                            colorScheme="green"
+                            fontSize="xs"
+                            px="10px"
+                            py="8px"
+                            borderRadius="4px"
+                            cursor="pointer"
+                            onClick={() => setSelectedStocks(selectedStocks.filter(s => s !== stock))}
+                          >
+                            {stock} ×
+                          </Badge>
+                        ))}
+                      </HStack>
+                    </VStack>
+                  )}
+                </VStack>
+              </Box>
+
+              {/* Footer with Save Button */}
+              <Box
+                p="20px"
+                borderTop="2px solid"
+                borderColor="gray.200"
+                bg="gray.50"
+                borderBottomRadius="20px"
               >
-                Save Configuration
-              </Button>
-            </Box>
-          </VStack>
-        </Box>
+                <Button
+                  leftIcon={<Icon as={MdSave} />}
+                  colorScheme="green"
+                  size="md"
+                  w="full"
+                  isDisabled={!portfolioConfig.name.trim() || selectedStocks.length === 0}
+                  onClick={async () => {
+                    try {
+                      const portfolioData = {
+                        name: portfolioConfig.name.trim(),
+                        description: portfolioConfig.description.trim(),
+                        stocks: [...selectedStocks],
+                      };
+
+                      // Check if portfolio exists in DB (has valid MongoDB ID)
+                      const existingPortfolio = selectedNode.data.portfolio;
+                      let savedPortfolio;
+
+                      if (existingPortfolio && existingPortfolio.id && String(existingPortfolio.id).match(/^[0-9a-fA-F]{24}$/)) {
+                        // Update existing portfolio in DB
+                        const response = await portfolioApi.update(existingPortfolio.id, portfolioData);
+                        if (response.success) {
+                          savedPortfolio = response.data;
+
+                          // Update portfolios list
+                          setPortfolios(portfolios.map(p =>
+                            p.id === existingPortfolio.id ? savedPortfolio : p
+                          ));
+                        }
+                      } else {
+                        // Create new portfolio in DB
+                        const response = await portfolioApi.create(currentHorizonId, portfolioData);
+                        if (response.success) {
+                          savedPortfolio = response.data;
+
+                          // Add to portfolios list
+                          setPortfolios([...portfolios, savedPortfolio]);
+                        }
+                      }
+
+                      // Update node with saved portfolio data
+                      setNodes((nds) =>
+                        nds.map((node) => {
+                          if (node.id === selectedNode.id) {
+                            return {
+                              ...node,
+                              data: {
+                                ...node.data,
+                                portfolio: savedPortfolio,
+                              },
+                            };
+                          }
+                          return node;
+                        })
+                      );
+
+                      toast({
+                        title: 'Portfolio configuration saved',
+                        description: `${portfolioData.name} with ${selectedStocks.length} stocks`,
+                        status: 'success',
+                        duration: 2000,
+                        isClosable: true,
+                      });
+
+                      setSelectedNode(null);
+                      setNodes((nds) =>
+                        nds.map((n) => ({ ...n, selected: false }))
+                      );
+                    } catch (error) {
+                      console.error('[Portfolio] Save configuration error:', error);
+                      toast({
+                        title: 'Failed to save portfolio',
+                        description: error.message || 'An error occurred',
+                        status: 'error',
+                        duration: 3000,
+                        isClosable: true,
+                      });
+                    }
+                  }}
+                  fontWeight="600"
+                >
+                  Save Configuration
+                </Button>
+              </Box>
+            </VStack>
+          </Box>
         </>
       )}
 
@@ -4359,12 +4437,12 @@ function PipelineBuilderInner() {
                             nds.map((n) =>
                               n.id === editingPortfolioNodeId
                                 ? {
-                                    ...n,
-                                    data: {
-                                      ...n.data,
-                                      portfolio: response.data,
-                                    },
-                                  }
+                                  ...n,
+                                  data: {
+                                    ...n.data,
+                                    portfolio: response.data,
+                                  },
+                                }
                                 : n
                             )
                           );
@@ -4389,7 +4467,7 @@ function PipelineBuilderInner() {
 
                       if (response.success) {
                         setPortfolios([...portfolios, response.data]);
-                        
+
                         toast({
                           title: 'Portfolio Created',
                           description: `${response.data.name} with ${selectedStocks.length} stocks`,
@@ -4428,7 +4506,7 @@ function PipelineBuilderInner() {
       {/* Custom Data Agent Needed Modal */}
       <Modal
         isOpen={isDataAgentOpen}
-        onClose={() => {}}
+        onClose={() => { }}
         closeOnOverlayClick={false}
         isCentered
         size="lg"
@@ -4591,7 +4669,7 @@ function PipelineBuilderInner() {
             zIndex="15"
             onClick={() => setSelectedOutputNode(null)}
           />
-          
+
           {/* Sidebar panel */}
           <Box
             position="absolute"
@@ -4653,10 +4731,10 @@ function PipelineBuilderInner() {
                       onClick={async () => {
                         const currentOutput = revisions[selectedRevisionIndex];
                         const outputNodeId = currentOutput._id;
-                        
+
                         try {
                           await nodeApi.reactivate(outputNodeId);
-                          
+
                           toast({
                             title: 'Added to workflow',
                             description: 'This revision is now active in the pipeline',
@@ -4715,7 +4793,7 @@ function PipelineBuilderInner() {
                     const symbols = output.data?.metadata?.symbols || output.data?.result?.symbols || [];
                     const period = output.data?.metadata?.period || output.data?.result?.period || 'N/A';
                     const isActive = output.isActive === true;
-                    
+
                     return (
                       <Box
                         key={output._id || output.id}
@@ -4755,10 +4833,10 @@ function PipelineBuilderInner() {
                               onClick={async (e) => {
                                 e.stopPropagation();
                                 const outputNodeId = output._id;
-                                
+
                                 try {
                                   await nodeApi.reactivate(outputNodeId);
-                                  
+
                                   toast({
                                     title: 'Added to workflow',
                                     description: 'This revision is now active in the pipeline',
@@ -4796,15 +4874,15 @@ function PipelineBuilderInner() {
                             </Badge>
                           </HStack>
                         </HStack>
-                        <VStack 
-                          align="start" 
+                        <VStack
+                          align="start"
                           spacing="4px"
                           cursor="pointer"
                           onClick={() => {
                             setSelectedRevisionIndex(index);
                             setSidebarView(SIDEBAR_VIEW.DETAIL);
                           }}
-                          _hover={{ 
+                          _hover={{
                             opacity: 0.8,
                           }}
                         >
@@ -4826,7 +4904,7 @@ function PipelineBuilderInner() {
                     // Get the current output node (revision) data to display
                     const currentOutput = revisions[selectedRevisionIndex];
                     const displayResult = currentOutput?.data?.result;
-                    
+
                     return (
                       <>
                         {/* Summary Info */}
@@ -4902,13 +4980,13 @@ function PipelineBuilderInner() {
 
                             // Try known agent-specific fields first
                             const knownField = result.chart_data_by_symbol ||
-                                   result.earnings_data_by_symbol ||
-                                   result.news_data_by_symbol ||
-                                   result.technical_data_by_symbol ||
-                                   result.fundamentals_data_by_symbol ||
-                                   result.chart_data ||
-                                   result.data?.chart_data_by_symbol ||
-                                   result.result?.chart_data_by_symbol;
+                              result.earnings_data_by_symbol ||
+                              result.news_data_by_symbol ||
+                              result.technical_data_by_symbol ||
+                              result.fundamentals_data_by_symbol ||
+                              result.chart_data ||
+                              result.data?.chart_data_by_symbol ||
+                              result.result?.chart_data_by_symbol;
 
                             if (knownField) return knownField;
 
@@ -5349,9 +5427,9 @@ function PipelineBuilderInner() {
                                   // If dataBySymbol has multiple keys, render each separately
                                   // Otherwise render the whole result
                                   const isMultiSymbol = symbolData != null &&
-                                                        typeof symbolData === 'object' &&
-                                                        !Array.isArray(symbolData) &&
-                                                        Object.keys(symbolData).length > 1;
+                                    typeof symbolData === 'object' &&
+                                    !Array.isArray(symbolData) &&
+                                    Object.keys(symbolData).length > 1;
 
                                   if (isMultiSymbol) {
                                     return <CustomAgentRenderer key={symbol} symbol={symbol} data={symbolData} />;
@@ -5382,41 +5460,41 @@ function PipelineBuilderInner() {
                               })}
                             </VStack>
                           );
-                      })()}
+                        })()}
 
-                      {/* Raw JSON Data - Only show chart_data_by_symbol */}
-                      <Box>
-                        <Text fontSize="md" fontWeight="700" color="gray.800" mb="12px">
-                          Raw Output Data
-                        </Text>
-                        <Box
-                          p="16px"
-                          bg="gray.50"
-                          borderRadius="12px"
-                          border="1px solid"
-                          borderColor="gray.200"
-                          maxH="400px"
-                          overflowY="auto"
-                          fontSize="xs"
-                          fontFamily="monospace"
-                        >
-                          <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                            {JSON.stringify(
-                              displayResult?.chart_data_by_symbol || 
-                              displayResult?.chart_data || 
-                              displayResult?.data?.chart_data_by_symbol ||
-                              displayResult?.result?.chart_data_by_symbol ||
-                              { error: 'No chart data available' },
-                              null,
-                              2
-                            )}
-                          </pre>
+                        {/* Raw JSON Data - Only show chart_data_by_symbol */}
+                        <Box>
+                          <Text fontSize="md" fontWeight="700" color="gray.800" mb="12px">
+                            Raw Output Data
+                          </Text>
+                          <Box
+                            p="16px"
+                            bg="gray.50"
+                            borderRadius="12px"
+                            border="1px solid"
+                            borderColor="gray.200"
+                            maxH="400px"
+                            overflowY="auto"
+                            fontSize="xs"
+                            fontFamily="monospace"
+                          >
+                            <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                              {JSON.stringify(
+                                displayResult?.chart_data_by_symbol ||
+                                displayResult?.chart_data ||
+                                displayResult?.data?.chart_data_by_symbol ||
+                                displayResult?.result?.chart_data_by_symbol ||
+                                { error: 'No chart data available' },
+                                null,
+                                2
+                              )}
+                            </pre>
+                          </Box>
                         </Box>
-                      </Box>
-                    </>
-                  );
-                })()}
-              </VStack>
+                      </>
+                    );
+                  })()}
+                </VStack>
               )}
             </Box>
           </Box>

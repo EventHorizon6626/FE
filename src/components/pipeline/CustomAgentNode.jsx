@@ -33,12 +33,15 @@ export const CustomAgentNode = ({ data, id, selected }) => {
   const handlePlay = (e) => {
     e.stopPropagation();
 
-    if (runAgentMutation.isPending) {
+    if (runAgentMutation.isPending || data.isRunning) {
       return; // Prevent multiple clicks
     }
 
     runAgentMutation.mutate({ nodeId: id });
   };
+
+  // Check if agent is running (either from mutation or resumed job)
+  const isRunning = runAgentMutation.isPending || data.isRunning;
 
   return (
     <Box position="relative" className={`custom-agent-node${showAddOptions ? ' add-options-open' : ''}`}>
@@ -71,8 +74,8 @@ export const CustomAgentNode = ({ data, id, selected }) => {
           boxShadow="md"
           _hover={{ transform: 'scale(1.1)', boxShadow: 'lg' }}
           transition="all 0.2s"
-          isLoading={runAgentMutation.isPending}
-          isDisabled={runAgentMutation.isPending}
+          isLoading={isRunning}
+          isDisabled={isRunning}
         />
       </Box>
 
@@ -154,7 +157,7 @@ export const CustomAgentNode = ({ data, id, selected }) => {
         boxShadow={selected ? "0 4px 12px rgba(49, 151, 149, 0.4)" : "lg"}
         minW="200px"
         transition="all 0.2s"
-        opacity={runAgentMutation.isPending ? 0.7 : 1}
+        opacity={isRunning ? 0.7 : 1}
       >
         <VStack spacing="8px" align="stretch">
           <HStack spacing="12px">
@@ -209,7 +212,7 @@ export const CustomAgentNode = ({ data, id, selected }) => {
             </HStack>
           </Tooltip>
 
-          {runAgentMutation.isPending && (
+          {isRunning && (
             <Text fontSize="xs" color="gray.500">
               Running...
             </Text>

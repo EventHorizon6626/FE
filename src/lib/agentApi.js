@@ -1,5 +1,97 @@
 import { request } from './api';
 
+export const pollJobUntilComplete = async (jobId, pollingInterval = 2000, maxPolls = 300) => {
+  let polls = 0;
+
+  while (polls < maxPolls) {
+    // request.get() already extracts response.data
+    const job = await request.get(`/jobs/${jobId}`);
+
+    console.log(`[Job Poll] ${jobId} - Status: ${job.status}, Progress: ${job.progress}%`);
+
+    if (job.status === 'completed') {
+      return job.result;
+    }
+
+    if (job.status === 'failed') {
+      throw new Error(job.error?.message || 'Job failed');
+    }
+
+    // Wait before next poll
+    await new Promise(resolve => setTimeout(resolve, pollingInterval));
+    polls++;
+  }
+
+  throw new Error('Job polling timeout - job did not complete in time');
+};
+
+/**
+ * Get job status
+ * @param {string} jobId - Job ID
+ * @returns {Promise<object>} - Job status object
+ */
+export const getJobStatus = async (jobId) => {
+  // request.get() already extracts response.data
+  return await request.get(`/jobs/${jobId}`);
+};
+
+/**
+ * List all jobs for current user
+ * @param {object} filters - Optional filters (status, agentType, limit, skip)
+ * @returns {Promise<object>} - List of jobs
+ */
+export const listJobs = async (filters = {}) => {
+  const params = new URLSearchParams();
+  if (filters.status) params.append('status', filters.status);
+  if (filters.agentType) params.append('agentType', filters.agentType);
+  if (filters.limit) params.append('limit', filters.limit);
+  if (filters.skip) params.append('skip', filters.skip);
+  
+  const queryString = params.toString();
+  return await request.get(`/jobs${queryString ? `?${queryString}` : ''}`);
+};
+
+/**
+ * Get active job for a specific agent node
+ * @param {string} agentNodeId - Agent node ID
+ * @returns {Promise<object>} - Job object or null if not found
+ */
+export const getJobByNode = async (agentNodeId) => {
+  const response = await request.get(`/jobs/by-node/${agentNodeId}`);
+  return response.job; // Returns null if no active job
+};
+
+/**
+ * Call agent endpoint and handle job-based or direct response
+ * Automatically detects if response is a job (status 202) and polls for result
+ * @param {string} endpoint - API endpoint path
+ * @param {object} payload - Request payload
+ * @param {number} timeout - Optional timeout for direct calls (default 500000ms)
+ * @returns {Promise<object>} - Agent result
+ */
+async function callAgentWithJobSupport(endpoint, payload, timeout = 500000) {
+  try {
+    // Try direct call first (some agents may not use jobs yet)
+    const response = await request.withTimeout(timeout).post(endpoint, payload);
+    
+    // If response has jobId, it's a job-based response - poll for result
+    if (response.jobId) {
+      console.log(`[Agent] Job created: ${response.jobId}, polling for result...`);
+      return await pollJobUntilComplete(response.jobId, 2000, 300);
+    }
+    
+    // Otherwise it's a direct response
+    return response;
+  } catch (error) {
+    // If it's a 202 response that we couldn't parse, handle gracefully
+    if (error.status === 202 && error.raw?.jobId) {
+      console.log(`[Agent] Job created: ${error.raw.jobId}, polling for result...`);
+      return await pollJobUntilComplete(error.raw.jobId, 2000, 300);
+    }
+    throw error;
+  }
+}
+
 // ===== Custom Agent CRUD Operations =====
 
 export const createAgent = async (agentData) => {
@@ -106,103 +198,83 @@ export const runWebSearchAgent = async (stocks, context = {}) => {
 // ===== System 2 Team 1: Analyst Agents =====
 
 export const runFundamentalsAnalystAgent = async (stocks, context = {}) => {
-  // Use 90 second timeout for analyst agents (AI analysis can be slow)
-  const response = await request.withTimeout(90000).post('/ai/agents/fundamentals-analyst', {
+  return await callAgentWithJobSupport('/ai/agents/fundamentals-analyst', {
     stocks,
     ...context,
   });
-  return response;
 };
 
 export const runSentimentAnalystAgent = async (stocks, context = {}) => {
-  // Use 90 second timeout for analyst agents (AI analysis can be slow)
-  const response = await request.withTimeout(90000).post('/ai/agents/sentiment-analyst', {
+  return await callAgentWithJobSupport('/ai/agents/sentiment-analyst', {
     stocks,
     ...context,
   });
-  return response;
 };
 
 export const runNewsAnalystAgent = async (stocks, context = {}) => {
-  // Use 90 second timeout for analyst agents (AI analysis can be slow)
-  const response = await request.withTimeout(90000).post('/ai/agents/news-analyst', {
+  return await callAgentWithJobSupport('/ai/agents/news-analyst', {
     stocks,
     ...context,
   });
-  return response;
 };
 
 export const runTechnicalAnalystAgent = async (stocks, context = {}) => {
-  // Use 90 second timeout for analyst agents (AI analysis can be slow)
-  const response = await request.withTimeout(90000).post('/ai/agents/technical-analyst', {
+  return await callAgentWithJobSupport('/ai/agents/technical-analyst', {
     stocks,
     ...context,
   });
-  return response;
 };
 
 // ===== System 2 Team 2: Researcher Agents =====
 
 export const runBullResearcherAgent = async (data, context = {}) => {
-  // Use 90 second timeout for researcher agents (AI research can be slow)
-  const response = await request.withTimeout(90000).post('/ai/agents/bull-researcher', {
+  return await callAgentWithJobSupport('/ai/agents/bull-researcher', {
     data,
     ...context,
   });
-  return response;
 };
 
 export const runBearResearcherAgent = async (data, context = {}) => {
-  // Use 90 second timeout for researcher agents (AI research can be slow)
-  const response = await request.withTimeout(90000).post('/ai/agents/bear-researcher', {
+  return await callAgentWithJobSupport('/ai/agents/bear-researcher', {
     data,
     ...context,
   });
-  return response;
 };
 
 export const runResearchManagerAgent = async (bullThesis, bearThesis, context = {}) => {
-  // Use 90 second timeout for research manager (AI synthesis can be slow)
-  const response = await request.withTimeout(90000).post('/ai/agents/research-manager', {
+  return await callAgentWithJobSupport('/ai/agents/research-manager', {
     bull_thesis: bullThesis,
     bear_thesis: bearThesis,
     ...context,
   });
-  return response;
 };
 
 // ===== System 2 Team 3: Portfolio =====
 
 export const runPortfolioManagerAgent = async (stocks, data, context = {}) => {
-  // Use 90 second timeout for portfolio manager (AI portfolio construction can be slow)
-  const response = await request.withTimeout(90000).post('/ai/agents/portfolio-manager', {
+  return await callAgentWithJobSupport('/ai/agents/portfolio-manager', {
     stocks,
     data,
     ...context,
   });
-  return response;
 };
 
 // ===== System 2 Team 4: Risk & Execution =====
 
 export const runRiskManagerAgent = async (stocks, data, context = {}) => {
-  // Use 90 second timeout for risk manager (AI risk analysis can be slow)
-  const response = await request.withTimeout(90000).post('/ai/agents/risk-manager', {
+  return await callAgentWithJobSupport('/ai/agents/risk-manager', {
     stocks,
     data,
     ...context,
   });
-  return response;
 };
 
 export const runTraderAgent = async (stocks, data, context = {}) => {
-  // Use 90 second timeout for trader agent (AI trade execution can be slow)
-  const response = await request.withTimeout(90000).post('/ai/agents/trader', {
+  return await callAgentWithJobSupport('/ai/agents/trader', {
     stocks,
     data,
     ...context,
   });
-  return response;
 };
 
 // ===== Thinking Agent (ReAct-style iterative reasoning) =====
@@ -312,7 +384,8 @@ export const runAgent = async (agentType, inputData, customAgentConfig = null, e
       return await runResearchManagerAgent(data?.bullThesis, data?.bearThesis, context);
 
     case 'bull_bear_analyzer':
-      return await request.withTimeout(600000).post('/ai/agents/bull-bear-analyzer', {
+      // Use callAgentWithJobSupport for automatic job handling
+      return await callAgentWithJobSupport('/ai/agents/bull-bear-analyzer', {
         stocks,
         raw_data: data,
         ...context,

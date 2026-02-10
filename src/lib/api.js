@@ -102,7 +102,10 @@ api.interceptors.response.use(
       console.error(`[API] TIMEOUT after ${duration}ms: ${method} ${url}`);
     }
 
-    if (process.env.NODE_ENV !== 'production') {
+    // Skip logging if silentErrors flag is set in config
+    const silentErrors = error.config?.silentErrors;
+    
+    if (process.env.NODE_ENV !== 'production' && !silentErrors) {
       console.error('[API] Response error:', {
         status,
         message,
