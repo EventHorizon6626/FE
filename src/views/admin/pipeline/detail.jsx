@@ -6,6 +6,7 @@ import {
   Badge,
   Box,
   Button,
+  Collapse,
   Divider,
   FormControl,
   FormLabel,
@@ -25,8 +26,10 @@ import {
   ModalHeader,
   ModalOverlay,
   Progress,
+  Select,
   SimpleGrid,
   Spinner,
+  Switch,
   Text,
   Textarea,
   Tooltip,
@@ -35,62 +38,81 @@ import {
   useToast,
   VStack
 } from '@chakra-ui/react';
-import { useQuery } from '@tanstack/react-query';
 import { Component, useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 // useMutation removed - now used in CustomAgentNode component
-import ConsoleLog from 'components/pipeline/ConsoleLog';
-import { CustomAgentNode } from 'components/pipeline/CustomAgentNode';
-import { CustomBlockNode } from 'components/pipeline/CustomBlockNode';
-import { RobotHead } from 'components/pipeline/RobotHead';
-import { getActivatedAgentIds, getActivatedAnalyzerAgents, getActivatedDataAgents } from 'data/libraryAgents';
-import { searchSecurities, SECURITIES } from 'data/securities';
-import { generateAgentSystemPrompt, getJobByNode, pollJobUntilComplete } from 'lib/agentApi';
-import { request } from 'lib/api';
-import horizonAgentApi from 'lib/horizonAgentApi';
-import nodeApi from 'lib/nodeApi';
-import portfolioApi from 'lib/portfolioApi';
-import Chart from 'react-apexcharts';
 import {
   MdAccountBalance,
-  MdAccountTree,
   MdAdd,
   MdArticle,
   MdClose,
   MdContentCopy,
   MdDelete,
   MdEdit,
+  MdGroups,
   MdHome,
   MdHub,
   MdMoreVert,
+  MdLightbulb,
+  MdPlayArrow,
   MdPsychology,
   MdRefresh,
   MdSave,
   MdShowChart,
   MdSmartToy,
   MdSpeed,
-  MdWarning
+  MdTrendingUp,
+  MdWarning,
+  MdAccountTree
 } from 'react-icons/md';
 import ReactFlow, {
   addEdge,
   Background,
-  BaseEdge,
   Controls,
-  EdgeLabelRenderer,
-  getBezierPath,
-  Handle,
   MiniMap,
   Panel,
-  Position,
   ReactFlowProvider,
   SelectionMode,
   useEdgesState,
   useNodesState,
   useReactFlow,
+  BaseEdge,
+  EdgeLabelRenderer,
+  getSmoothStepPath,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { IDshorten } from 'utils';
 import '../../../assets/css/ReactFlowCustom.css';
+import { searchSecurities, SECURITIES } from 'data/securities';
+import { runAgent, getAgentInputData, generateAgentSystemPrompt } from 'lib/agentApi';
+import { request } from 'lib/api';
+import portfolioApi from 'lib/portfolioApi';
+import horizonAgentApi from 'lib/horizonAgentApi';
+import nodeApi from 'lib/nodeApi';
+import { CustomAgentNode } from 'components/pipeline/CustomAgentNode';
+import { CustomBlockNode } from 'components/pipeline/CustomBlockNode';
+import { NodeHandles } from 'components/pipeline/NodeHandles';
+import { RobotHead } from 'components/pipeline/RobotHead';
+import ConsoleLog from 'components/pipeline/ConsoleLog';
+import Chart from 'react-apexcharts';
+import StockAnalysisCard from 'views/admin/portfolio/components/StockAnalysisCard';
+import { IDshorten } from 'utils';
+import { getActivatedDataAgents, getActivatedAnalyzerAgents, getActivatedAgentIds } from 'data/libraryAgents';
+import {
+  GRID_SIZE,
+  DEFAULT_NODE_WIDTH,
+  DEFAULT_NODE_HEIGHT,
+  LAYOUT_COL_SPACING,
+  LAYOUT_ROW_SPACING,
+  snapPositionToGrid,
+  snapDimension,
+  getNodeDimensions,
+  buildOccupancyList,
+  findNearestFreePosition,
+  layoutGridToPosition,
+  migratePositionsToGrid,
+} from 'utils/gridUtils';
+
 
 // Sidebar view modes
 const SIDEBAR_VIEW = {
@@ -185,13 +207,13 @@ const extractDataBySymbol = (result) => {
 
   // Try known agent-specific fields first
   const knownField = result.chart_data_by_symbol ||
-    result.earnings_data_by_symbol ||
-    result.news_data_by_symbol ||
-    result.technical_data_by_symbol ||
-    result.fundamentals_data_by_symbol ||
-    result.chart_data ||
-    result.data?.chart_data_by_symbol ||
-    result.result?.chart_data_by_symbol;
+         result.earnings_data_by_symbol ||
+         result.news_data_by_symbol ||
+         result.technical_data_by_symbol ||
+         result.fundamentals_data_by_symbol ||
+         result.chart_data ||
+         result.data?.chart_data_by_symbol ||
+         result.result?.chart_data_by_symbol;
 
   if (knownField && typeof knownField === 'object') return knownField;
 
@@ -223,11 +245,7 @@ function CustomPortfolioNode({ data, id, selected }) {
 
   return (
     <Box position="relative" className={`custom-portfolio-node${showAddOptions ? ' add-options-open' : ''}`}>
-      <Handle
-        type="source"
-        position={Position.Right}
-        style={{ background: '#38A169', width: '12px', height: '12px' }}
-      />
+      <NodeHandles role="source-only" color="#38A169" />
 
       {/* Add child node button — invisible hover zone near right edge */}
       {data.onAddChildNode && (
@@ -326,13 +344,13 @@ function CustomPortfolioNode({ data, id, selected }) {
 
       <Box
         p="16px"
-        bg="white"
+        bg="rgba(255,255,255,0.7)"
         borderRadius="12px"
-        border={selected ? "3px solid" : "3px dashed"}
-        borderColor={selected ? "green.500" : "green.300"}
+        border={selected ? "5px solid" : "5px dashed"}
+        borderColor={selected ? "green.500" : "rgba(72,187,120,0.5)"}
         boxShadow={selected ? "0 4px 12px rgba(56, 161, 105, 0.4)" : "md"}
-        minW="220px"
-        maxW="300px"
+        minW="240px"
+        maxW="280px"
         transition="all 0.2s"
       >
         <VStack align="start" spacing="8px">
@@ -344,8 +362,8 @@ function CustomPortfolioNode({ data, id, selected }) {
           </HStack>
 
           {/* ID Section with Tooltip and Copy Button */}
-          <Tooltip
-            label={id}
+          <Tooltip 
+            label={id} 
             placement="bottom"
             hasArrow
             bg="gray.700"
@@ -353,10 +371,10 @@ function CustomPortfolioNode({ data, id, selected }) {
             fontSize="xs"
             p="8px"
           >
-            <HStack
-              spacing="6px"
-              bg="gray.50"
-              p="6px 8px"
+            <HStack 
+              spacing="6px" 
+              bg="gray.50" 
+              p="6px 8px" 
               borderRadius="6px"
               _hover={{ bg: 'gray.100' }}
               transition="all 0.2s"
@@ -413,17 +431,23 @@ function CustomPortfolioNode({ data, id, selected }) {
 }
 
 function CustomEdge({ id, source, target, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, data }) {
-  const [edgePath, labelX, labelY] = getBezierPath({
-    sourceX,
-    sourceY,
-    sourcePosition,
-    targetX,
-    targetY,
-    targetPosition,
-  });
+  const routingMode = data?.routingMode || 'elbow';
+
+  let edgePath, labelX, labelY;
+  if (routingMode === 'straight') {
+    edgePath = `M ${sourceX},${sourceY} L ${targetX},${targetY}`;
+    labelX = (sourceX + targetX) / 2;
+    labelY = (sourceY + targetY) / 2;
+  } else {
+    [edgePath, labelX, labelY] = getSmoothStepPath({
+      sourceX, sourceY, sourcePosition,
+      targetX, targetY, targetPosition,
+      borderRadius: 8,
+    });
+  }
 
   const [showOutput, setShowOutput] = useState(false);
-  const { getNode } = useReactFlow();
+  const { getNode, setEdges } = useReactFlow();
 
   const sourceNode = getNode(source);
   const targetNode = getNode(target);
@@ -439,83 +463,117 @@ function CustomEdge({ id, source, target, sourceX, sourceY, targetX, targetY, so
     setShowOutput(!showOutput);
   };
 
+  const handleToggleRouting = (e) => {
+    e.stopPropagation();
+    const newMode = routingMode === 'elbow' ? 'straight' : 'elbow';
+    setEdges((eds) =>
+      eds.map((edge) =>
+        edge.id === id
+          ? { ...edge, data: { ...edge.data, routingMode: newMode } }
+          : edge
+      )
+    );
+  };
+
   const iconColorScheme = isDataToAnalyzer && !hasOutput ? 'gray' : 'teal';
   const iconOpacity = isDataToAnalyzer && !hasOutput ? 0.3 : 1;
   const iconCursor = isDataToAnalyzer && !hasOutput ? 'default' : 'pointer';
 
   return (
     <>
-      <BaseEdge path={edgePath} />
-      {isDataToAnalyzer && (
-        <EdgeLabelRenderer>
+      <BaseEdge path={edgePath} style={{ strokeWidth: 5 }} />
+      <EdgeLabelRenderer>
+        <div
+          style={{
+            position: 'absolute',
+            transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
+            pointerEvents: 'all',
+            display: 'flex',
+            gap: '4px',
+            alignItems: 'center',
+          }}
+        >
+          {/* Routing mode toggle */}
+          <IconButton
+            icon={<Icon as={routingMode === 'elbow' ? MdTrendingUp : MdAccountTree} boxSize="12px" />}
+            size="xs"
+            variant="ghost"
+            borderRadius="full"
+            aria-label="Toggle edge routing"
+            onClick={handleToggleRouting}
+            opacity={0.4}
+            minW="20px"
+            h="20px"
+            _hover={{ opacity: 1, bg: 'gray.100' }}
+          />
+          {isDataToAnalyzer && (
+            <>
+              <IconButton
+                icon={<Icon as={MdArticle} />}
+                size="xs"
+                colorScheme={iconColorScheme}
+                variant="solid"
+                borderRadius="full"
+                aria-label="Inspect data"
+                onClick={handleInspect}
+                boxShadow="md"
+                opacity={iconOpacity}
+                cursor={iconCursor}
+                _hover={{ transform: !hasOutput ? 'none' : 'scale(1.2)' }}
+              />
+            </>
+          )}
+        </div>
+        {isDataToAnalyzer && showOutput && data?.output && (
           <div
             style={{
               position: 'absolute',
-              transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
+              transform: `translate(-50%, 0) translate(${labelX}px,${labelY + 15}px)`,
               pointerEvents: 'all',
             }}
           >
-            <IconButton
-              icon={<Icon as={MdArticle} />}
-              size="xs"
-              colorScheme={iconColorScheme}
-              variant="solid"
-              borderRadius="full"
-              aria-label="Inspect data"
-              onClick={handleInspect}
-              boxShadow="md"
-              opacity={iconOpacity}
-              cursor={iconCursor}
-              _hover={{ transform: !hasOutput ? 'none' : 'scale(1.2)' }}
-            />
-            {showOutput && data?.output && (
+            <Box
+              bg="white"
+              border="2px solid"
+              borderColor="teal.400"
+              borderRadius="8px"
+              p="12px"
+              minW="300px"
+              maxW="500px"
+              maxH="400px"
+              overflowY="auto"
+              boxShadow="lg"
+              zIndex="1000"
+            >
+              <HStack justify="space-between" mb="8px">
+                <Text fontSize="xs" fontWeight="700" color="teal.600">
+                  Data Flow
+                </Text>
+                <IconButton
+                  icon={<Icon as={MdClose} />}
+                  size="xs"
+                  variant="ghost"
+                  onClick={handleInspect}
+                  aria-label="Close"
+                />
+              </HStack>
               <Box
-                position="absolute"
-                top="30px"
-                left="50%"
-                transform="translateX(-50%)"
-                bg="white"
-                border="2px solid"
-                borderColor="teal.400"
-                borderRadius="8px"
-                p="12px"
-                minW="300px"
-                maxW="500px"
-                maxH="400px"
-                overflowY="auto"
-                boxShadow="lg"
-                zIndex="1000"
+                fontSize="xs"
+                fontFamily="monospace"
+                bg="gray.50"
+                p="8px"
+                borderRadius="4px"
+                userSelect="text"
+                cursor="text"
               >
-                <HStack justify="space-between" mb="8px">
-                  <Text fontSize="xs" fontWeight="700" color="teal.600">
-                    Data Flow
-                  </Text>
-                  <IconButton
-                    icon={<Icon as={MdClose} />}
-                    size="xs"
-                    variant="ghost"
-                    onClick={handleInspect}
-                    aria-label="Close"
-                  />
-                </HStack>
-                <Box
-                  fontSize="xs"
-                  fontFamily="monospace"
-                  bg="gray.50"
-                  p="8px"
-                  borderRadius="4px"
-                  userSelect="text"
-                  cursor="text"
-                >
-                  <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', userSelect: 'text' }}>
-                    {JSON.stringify(data.output, null, 2)}
-                  </pre>
-                </Box>
+                <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', userSelect: 'text' }}>
+                  {JSON.stringify(data.output, null, 2)}
+                </pre>
               </Box>
-            )}
+            </Box>
           </div>
-        </EdgeLabelRenderer>
-      )}
+        )}
+      </EdgeLabelRenderer>
     </>
   );
 }
@@ -526,11 +584,7 @@ function CustomOutputNode({ data, id, selected }) {
 
   return (
     <Box position="relative" className="custom-output-node">
-      <Handle
-        type="target"
-        position={Position.Left}
-        style={{ background: '#38B2AC', width: '12px', height: '12px' }}
-      />
+      <NodeHandles role="target-only" color="#38B2AC" />
 
       <Box
         p="16px"
@@ -561,8 +615,8 @@ function CustomOutputNode({ data, id, selected }) {
           </HStack>
 
           {/* ID Section with Tooltip and Copy Button */}
-          <Tooltip
-            label={id}
+          <Tooltip 
+            label={id} 
             placement="bottom"
             hasArrow
             bg="gray.700"
@@ -570,10 +624,10 @@ function CustomOutputNode({ data, id, selected }) {
             fontSize="xs"
             p="8px"
           >
-            <HStack
-              spacing="6px"
-              bg="gray.50"
-              p="6px 8px"
+            <HStack 
+              spacing="6px" 
+              bg="gray.50" 
+              p="6px 8px" 
               borderRadius="6px"
               _hover={{ bg: 'gray.100' }}
               transition="all 0.2s"
@@ -679,7 +733,7 @@ class ReactFlowErrorBoundary extends Component {
 
   componentDidCatch(error, errorInfo) {
     console.error('[ReactFlowErrorBoundary] Error caught:', error, errorInfo);
-
+    
     // Auto-recover by refetching
     if (this.props.onError) {
       this.props.onError(error);
@@ -715,7 +769,7 @@ class ReactFlowErrorBoundary extends Component {
 function PipelineBuilderInner() {
   const { id } = useParams(); // Get horizon ID from URL
   const navigate = useNavigate();
-
+  
   // Suppress ResizeObserver warnings
   useEffect(() => {
     const resizeObserverErrHandler = (e) => {
@@ -728,43 +782,18 @@ function PipelineBuilderInner() {
     window.addEventListener('error', resizeObserverErrHandler);
     return () => window.removeEventListener('error', resizeObserverErrHandler);
   }, []);
-
+  
   const [nodes, setNodes, onNodesChangeDefault] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChangeDefault] = useEdgesState(initialEdges);
   const [reactFlowError, setReactFlowError] = useState(null);
-
-  // Custom onNodesChange to ensure only one node is selected at a time (unless Shift is held)
-  const shiftHeldRef = useRef(false);
-  useEffect(() => {
-    const down = (e) => { if (e.key === 'Shift') shiftHeldRef.current = true; };
-    const up = (e) => { if (e.key === 'Shift') shiftHeldRef.current = false; };
-    window.addEventListener('keydown', down);
-    window.addEventListener('keyup', up);
-    return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); };
-  }, []);
-
+  
+  // Custom onNodesChange - just apply all changes normally
   const onNodesChange = useCallback(
     (changes) => {
       try {
-        // Check if any selection changes
-        const selectionChanges = changes.filter(change =>
-          change.type === 'select' && change.selected === true
-        );
-
-        if (selectionChanges.length === 1 && !shiftHeldRef.current) {
-          // Single click without Shift — keep single-select behavior
-          const selectedNodeId = selectionChanges[0].id;
-
-          setNodes((nds) =>
-            nds.map((node) => ({
-              ...node,
-              selected: node.id === selectedNodeId,
-            }))
-          );
-        } else {
-          // Shift+click, multi-select (Shift+drag box), or no selection changes — let React Flow handle it natively
-          onNodesChangeDefault(changes);
-        }
+        console.log('[onNodesChange] ✨ Changes:', changes);
+        // Just apply all changes - React Flow handles selection
+        onNodesChangeDefault(changes);
       } catch (error) {
         if (error?.message?.includes('Parent node') && error?.message?.includes('not found')) {
           console.warn('[onNodesChange] Caught orphaned parentId error, triggering refetch:', error.message);
@@ -774,9 +803,9 @@ function PipelineBuilderInner() {
         }
       }
     },
-    [onNodesChangeDefault, setNodes]
+    [onNodesChangeDefault]
   );
-
+  
   // Custom onEdgesChange to handle edge deletion
   const onEdgesChange = useCallback(
     async (changes) => {
@@ -785,11 +814,11 @@ function PipelineBuilderInner() {
 
       // Check if any edge was removed
       const removedEdges = changes.filter(change => change.type === 'remove');
-
+      
       if (removedEdges.length > 0) {
         // Find the edge details before it's removed
         const currentEdges = edges;
-
+        
         for (const change of removedEdges) {
           const edge = currentEdges.find(e => e.id === change.id);
           if (edge) {
@@ -869,6 +898,7 @@ function PipelineBuilderInner() {
   const [draggedItem, setDraggedItem] = useState(null);
   const [dragPreviewNodeId, setDragPreviewNodeId] = useState(null);
   const dragStartPosRef = useRef(null); // Track mouse start position to require minimum drag distance
+  const shiftHeldRef = useRef(false); // Track if Shift key is currently held
 
   // State for block node
   const [selectedBlockId, setSelectedBlockId] = useState(null);
@@ -883,13 +913,10 @@ function PipelineBuilderInner() {
   const [selectedRevisionIndex, setSelectedRevisionIndex] = useState(0);
   const [isLoadingRevisions, setIsLoadingRevisions] = useState(false);
   const [sidebarView, setSidebarView] = useState(SIDEBAR_VIEW.LIST);
-
+  
   // Ref for Console Log
   const consoleLogRef = useRef(null);
-
-  // Track running jobs for nodes (nodeId -> jobId mapping)
-  const runningJobsRef = useRef(new Map());
-
+  
   useEffect(() => {
     if (editingPortfolio) {
       setSelectedStocks(editingPortfolio.stocks || []);
@@ -900,9 +927,29 @@ function PipelineBuilderInner() {
     }
   }, [editingPortfolio]);
 
+  // Track Shift key state for multi-selection during drag
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Shift') {
+        shiftHeldRef.current = true;
+      }
+    };
+    const handleKeyUp = (e) => {
+      if (e.key === 'Shift') {
+        shiftHeldRef.current = false;
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
+
   const toast = useToast();
   const { screenToFlowPosition } = useReactFlow();
-
+  
   // Load horizon data from backend using React Query
   const { isLoading, data: horizonData, error: horizonError, refetch: refetchHorizon } = useQuery({
     queryKey: ['horizon', id],
@@ -941,7 +988,7 @@ function PipelineBuilderInner() {
       navigate('/pipeline');
     }
   }, [horizonError, toast, navigate]);
-
+  
   // loadingNodes state removed - now managed internally by CustomAgentNode with useMutation
 
   useEffect(() => {
@@ -968,7 +1015,7 @@ function PipelineBuilderInner() {
   const onConnect = useCallback(
     async (params) => {
       console.log('[onConnect] Connection params:', params);
-
+      
       // Add edge to canvas immediately
       setEdges((eds) => {
         const newEdge = {
@@ -987,9 +1034,9 @@ function PipelineBuilderInner() {
         await nodeApi.update(params.target, {
           parentId: params.source,
         });
-
+        
         console.log(`[onConnect] Updated node ${params.target} with parentId: ${params.source}`);
-
+        
         // Refetch horizon to update UI
         await refetchHorizon();
       } catch (error) {
@@ -1005,6 +1052,19 @@ function PipelineBuilderInner() {
     },
     [toast, refetchHorizon]
   );
+
+  // Connection validation: allow free connections between any nodes
+  const isValidConnection = useCallback((connection) => {
+    // Only prevent self-connections
+    if (connection.source === connection.target) return false;
+    // Allow all other connections (free branching)
+    return true;
+  }, []);
+
+  // Track connection drag to toggle .connecting class (shows handles on all nodes)
+  const [isConnecting, setIsConnecting] = useState(false);
+  const onConnectStart = useCallback(() => setIsConnecting(true), []);
+  const onConnectEnd = useCallback(() => setIsConnecting(false), []);
 
   // Config panel is shown only on double-click (see handleNodeDoubleClick)
   // Single click just selects the node for moving/deleting
@@ -1032,69 +1092,13 @@ function PipelineBuilderInner() {
         return;
       }
 
-      const target = event.target;
-      const isInputField = target.tagName === 'INPUT' ||
-        target.tagName === 'TEXTAREA' ||
-        target.isContentEditable ||
-        target.closest('[contenteditable="true"]');
-
-      if (isInputField) {
-        return;
-      }
-
-      if (event.key === 'Delete' || event.key === 'Backspace') {
-        const selectedNodes = nodes.filter((node) => node.selected);
-        if (selectedNodes.length > 0) {
-          const deletableNodes = selectedNodes.filter(
-            (node) => !['data-pipeline', 'team1', 'team2', 'team3', 'team4'].includes(node.id)
-          );
-
-          if (deletableNodes.length > 0) {
-            // Track locally-deleted IDs to prevent ghost nodes
-            deletableNodes.forEach(n => deletedNodeIdsRef.current.add(n.id));
-
-            // Remove from local React Flow state immediately
-            setNodes((nds) => nds.filter(n => !deletableNodes.some(d => d.id === n.id)));
-
-            // Delete nodes via backend API (wait for all to complete)
-            Promise.all(
-              deletableNodes.map(async (node) => {
-                try {
-                  await nodeApi.delete(node.id);
-                  console.log(`[KeyboardDelete] Deleted node: ${node.id}`);
-                } catch (error) {
-                  console.error(`[KeyboardDelete] Failed to delete node ${node.id}:`, error);
-                  toast({
-                    title: 'Delete failed',
-                    description: `Could not delete node`,
-                    status: 'error',
-                    duration: 2000,
-                    isClosable: true,
-                  });
-                }
-              })
-            ).then(() => {
-              // Refetch to get updated data after all deletes complete
-              if (refetchHorizon) {
-                refetchHorizon();
-              }
-              consoleLogRef.current?.addLog('success', `${deletableNodes.length} node(s) deleted`);
-              // toast({
-              //   title: 'Nodes deleted',
-              //   description: `${deletableNodes.length} node(s) removed`,
-              //   status: 'success',
-              //   duration: 2000,
-              //   isClosable: true,
-              // });
-            });
-          }
-        }
-      }
+      // Note: Delete/Backspace key handling is now done via ReactFlow's built-in
+      // onNodesDelete and onEdgesDelete handlers for proper backend synchronization
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [nodes, toast, isAddingToBlock, refetchHorizon]);
+  }, [toast, isAddingToBlock, setNodes]);
 
   const handleNodeDoubleClick = useCallback((event, node) => {
     if (node.type === 'agentNode') {
@@ -1117,14 +1121,14 @@ function PipelineBuilderInner() {
     }
   }, []);
 
-
+  
   // Add node to block
   const handleNodeClickForBlock = useCallback(async (nodeId) => {
     if (!isAddingToBlock || !selectedBlockId) return;
 
     const currentNodes = getNodes();
     const currentEdges = getEdges();
-
+    
     // Check if node is disconnected (no edges)
     const hasConnection = currentEdges.some(
       e => e.source === nodeId || e.target === nodeId
@@ -1181,10 +1185,22 @@ function PipelineBuilderInner() {
   }, [isAddingToBlock, selectedBlockId, getNodes, getEdges, setNodes]);
 
   const handleNodeClick = useCallback(async (event, node) => {
+    console.log('[handleNodeClick] ✨ Clicked node:', node.id, 'Current selected:', node.selected);
+
     // Handle block selection mode
     if (isAddingToBlock && node.type !== 'block' && node.type !== 'outputNode') {
       handleNodeClickForBlock(node.id);
       return;
+    }
+
+    // If not in special mode, ensure the node gets selected
+    // React Flow's default selection should handle this, but we'll make it explicit
+    if (!node.selected && !event.shiftKey) {
+      console.log('[handleNodeClick] ✨ Manually selecting node');
+      setNodes(nds => nds.map(n => ({
+        ...n,
+        selected: n.id === node.id
+      })));
     }
 
     if (node.type === 'outputNode') {
@@ -1216,12 +1232,12 @@ function PipelineBuilderInner() {
           nds.map((n) =>
             n.id === node.id
               ? {
-                ...n,
-                data: {
-                  ...n.data,
-                  revisionCount: loadedOutputs.length,
-                },
-              }
+                  ...n,
+                  data: {
+                    ...n.data,
+                    revisionCount: loadedOutputs.length,
+                  },
+                }
               : n
           )
         );
@@ -1242,37 +1258,142 @@ function PipelineBuilderInner() {
   }, [toast, setNodes, currentHorizonId, isAddingToBlock, handleNodeClickForBlock]);
 
   const handleNodeDelete = useCallback(async (nodeId) => {
+    console.log('[handleNodeDelete] ✨ DELETE CALLED for node:', nodeId);
+    console.log('[handleNodeDelete] ✨ deletedNodeIdsRef BEFORE:', Array.from(deletedNodeIdsRef.current));
     try {
       deletedNodeIdsRef.current.add(nodeId);
+      console.log('[handleNodeDelete] ✨ deletedNodeIdsRef AFTER add:', Array.from(deletedNodeIdsRef.current));
       // Remove from local state immediately for responsiveness
       setNodes((nds) => nds.filter(n => n.id !== nodeId));
 
+      console.log('[handleNodeDelete] ✨ Calling nodeApi.delete...');
       await nodeApi.delete(nodeId);
+      console.log('[handleNodeDelete] ✨ nodeApi.delete SUCCESS');
 
       // Refetch horizon data to get updated nodes with cleaned parentId references
       await refetchHorizon();
 
+      console.log('[handleNodeDelete] ✨ Calling refetchHorizon...');
       console.log('[Delete] Adding log, ref:', consoleLogRef.current);
       consoleLogRef.current?.addLog('info', `Node deleted: ${nodeId}`);
     } catch (error) {
-      // Rollback tracking on failure
+      console.log('[handleNodeDelete] ✨ DELETE FAILED:', error);
+      // Delete failed → node still exists in backend
+      // Remove from tracking FIRST, then refetch to restore it in UI
       deletedNodeIdsRef.current.delete(nodeId);
+      console.log('[handleNodeDelete] ✨ Removed from deletedNodeIdsRef after failure');
+      try { await refetchHorizon(); } catch (_) {}
       console.error('Failed to delete node:', error);
       consoleLogRef.current?.addLog('error', `Failed to delete node: ${error.message}`);
+      toast({
+        title: 'Delete failed',
+        description: 'Could not delete node. It has been restored.',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
     }
-  }, [refetchHorizon, setNodes]);
+  }, [refetchHorizon, setNodes, toast]);
 
+  // ReactFlow's built-in delete handlers (called when deleteKeyCode is triggered)
+  const onNodesDelete = useCallback(async (nodesToDelete) => {
+    console.log('[onNodesDelete] ✨ ReactFlow delete triggered for nodes:', nodesToDelete.map(n => n.id));
+
+    // Filter out non-deletable nodes
+    const deletableNodes = nodesToDelete.filter(
+      (node) => !['data-pipeline', 'team1', 'team2', 'team3', 'team4'].includes(node.id)
+    );
+
+    if (deletableNodes.length === 0) {
+      console.log('[onNodesDelete] ✨ No deletable nodes');
+      return;
+    }
+
+    console.log('[onNodesDelete] ✨ Deletable nodes:', deletableNodes.map(n => n.id));
+
+    // Track deleted nodes
+    deletableNodes.forEach(n => deletedNodeIdsRef.current.add(n.id));
+    console.log('[onNodesDelete] ✨ deletedNodeIdsRef updated:', Array.from(deletedNodeIdsRef.current));
+
+    // Delete via backend API
+    try {
+      await Promise.all(
+        deletableNodes.map(async (node) => {
+          try {
+            await nodeApi.delete(node.id);
+            console.log(`[onNodesDelete] ✨ Backend delete SUCCESS for node: ${node.id}`);
+          } catch (error) {
+            console.error(`[onNodesDelete] ✨ Backend delete FAILED for node ${node.id}:`, error);
+            // Remove from tracking if delete failed
+            deletedNodeIdsRef.current.delete(node.id);
+            throw error;
+          }
+        })
+      );
+
+      // Refetch to get updated data
+      console.log('[onNodesDelete] ✨ All deletes complete, refetching...');
+      await refetchHorizon();
+      consoleLogRef.current?.addLog('success', `${deletableNodes.length} node(s) deleted`);
+    } catch (error) {
+      console.error('[onNodesDelete] ✨ Delete operation failed:', error);
+      toast({
+        title: 'Delete failed',
+        description: 'Could not delete one or more nodes',
+        status: 'error',
+        duration: 2000,
+        isClosable: true,
+      });
+      // Refetch to restore failed nodes
+      await refetchHorizon();
+    }
+  }, [refetchHorizon, toast]);
+
+  const onEdgesDelete = useCallback(async (edgesToDelete) => {
+    console.log('[onEdgesDelete] ✨ ReactFlow delete triggered for edges:', edgesToDelete.map(e => e.id));
+
+    // Delete via backend API
+    try {
+      await Promise.all(
+        edgesToDelete.map(async (edge) => {
+          try {
+            await edgeApi.delete(edge.id);
+            console.log(`[onEdgesDelete] ✨ Backend delete SUCCESS for edge: ${edge.id}`);
+          } catch (error) {
+            console.error(`[onEdgesDelete] ✨ Backend delete FAILED for edge ${edge.id}:`, error);
+            throw error;
+          }
+        })
+      );
+
+      // Refetch to get updated data
+      console.log('[onEdgesDelete] ✨ All edge deletes complete, refetching...');
+      await refetchHorizon();
+      consoleLogRef.current?.addLog('success', `${edgesToDelete.length} edge(s) deleted`);
+    } catch (error) {
+      console.error('[onEdgesDelete] ✨ Delete operation failed:', error);
+      toast({
+        title: 'Delete failed',
+        description: 'Could not delete one or more edges',
+        status: 'error',
+        duration: 2000,
+        isClosable: true,
+      });
+      // Refetch to restore failed edges
+      await refetchHorizon();
+    }
+  }, [refetchHorizon, toast]);
 
   // Add a child node from the "+" button on a node's outbound side
   const handleAddChildNode = useCallback(async (sourceNodeId, agentTemplate) => {
     const sourceNode = getNodes().find(n => n.id === sourceNodeId);
     if (!sourceNode || !currentHorizonId) return;
 
-    const sourceW = sourceNode.width || 250;
-    const position = {
-      x: sourceNode.position.x + sourceW + 80,
-      y: sourceNode.position.y,
-    };
+    // Place child one layout-column to the right, same vertical position
+    // No collision avoidance - nodes appear exactly at the calculated position
+    const position = snapPositionToGrid(
+      { x: sourceNode.position.x + LAYOUT_COL_SPACING, y: sourceNode.position.y },
+    );
 
     try {
       const response = await nodeApi.create({
@@ -1293,7 +1414,7 @@ function PipelineBuilderInner() {
       });
 
       const savedNode = response.data;
-
+      
       // Refetch horizon to get updated data
       await refetchHorizon();
 
@@ -1304,14 +1425,11 @@ function PipelineBuilderInner() {
     }
   }, [getNodes, currentHorizonId, setNodes, setEdges, handleNodeDelete, refetchHorizon]);
 
-  // Auto-layout: barycenter method — centers parents with children, spaces subtrees
+  // Auto-layout: layer-based grid layout — each node gets a grid cell
   const handleAutoLayout = useCallback(() => {
     const currentNodes = getNodes();
     const currentEdges = getEdges();
     if (currentNodes.length === 0) return;
-
-    const RANK_SEP = 120;
-    const NODE_SEP = 50;
 
     // Separate connected vs disconnected
     const connectedIds = new Set();
@@ -1329,12 +1447,6 @@ function PipelineBuilderInner() {
       }
     });
 
-    // Node dimensions
-    const nodeMap = {};
-    currentNodes.forEach(n => { nodeMap[n.id] = n; });
-    const getW = (id) => nodeMap[id]?.width || 250;
-    const getH = (id) => nodeMap[id]?.height || 120;
-
     // Find roots
     const roots = [...connectedIds].filter(id => !parentsOf[id] || parentsOf[id].length === 0);
     if (roots.length === 0 && connectedIds.size > 0) roots.push([...connectedIds][0]);
@@ -1349,7 +1461,7 @@ function PipelineBuilderInner() {
     roots.forEach(r => assignLayer(r, 0));
     connectedIds.forEach(id => { if (layers[id] === undefined) layers[id] = 0; });
 
-    // Group by layer
+    // Group by layer and sort by barycenter (parent Y average)
     const layerGroups = {};
     connectedIds.forEach(id => {
       const l = layers[id];
@@ -1358,92 +1470,68 @@ function PipelineBuilderInner() {
     });
     const maxLayer = Math.max(...Object.values(layers), 0);
 
-    // X offset per layer
-    const layerX = {};
-    let xPos = 0;
-    for (let l = 0; l <= maxLayer; l++) {
-      const ids = layerGroups[l] || [];
-      const maxW = ids.length > 0 ? Math.max(...ids.map(id => getW(id))) : 250;
-      layerX[l] = xPos;
-      xPos += maxW + RANK_SEP;
-    }
-
-    // Initial Y: evenly spaced per layer
+    // Assign grid positions: layer → column, order within layer → row
     const positions = {};
     for (let l = 0; l <= maxLayer; l++) {
-      let y = 0;
-      (layerGroups[l] || []).forEach(id => {
-        positions[id] = { x: layerX[l], y };
-        y += getH(id) + NODE_SEP;
+      const ids = layerGroups[l] || [];
+      ids.forEach((id, index) => {
+        positions[id] = layoutGridToPosition(l, index);
       });
     }
 
-    // Resolve overlaps within a sorted layer, then re-center the group
-    function resolveOverlaps(sortedIds) {
-      if (sortedIds.length <= 1) return;
-      const desiredCenter = sortedIds.reduce((s, id) => s + positions[id].y + getH(id) / 2, 0) / sortedIds.length;
-      for (let i = 1; i < sortedIds.length; i++) {
-        const prev = sortedIds[i - 1];
-        const curr = sortedIds[i];
-        const minY = positions[prev].y + getH(prev) + NODE_SEP;
-        if (positions[curr].y < minY) positions[curr].y = minY;
-      }
-      const actualCenter = sortedIds.reduce((s, id) => s + positions[id].y + getH(id) / 2, 0) / sortedIds.length;
-      const shift = desiredCenter - actualCenter;
-      sortedIds.forEach(id => { positions[id].y += shift; });
-    }
-
-    // Barycenter: 8 passes forward + backward
-    for (let pass = 0; pass < 8; pass++) {
-      // Forward: position each layer based on parents
+    // Barycenter reordering: 4 passes forward + backward to minimize crossings
+    for (let pass = 0; pass < 4; pass++) {
       for (let l = 1; l <= maxLayer; l++) {
         const ids = [...(layerGroups[l] || [])];
         const bary = {};
         ids.forEach(id => {
           const pars = (parentsOf[id] || []).filter(p => positions[p]);
           bary[id] = pars.length > 0
-            ? pars.reduce((s, p) => s + positions[p].y + getH(p) / 2, 0) / pars.length
-            : positions[id].y + getH(id) / 2;
+            ? pars.reduce((s, p) => s + positions[p].y, 0) / pars.length
+            : positions[id].y;
         });
         ids.sort((a, b) => bary[a] - bary[b]);
-        ids.forEach(id => { positions[id].y = bary[id] - getH(id) / 2; });
-        resolveOverlaps(ids);
+        ids.forEach((id, index) => { positions[id] = layoutGridToPosition(l, index); });
         layerGroups[l] = ids;
       }
-      // Backward: position each layer based on children
       for (let l = maxLayer - 1; l >= 0; l--) {
         const ids = [...(layerGroups[l] || [])];
         const bary = {};
         ids.forEach(id => {
           const kids = (childrenOf[id] || []).filter(k => positions[k]);
           bary[id] = kids.length > 0
-            ? kids.reduce((s, k) => s + positions[k].y + getH(k) / 2, 0) / kids.length
-            : positions[id].y + getH(id) / 2;
+            ? kids.reduce((s, k) => s + positions[k].y, 0) / kids.length
+            : positions[id].y;
         });
         ids.sort((a, b) => bary[a] - bary[b]);
-        ids.forEach(id => { positions[id].y = bary[id] - getH(id) / 2; });
-        resolveOverlaps(ids);
+        ids.forEach((id, index) => { positions[id] = layoutGridToPosition(l, index); });
         layerGroups[l] = ids;
       }
     }
 
-    // Apply positions
-    let maxTreeY = 0;
+    // Find max row index used by connected nodes
+    let maxRow = 0;
+    connectedIds.forEach(id => {
+      if (positions[id]) {
+        const row = Math.round(positions[id].y / LAYOUT_ROW_SPACING);
+        if (row > maxRow) maxRow = row;
+      }
+    });
+
+    // Apply positions to connected nodes
     const finalNodes = currentNodes.map(node => {
       if (connectedIds.has(node.id) && positions[node.id]) {
-        const pos = { x: Math.round(positions[node.id].x), y: Math.round(positions[node.id].y) };
-        maxTreeY = Math.max(maxTreeY, pos.y + getH(node.id));
-        return { ...node, position: pos };
+        return { ...node, position: positions[node.id] };
       }
       return node;
     });
 
-    // Disconnected nodes in a row below
-    let dx = 0;
+    // Disconnected nodes placed in row below main tree, each in its own column
+    let dcCol = 0;
     const result = finalNodes.map(node => {
       if (!connectedIds.has(node.id)) {
-        const pos = { x: dx, y: maxTreeY + 100 };
-        dx += 260;
+        const pos = layoutGridToPosition(dcCol, maxRow + 1);
+        dcCol++;
         return { ...node, position: pos };
       }
       return node;
@@ -1451,18 +1539,16 @@ function PipelineBuilderInner() {
 
     setNodes(result);
     result.forEach(node => {
-      nodeApi.update(node.id, { position: node.position }).catch(() => { });
+      nodeApi.update(node.id, { position: node.position }).catch(() => {});
     });
-    setTimeout(() => fitView({ padding: 0.15, duration: 400 }), 50);
-  }, [getNodes, getEdges, setNodes, fitView]);
+    // Camera stays in place - no automatic fitView after layout
+  }, [getNodes, getEdges, setNodes]);
 
   // Check if two nodes overlap based on position and size
   const checkNodeOverlap = useCallback((node1, node2) => {
-    // Get node dimensions (use measured width/height or defaults)
-    const node1Width = node1.width || 250;
-    const node1Height = node1.height || 120;
-    const node2Width = node2.width || 300;
-    const node2Height = node2.height || 150;
+    // Get node dimensions from data/style or defaults
+    const { width: node1Width, height: node1Height } = getNodeDimensions(node1);
+    const { width: node2Width, height: node2Height } = getNodeDimensions(node2);
 
     // Calculate boundaries
     const node1Left = node1.position.x;
@@ -1476,10 +1562,10 @@ function PipelineBuilderInner() {
     const node2Bottom = node2.position.y + node2Height;
 
     // Check overlap
-    return !(node1Right < node2Left ||
-      node1Left > node2Right ||
-      node1Bottom < node2Top ||
-      node1Top > node2Bottom);
+    return !(node1Right < node2Left || 
+             node1Left > node2Right || 
+             node1Bottom < node2Top || 
+             node1Top > node2Bottom);
   }, []);
 
   // Handle node drag (while dragging) to highlight blocks
@@ -1542,87 +1628,111 @@ function PipelineBuilderInner() {
     setHighlightedBlockId(null);
 
     try {
-      // Check if node was dropped onto a block
       const currentNodes = getNodes();
       const currentEdges = getEdges();
 
-      // Skip if this is a block node or output node
-      if (node.type === 'block' || node.type === 'outputNode') {
-        await nodeApi.update(node.id, {
-          position: node.position,
-        });
-        return;
-      }
+      // Snap top-left corner to grid
+      const { width, height } = getNodeDimensions(node);
+      const snappedPosition = snapPositionToGrid(node.position);
 
-      // Check if node has connections
-      const hasConnection = currentEdges.some(
-        e => e.source === node.id || e.target === node.id
-      );
+      // --- Block-drop check BEFORE collision avoidance ---
+      // Only eligible if not a block/output node and has no connections
+      const isBlockDropEligible =
+        node.type !== 'block' &&
+        node.type !== 'outputNode' &&
+        !currentEdges.some(e => e.source === node.id || e.target === node.id);
 
-      if (hasConnection) {
-        // Node has connections, just save position
-        await nodeApi.update(node.id, {
-          position: node.position,
-        });
-        return;
-      }
-
-      // Find all block nodes
-      const blockNodes = currentNodes.filter(n => n.type === 'block');
-
-      // Check if dropped node overlaps with any block
-      let targetBlock = null;
-      for (const blockNode of blockNodes) {
-        if (checkNodeOverlap(node, blockNode)) {
-          targetBlock = blockNode;
-          break;
+      if (isBlockDropEligible) {
+        const blockNodes = currentNodes.filter(n => n.type === 'block');
+        let targetBlock = null;
+        for (const blockNode of blockNodes) {
+          if (checkNodeOverlap({ ...node, position: snappedPosition }, blockNode)) {
+            targetBlock = blockNode;
+            break;
+          }
         }
-      }
 
-      if (targetBlock) {
-        // Node was dropped onto a block - add it to the block using new design
-        console.log(`[DragDrop] Node ${node.id} dropped onto block ${targetBlock.id}`);
+        if (targetBlock) {
+          // Node was dropped onto a block - add it to the block
+          console.log(`[DragDrop] Node ${node.id} dropped onto block ${targetBlock.id}`);
 
-        const currentChildNodeIds = targetBlock.data?.childNodeIds || [];
+          // Update position in state (use snapped position, no collision avoidance)
+          setNodes((nds) =>
+            nds.map((n) => n.id === node.id ? { ...n, position: snappedPosition } : n)
+          );
 
-        // Check if node is already in this block
-        if (currentChildNodeIds.includes(node.id)) {
-          // Just update position
+          const currentChildNodeIds = targetBlock.data?.childNodeIds || [];
+
+          // Check if node is already in this block
+          if (currentChildNodeIds.includes(node.id)) {
+            await nodeApi.update(node.id, {
+              position: snappedPosition,
+            });
+            return;
+          }
+
+          const updatedChildNodeIds = [...currentChildNodeIds, node.id];
+
+          // Update block node with new child ID
+          await nodeApi.update(targetBlock.id, {
+            childNodeIds: updatedChildNodeIds,
+          });
+
+          // Update node to set its blockId
           await nodeApi.update(node.id, {
-            position: node.position,
+            blockId: targetBlock.id,
+            position: snappedPosition,
+          });
+
+          // Refetch horizon to get updated data
+          await refetchHorizon();
+
+          toast({
+            title: 'Node added to block',
+            description: `Successfully moved node into block container`,
+            status: 'success',
+            duration: 2000,
+            isClosable: true,
           });
           return;
         }
-
-        const updatedChildNodeIds = [...currentChildNodeIds, node.id];
-
-        // Update block node with new child ID
-        await nodeApi.update(targetBlock.id, {
-          childNodeIds: updatedChildNodeIds,
-        });
-
-        // Update node to set its blockId
-        await nodeApi.update(node.id, {
-          blockId: targetBlock.id,
-          position: node.position,
-        });
-
-        // Refetch horizon to get updated data
-        await refetchHorizon();
-        consoleLogRef.current?.addLog('success', `Node added to block ${targetBlock.data?.name || targetBlock.id}`);
-
-      } else {
-        // Normal drag - just save position
-        await nodeApi.update(node.id, {
-          position: node.position,
-        });
-        console.log(`[NodeDrag] Saved position for node ${node.id}:`, node.position);
       }
+
+      // --- Normal path: use the snapped position directly (no collision avoidance for manual drag) ---
+      // User can see where they're dropping, so honor that position
+      setNodes((nds) =>
+        nds.map((n) => n.id === node.id ? { ...n, position: snappedPosition } : n)
+      );
+
+      await nodeApi.update(node.id, {
+        position: snappedPosition,
+      });
+      console.log(`[NodeDrag] Saved position for node ${node.id}:`, snappedPosition);
     } catch (error) {
       console.error('Failed to save node position:', error);
       consoleLogRef.current?.addLog('error', 'Failed to save node position');
     }
   }, [getNodes, getEdges, checkNodeOverlap, setNodes]);
+
+  // Handle node resize — snap dimensions & persist
+  const handleNodeResize = useCallback((nodeId, { width, height }) => {
+    const snappedW = snapDimension(width);
+    const snappedH = snapDimension(height);
+
+    setNodes((nds) =>
+      nds.map((n) =>
+        n.id === nodeId
+          ? {
+              ...n,
+              style: { ...n.style, width: snappedW, height: snappedH },
+              data: { ...n.data, width: snappedW, height: snappedH },
+            }
+          : n
+      )
+    );
+
+    nodeApi.update(nodeId, { width: snappedW, height: snappedH }).catch(() => {});
+  }, [setNodes]);
 
   // Start adding nodes to block
   const handleAddToBlock = useCallback((blockId) => {
@@ -1635,7 +1745,7 @@ function PipelineBuilderInner() {
   const handleDropToBlock = useCallback(async (blockId, nodeId) => {
     const currentNodes = getNodes();
     const currentEdges = getEdges();
-
+    
     // Check if node is disconnected (no edges)
     const hasConnection = currentEdges.some(
       e => e.source === nodeId || e.target === nodeId
@@ -1682,7 +1792,13 @@ function PipelineBuilderInner() {
 
       // Refetch horizon to get updated data
       await refetchHorizon();
-      consoleLogRef.current?.addLog('success', `Node added to block ${blockNode.data?.name || blockNode.id} via drag & drop`);
+
+      toast({
+        title: 'Node added to block',
+        status: 'success',
+        duration: 2000,
+        isClosable: true,
+      });
     } catch (error) {
       console.error('Failed to add node to block:', error);
       toast({
@@ -1700,13 +1816,13 @@ function PipelineBuilderInner() {
     try {
       const currentNodes = getNodes();
       const blockNode = currentNodes.find(n => n.id === blockId);
-
+      
       if (!blockNode || !blockNode.data.childNodeIds) {
         return;
       }
 
       const childNodeIds = blockNode.data.childNodeIds;
-
+      
       // Check if child node exists in block
       if (!childNodeIds.includes(childNodeId)) {
         return;
@@ -1756,18 +1872,18 @@ function PipelineBuilderInner() {
   // Handle double-click on child node to edit
   const handleEditChildNode = useCallback(async (blockId, childNodeId) => {
     console.log(`[EditChildNode] Block: ${blockId}, Child: ${childNodeId}`);
-
+    
     try {
       const currentNodes = getNodes();
       const blockNode = currentNodes.find(n => n.id === blockId);
-
+      
       if (!blockNode || !blockNode.data.childNodeIds) {
         console.warn('[EditChildNode] Block not found or has no childNodeIds');
         return;
       }
 
       const childNodeIds = blockNode.data.childNodeIds;
-
+      
       // Check if child node exists in block
       if (!childNodeIds.includes(childNodeId)) {
         console.warn('[EditChildNode] Child node not in block childNodeIds');
@@ -1780,7 +1896,7 @@ function PipelineBuilderInner() {
         console.warn('[EditChildNode] Child node not found in block.data.childNodes');
         return;
       }
-
+      
       // First, extract the node from block by removing from childNodeIds
       const updatedChildNodeIds = childNodeIds.filter(id => id !== childNodeId);
 
@@ -1854,39 +1970,30 @@ function PipelineBuilderInner() {
   // Handle config button click on child node (edit in-place without extraction)
   const handleConfigChildNode = useCallback((blockId, childNodeId) => {
     console.log(`[ConfigChildNode] Block: ${blockId}, Child: ${childNodeId}`);
-
+    
     const currentNodes = getNodes();
     const blockNode = currentNodes.find(n => n.id === blockId);
-
-    console.log('[ConfigChildNode] blockNode:', blockNode);
-
+    
     if (!blockNode || !blockNode.data.childNodeIds) {
-      console.log('[ConfigChildNode] Early return: no blockNode or childNodeIds');
+      console.warn('[ConfigChildNode] Block not found or has no childNodeIds');
       return;
     }
 
     const childNodeIds = blockNode.data.childNodeIds;
-
-    console.log('[ConfigChildNode] childNodeIds:', childNodeIds);
-
+    
     // Check if child node exists in block
     if (!childNodeIds.includes(childNodeId)) {
-      console.log('[ConfigChildNode] Early return: childNodeId not in block');
+      console.warn('[ConfigChildNode] Child node not in block childNodeIds');
       return;
     }
 
-    // Find the child node from blockNode.data.childNodes (not from currentNodes!)
+    // Find the actual child node from block's childNodes data
     const childNode = blockNode.data.childNodes?.find(n => n.id === childNodeId);
-
-    console.log('[ConfigChildNode] childNode:', childNode);
-
     if (!childNode) {
-      console.log('[ConfigChildNode] Early return: childNode not found in block.data.childNodes');
+      console.warn('[ConfigChildNode] Child node not found in block.data.childNodes');
       return;
     }
-
-    console.log('[ConfigChildNode] childNode.type:', childNode.type);
-
+    
     // Create a temporary node object for config panel
     const tempNode = {
       id: childNodeId, // Use actual node ID
@@ -1899,7 +2006,6 @@ function PipelineBuilderInner() {
 
     // Open config panel based on node type
     if (childNode.type === 'agentNode') {
-      console.log('[ConfigChildNode] Opening agentNode config');
       setSelectedNode(tempNode);
       setNodeConfig({
         name: childNode.data?.config?.name || childNode.data?.agent?.name || '',
@@ -1910,7 +2016,6 @@ function PipelineBuilderInner() {
         systemPrompt: childNode.data?.agent?.systemPrompt || '',
       });
     } else if (childNode.type === 'portfolioNode') {
-      console.log('[ConfigChildNode] Opening portfolioNode config');
       setSelectedNode(tempNode);
       setPortfolioConfig({
         name: childNode.data?.portfolio?.name || '',
@@ -1931,34 +2036,27 @@ function PipelineBuilderInner() {
   // Handle extract and drag child node out of block (start drag operation)
   const handleExtractAndDrag = useCallback((blockId, childNodeId, mouseEvent) => {
     console.log(`[ExtractAndDrag] Block: ${blockId}, Child: ${childNodeId}`);
-
+    
     const currentNodes = getNodes();
     const blockNode = currentNodes.find(n => n.id === blockId);
-
-    console.log('[ExtractAndDrag] blockNode:', blockNode);
-
+    
     if (!blockNode || !blockNode.data.childNodeIds) {
-      console.log('[ExtractAndDrag] Early return: no blockNode or childNodeIds');
+      console.warn('[ExtractAndDrag] Block not found or has no childNodeIds');
       return;
     }
 
     const childNodeIds = blockNode.data.childNodeIds;
-
-    console.log('[ExtractAndDrag] childNodeIds:', childNodeIds);
-
+    
     // Check if child node exists in block
     if (!childNodeIds.includes(childNodeId)) {
-      console.log('[ExtractAndDrag] Early return: childNodeId not in block');
+      console.warn('[ExtractAndDrag] Child node not in block childNodeIds');
       return;
     }
 
-    // Find the child node from blockNode.data.childNodes (not from currentNodes!)
+    // Find the child node from block's childNodes data (not from visible nodes)
     const childNode = blockNode.data.childNodes?.find(n => n.id === childNodeId);
-
-    console.log('[ExtractAndDrag] childNode:', childNode);
-
     if (!childNode) {
-      console.log('[ExtractAndDrag] Early return: childNode not found in block.data.childNodes');
+      console.warn('[ExtractAndDrag] Child node not found in block.data.childNodes');
       return;
     }
 
@@ -1967,8 +2065,6 @@ function PipelineBuilderInner() {
       x: mouseEvent.clientX,
       y: mouseEvent.clientY,
     });
-
-    console.log('[ExtractAndDrag] position:', position);
 
     // Create preview node
     const previewNodeId = `preview-extract-${Date.now()}`;
@@ -1981,21 +2077,19 @@ function PipelineBuilderInner() {
       style: { opacity: 0.6 }, // Preview style
     };
 
-    console.log('[ExtractAndDrag] Creating preview node:', previewNode);
-
     setNodes((nds) => nds.concat(previewNode));
     setDragPreviewNodeId(previewNodeId);
     setExtractingChild({ blockId, childNodeId, childNode });
     dragStartPosRef.current = { x: mouseEvent.clientX, y: mouseEvent.clientY };
     setIsDragging(true);
 
-    // toast({
-    //   title: 'Extracting node',
-    //   description: 'Move to desired position and release',
-    //   status: 'info',
-    //   duration: 2000,
-    //   isClosable: true,
-    // });
+    toast({
+      title: 'Extracting node',
+      description: 'Move to desired position and release',
+      status: 'info',
+      duration: 2000,
+      isClosable: true,
+    });
   }, [getNodes, screenToFlowPosition, setNodes, toast]);
 
   // Create a new block node (OLD - now using drag from sidebar)
@@ -2060,7 +2154,7 @@ function PipelineBuilderInner() {
       data: {
         agent: agent,
         horizonId: currentHorizonId,
-        onDelete: () => { },
+        onDelete: () => {},
         refetchHorizon: refetchHorizon,
         config: {
           name: agent.name,
@@ -2098,7 +2192,7 @@ function PipelineBuilderInner() {
       position,
       data: {
         portfolio: portfolio,
-        onDelete: () => { },
+        onDelete: () => {},
         refetchHorizon: refetchHorizon,
       },
       draggable: false,
@@ -2131,12 +2225,12 @@ function PipelineBuilderInner() {
         childNodeIds: [],
         childNodes: [],
         horizonId: currentHorizonId,
-        onDelete: () => { },
-        onAddToBlock: () => { },
-        onDropToBlock: () => { },
-        onRemoveFromBlock: () => { },
-        onConfigChildNode: () => { },
-        onExtractAndDrag: () => { },
+        onDelete: () => {},
+        onAddToBlock: () => {},
+        onDropToBlock: () => {},
+        onRemoveFromBlock: () => {},
+        onConfigChildNode: () => {},
+        onExtractAndDrag: () => {},
         isHighlighted: false,
       },
       draggable: false,
@@ -2156,10 +2250,11 @@ function PipelineBuilderInner() {
     if (!isDragging || !dragPreviewNodeId) return;
 
     const handleMouseMove = (event) => {
-      const position = screenToFlowPosition({
+      const rawPosition = screenToFlowPosition({
         x: event.clientX,
         y: event.clientY,
       });
+      const position = snapPositionToGrid(rawPosition);
 
       // Update preview node position
       setNodes((nds) =>
@@ -2172,9 +2267,13 @@ function PipelineBuilderInner() {
     };
 
     const handleMouseUp = async (event) => {
-      // Get final position
+      // Get final position, snap to grid & resolve occupancy
       const previewNode = getNodes().find(n => n.id === dragPreviewNodeId);
-      const finalPosition = previewNode?.position || { x: 0, y: 0 };
+      const rawFinalPos = previewNode?.position || { x: 0, y: 0 };
+      const snappedPos = snapPositionToGrid(rawFinalPos);
+      const otherNodes = getNodes().filter(n => n.id !== dragPreviewNodeId);
+      const occupancy = buildOccupancyList(otherNodes);
+      const finalPosition = findNearestFreePosition(snappedPos, occupancy, DEFAULT_NODE_WIDTH, DEFAULT_NODE_HEIGHT);
 
       // Remove preview node
       setNodes((nds) => nds.filter((n) => n.id !== dragPreviewNodeId));
@@ -2220,7 +2319,14 @@ function PipelineBuilderInner() {
 
             // Refetch horizon to get updated data
             await refetchHorizon();
-            consoleLogRef.current?.addLog('success', `Node extracted from block ${blockNode.data?.name || blockNode.id}`);
+
+            toast({
+              title: 'Node extracted',
+              description: 'Node successfully removed from block',
+              status: 'success',
+              duration: 2000,
+              isClosable: true,
+            });
           }
         } catch (error) {
           console.error('Failed to extract node:', error);
@@ -2254,7 +2360,7 @@ function PipelineBuilderInner() {
             });
 
             const savedNode = response.data;
-
+            
             // Refetch horizon to get updated data
             await refetchHorizon();
             consoleLogRef.current?.addLog('info', `Added agent node: ${draggedItem.data.name}`);
@@ -2269,7 +2375,7 @@ function PipelineBuilderInner() {
             });
 
             const savedNode = response.data;
-
+            
             // Refetch horizon to get updated data
             await refetchHorizon();
 
@@ -2290,10 +2396,17 @@ function PipelineBuilderInner() {
             });
 
             const savedNode = response.data;
-
+            
             // Refetch horizon to get updated data
             await refetchHorizon();
-            consoleLogRef.current?.addLog('success', 'Block node created');
+
+            toast({
+              title: 'Block added',
+              description: 'Block container created',
+              status: 'success',
+              duration: 2000,
+              isClosable: true,
+            });
           }
         } catch (error) {
           console.error('Failed to create node:', error);
@@ -2391,7 +2504,7 @@ function PipelineBuilderInner() {
       if (editingAgent) {
         // Update existing agent via API
         const response = await horizonAgentApi.update(editingAgent.id, agentData);
-
+        
         if (response.success) {
           const updatedAgent = response.data;
 
@@ -2466,6 +2579,20 @@ function PipelineBuilderInner() {
     }
   };
 
+  // Generate auto-incrementing "Untitled X" name for portfolios
+  const generateUntitledPortfolioName = useCallback(() => {
+    const untitledPattern = /^Untitled( \d+)?$/;
+    const untitledNumbers = portfolios
+      .map(p => {
+        const match = p.name?.match(untitledPattern);
+        if (!match) return 0;
+        return match[1] ? parseInt(match[1].trim(), 10) : 1;
+      })
+      .filter(n => n > 0);
+
+    const maxNumber = untitledNumbers.length > 0 ? Math.max(...untitledNumbers) : 0;
+    return maxNumber === 0 ? 'Untitled' : `Untitled ${maxNumber + 1}`;
+  }, [portfolios]);
 
   const handleDeletePortfolio = async (portfolioId) => {
     try {
@@ -2474,9 +2601,20 @@ function PipelineBuilderInner() {
       // Remove from local state (use 'id' not '_id' since backend returns 'id')
       setPortfolios(portfolios.filter(p => p.id !== portfolioId));
 
-      // Remove any nodes using this portfolio
+      // Find canvas nodes for this portfolio, track + delete them
+      const portfolioNodes = nodes.filter(node =>
+        (node.type === 'portfolioNode' || node.type === 'dataSource') &&
+        (node.data?.portfolio?.id === portfolioId || node.data?.portfolioId === portfolioId)
+      );
+      portfolioNodes.forEach(n => {
+        deletedNodeIdsRef.current.add(n.id);
+        nodeApi.delete(n.id).catch(() => {});
+      });
+
+      // Remove from local React Flow state
       setNodes((nds) => nds.filter(node => {
-        if (node.type === 'dataSource' && node.data?.portfolioId === portfolioId) {
+        if ((node.type === 'portfolioNode' || node.type === 'dataSource') &&
+            (node.data?.portfolio?.id === portfolioId || node.data?.portfolioId === portfolioId)) {
           return false;
         }
         return true;
@@ -2508,7 +2646,16 @@ function PipelineBuilderInner() {
       setAvailableAgents(availableAgents.filter(a => a.id !== agentId));
       setAnalyzerAgents(analyzerAgents.filter(a => a.id !== agentId));
 
-      // Remove any nodes using this agent
+      // Find canvas nodes for this agent, track + delete them
+      const agentNodes = nodes.filter(node =>
+        node.type === 'agentNode' && node.data?.agent?.id === agentId
+      );
+      agentNodes.forEach(n => {
+        deletedNodeIdsRef.current.add(n.id);
+        nodeApi.delete(n.id).catch(() => {});
+      });
+
+      // Remove from local React Flow state
       setNodes((nds) => nds.filter(node => {
         if (node.type === 'agentNode' && node.data?.agent?.id === agentId) {
           return false;
@@ -2548,7 +2695,7 @@ function PipelineBuilderInner() {
     if (selectedNode._isChildNode) {
       const { _blockId } = selectedNode;
       const childNodeId = selectedNode.id; // Use actual node ID
-
+      
       try {
         // Update the child node directly in backend
         await nodeApi.update(childNodeId, {
@@ -2573,7 +2720,7 @@ function PipelineBuilderInner() {
         await refetchHorizon();
 
         setSelectedNode(null);
-
+        
         toast({
           title: 'Configuration saved',
           description: 'Child node configuration updated',
@@ -2659,7 +2806,7 @@ function PipelineBuilderInner() {
 
       if (result.success && result.data) {
         setCurrentHorizonName(newName);
-
+        
         toast({
           title: 'Horizon renamed',
           description: `Renamed to "${newName}"`,
@@ -2694,6 +2841,7 @@ function PipelineBuilderInner() {
   const handleRemoveFromBlockRef = useRef(handleRemoveFromBlock);
   const handleConfigChildNodeRef = useRef(handleConfigChildNode);
   const handleExtractAndDragRef = useRef(handleExtractAndDrag);
+  const handleNodeResizeRef = useRef(handleNodeResize);
 
   useEffect(() => {
     handleNodeDeleteRef.current = handleNodeDelete;
@@ -2704,123 +2852,66 @@ function PipelineBuilderInner() {
     handleRemoveFromBlockRef.current = handleRemoveFromBlock;
     handleConfigChildNodeRef.current = handleConfigChildNode;
     handleExtractAndDragRef.current = handleExtractAndDrag;
+    handleNodeResizeRef.current = handleNodeResize;
   });
 
-  // Check and resume pending/processing jobs after page reload
-  const checkAndResumePendingJobs = async (nodes) => {
-    try {
-      console.log('[Jobs] Checking for pending/processing jobs...');
-      console.log('[Jobs] Agent nodes to check:', nodes.filter(n => n.type === 'agentNode' || n.type === 'customNode').map(n => ({ id: n.id, type: n.type })));
-
-      // For each agent node, check if it has an active job
-      const agentNodes = nodes.filter(n => n.type === 'agentNode' || n.type === 'customNode');
-      let resumedCount = 0;
-
-      for (const node of agentNodes) {
-        // Use new API to get job by node ID
-        const job = await getJobByNode(node.id);
-
-        if (job) {
-          console.log(`[Jobs] Found active job for node ${node.id}:`, job);
-          console.log(`[Jobs] Resuming job ${job.jobId} for node ${node.id} (${job.agentType}, status: ${job.status})`);
-
-          // Store in running jobs tracker
-          runningJobsRef.current.set(node.id, job.jobId);
-
-          // Update node UI to show running state
-          setNodes(nds => nds.map(n =>
-            n.id === node.id
-              ? { ...n, data: { ...n.data, isRunning: true } }
-              : n
-          ));
-
-          // Add log
-          consoleLogRef.current?.addLog('info', `Resuming job for ${job.agentType} (${job.status})`);
-
-          resumedCount++;
-
-          // Start polling in background
-          pollJobUntilComplete(job.jobId, 2000, 300)
-            .then(result => {
-              console.log(`[Jobs] Job ${job.jobId} completed for node ${node.id}`);
-              runningJobsRef.current.delete(node.id);
-
-              // Update node UI to remove running state
-              setNodes(nds => nds.map(n =>
-                n.id === node.id
-                  ? { ...n, data: { ...n.data, isRunning: false } }
-                  : n
-              ));
-
-              consoleLogRef.current?.addLog('success', `Job completed for ${job.agentType}`);
-
-              // Refetch horizon to update output node
-              refetchHorizon();
-            })
-            .catch(error => {
-              console.error(`[Jobs] Job ${job.jobId} failed for node ${node.id}:`, error);
-              runningJobsRef.current.delete(node.id);
-
-              // Update node UI to remove running state
-              setNodes(nds => nds.map(n =>
-                n.id === node.id
-                  ? { ...n, data: { ...n.data, isRunning: false } }
-                  : n
-              ));
-
-              consoleLogRef.current?.addLog('error', `Job failed for ${job.agentType}: ${error.message}`);
-            });
-        }
-      }
-
-      if (resumedCount > 0) {
-        console.log(`[Jobs] Resumed ${resumedCount} active job(s)`);
-        consoleLogRef.current?.addLog('info', `Resumed ${resumedCount} active job(s)`);
-      } else {
-        console.log('[Jobs] No active jobs found');
-      }
-
-    } catch (error) {
-      console.error('[Jobs] Error checking pending jobs:', error);
-      consoleLogRef.current?.addLog('error', `Failed to check pending jobs: ${error.message}`);
-    }
-  };
+  // Reset deleted nodes tracking when horizon changes
+  useEffect(() => {
+    console.log('[PipelineDetail] Horizon changed, resetting deletedNodeIdsRef');
+    deletedNodeIdsRef.current.clear();
+  }, [id]); // id is the horizon ID from useParams
 
   // Process horizon data when it changes
   useEffect(() => {
     if (horizonData) {
       console.log('[PipelineDetail] Loaded horizon:', horizonData);
       console.log('[PipelineDetail] Horizon ID:', horizonData.id, 'URL ID:', id);
-
+      
       // Debug: Log all nodes and their parentIds
       console.log('[PipelineDetail] Nodes received from backend:',
         horizonData.nodes.map(n => ({ id: n.id, type: n.type, parentId: n.parentId }))
       );
 
+      // ✨ DEBUG: Check for soft-delete flags in backend data ✨
+      console.log('[PipelineDetail] DEBUG - Full node data from backend:',
+        horizonData.nodes.map(n => ({
+          id: n.id,
+          type: n.type,
+          deletedAt: n.deletedAt,
+          isDeleted: n.isDeleted,
+          deleted: n.deleted,
+          status: n.status,
+          allKeys: Object.keys(n)  // See all fields
+        }))
+      );
+      console.log('[PipelineDetail] DEBUG - deletedNodeIdsRef contains:',
+        Array.from(deletedNodeIdsRef.current)
+      );
+
       // Create a set of valid node IDs for quick lookup
       const validNodeIds = new Set((horizonData.nodes || []).map(node => node.id));
-
+      
       // Debug: Find orphaned parentIds
       const orphanedNodes = horizonData.nodes.filter(n => n.parentId && !validNodeIds.has(n.parentId));
       if (orphanedNodes.length > 0) {
-        console.warn('[PipelineDetail] Found nodes with orphaned parentIds (backend failed to clean):',
+        console.warn('[PipelineDetail] Found nodes with orphaned parentIds (backend failed to clean):', 
           orphanedNodes.map(n => ({ id: n.id, parentId: n.parentId }))
         );
       }
-
+      
       // Add horizonId and refetch to all nodes for useRunAgent
       // Also validate and clean parentId references
       // For block nodes, load child nodes from childNodeIds
       const allNodes = horizonData.nodes || [];
-
+      
       const nodesWithHorizonId = allNodes.map(node => {
         // Check if parentId exists and points to a valid node
         const hasValidParent = node.parentId && validNodeIds.has(node.parentId);
-
+        
         if (node.parentId && !hasValidParent) {
           console.warn(`[PipelineDetail] Removing orphaned parentId ${node.parentId} from node ${node.id}`);
         }
-
+        
         // For block nodes, load child nodes based on childNodeIds
         let childNodesData = [];
         if (node.type === 'block' && node.childNodeIds && node.childNodeIds.length > 0) {
@@ -2828,18 +2919,31 @@ function PipelineBuilderInner() {
           childNodesData = node.childNodeIds
             .map(childId => allNodes.find(n => n.id === childId))
             .filter(Boolean); // Remove undefined entries
-
-          console.log(`[PipelineDetail] Block ${node.id} has ${childNodesData.length} children:`,
+          
+          console.log(`[PipelineDetail] Block ${node.id} has ${childNodesData.length} children:`, 
             childNodesData.map(n => ({ id: n.id, type: n.type }))
           );
         }
+        
+        // For agent nodes, read persisted dimensions (fall back to defaults)
+        const isAgent = node.type === 'agentNode';
+        const nodeW = node.data?.width || node.width || DEFAULT_NODE_WIDTH;
+        const nodeH = node.data?.height || node.height || DEFAULT_NODE_HEIGHT;
 
         return {
           ...node,
           // Remove parentId if it points to non-existent node (React Flow validation)
           parentId: hasValidParent ? node.parentId : undefined,
+          // Set style.width/height so NodeResizer works correctly
+          ...(isAgent ? { style: { ...node.style, width: nodeW, height: nodeH } } : {}),
           data: {
             ...node.data,
+            // For agent nodes, pass dimensions + resize callback
+            ...(isAgent ? {
+              width: nodeW,
+              height: nodeH,
+              onResize: handleNodeResizeRef.current,
+            } : {}),
             // For block nodes, include childNodeIds and loaded childNodes in data
             ...(node.type === 'block' ? {
               childNodeIds: node.childNodeIds || [],
@@ -2860,37 +2964,63 @@ function PipelineBuilderInner() {
           }
         };
       });
-
+      
       // Filter out nodes that have blockId (they are rendered inside blocks)
       const visibleNodes = nodesWithHorizonId.filter(node => !node.blockId);
-
-      console.log('[PipelineDetail] Processed nodes (including hidden):',
+      
+      console.log('[PipelineDetail] Processed nodes (including hidden):', 
         nodesWithHorizonId.map(n => ({ id: n.id, type: n.type, parentId: n.parentId, blockId: n.blockId }))
       );
       console.log('[PipelineDetail] Visible nodes (excluding children in blocks):',
         visibleNodes.map(n => ({ id: n.id, type: n.type }))
       );
 
-      // Clean up confirmed deletions (nodes the backend no longer returns)
+      // Clean up deletedNodeIdsRef - remove IDs that no longer exist in backend
       const backendNodeIds = new Set((horizonData.nodes || []).map(n => n.id));
+      const idsToRemove = [];
       for (const deletedId of deletedNodeIdsRef.current) {
         if (!backendNodeIds.has(deletedId)) {
-          deletedNodeIdsRef.current.delete(deletedId);
+          idsToRemove.push(deletedId);
         }
       }
+      idsToRemove.forEach(id => deletedNodeIdsRef.current.delete(id));
 
-      // Filter out locally-deleted nodes that backend hasn't caught up with yet
+      console.log('[PipelineDetail] Cleaned up deleted IDs:', idsToRemove);
+
+      // Filter out locally-deleted nodes — keep tracking IDs for the entire session
+      // to guard against soft-deleted nodes reappearing from stale/cached backend data.
+      console.log('[PipelineDetail] DEBUG - Filtering deleted nodes:', {
+        horizonId: id,
+        visibleCount: visibleNodes.length,
+        deletedIdsTracked: Array.from(deletedNodeIdsRef.current),
+        deletedInThisHorizon: visibleNodes.filter(n => deletedNodeIdsRef.current.has(n.id)).map(n => n.id)
+      });
+
       const finalNodes = visibleNodes.filter(n => !deletedNodeIdsRef.current.has(n.id));
 
+      console.log('[PipelineDetail] DEBUG - After filtering:', {
+        horizonId: id,
+        finalCount: finalNodes.length,
+        filteredOut: visibleNodes.filter(n => deletedNodeIdsRef.current.has(n.id)).map(n => n.id)
+      });
+
+      // Migrate existing free-form positions to grid
+      const movedNodes = migratePositionsToGrid(finalNodes);
+      if (movedNodes.length > 0) {
+        movedNodes.forEach(node => {
+          nodeApi.update(node.id, { position: node.position }).catch(() => {});
+        });
+      }
+
       setNodes(finalNodes);
-
-      // Check for pending/processing jobs and resume polling
-      checkAndResumePendingJobs(finalNodes);
-
       setEdges(prevEdges => {
         const newEdges = horizonData.edges || [];
         const prevEdgeMap = new Map(prevEdges.map(e => [e.id, e]));
         return newEdges.map(newEdge => {
+          // Default old edges (with null handles) to right-source / left-target
+          if (!newEdge.sourceHandle) newEdge = { ...newEdge, sourceHandle: 'right-source' };
+          if (!newEdge.targetHandle) newEdge = { ...newEdge, targetHandle: 'left-target' };
+
           const prev = prevEdgeMap.get(newEdge.id);
           // Preserve existing output data if backend doesn't have it
           if (prev?.data?.output && !newEdge.data?.output) {
@@ -2899,7 +3029,7 @@ function PipelineBuilderInner() {
           return newEdge;
         });
       });
-
+      
       // System 1 & 2: Merge builtin + library-activated + activated custom agents
       // Custom agents from horizonData only includes agents saved to THIS horizon.
       // We also need to fetch global library custom agents so they appear on new horizons too.
@@ -2941,13 +3071,13 @@ function PipelineBuilderInner() {
         setAvailableAgents([...BUILTIN_AGENTS, ...getActivatedDataAgents(), ...activatedCustomData]);
         setAnalyzerAgents([...DEFAULT_ANALYZERS, ...getActivatedAnalyzerAgents(), ...activatedCustomAnalyzers]);
       });
-
+      
       setCustomAgents(horizonData.customAgents || []);
       setCurrentHorizonName(horizonData.name);
       setCurrentHorizonId(horizonData.id);
       setPortfolios(horizonData.portfolios || []);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [horizonData, id]);
 
   // Update block nodes highlight state when dragging
@@ -3082,77 +3212,77 @@ function PipelineBuilderInner() {
                   </Text>
                 ) : (
                   portfolios.map((portfolio) => (
-                    <HStack
-                      key={portfolio.id}
-                      p="10px"
-                      bg="white"
-                      borderRadius="8px"
-                      border="1px solid"
-                      borderColor="gray.200"
-                      _hover={{ bg: 'green.50', borderColor: 'green.400', boxShadow: 'sm' }}
-                      w="full"
-                      spacing="8px"
+                  <HStack
+                    key={portfolio.id}
+                    p="10px"
+                    bg="white"
+                    borderRadius="8px"
+                    border="1px solid"
+                    borderColor="gray.200"
+                    _hover={{ bg: 'green.50', borderColor: 'green.400', boxShadow: 'sm' }}
+                    w="full"
+                    spacing="8px"
+                  >
+                    <Box
+                      flex="1"
+                      cursor="grab"
+                      _active={{ cursor: 'grabbing' }}
+                      onMouseDown={(e) => {
+                        // Drag portfolio as a data source node
+                        handlePortfolioMouseDown(e, portfolio);
+                      }}
                     >
-                      <Box
-                        flex="1"
-                        cursor="grab"
-                        _active={{ cursor: 'grabbing' }}
-                        onMouseDown={(e) => {
-                          // Drag portfolio as a data source node
-                          handlePortfolioMouseDown(e, portfolio);
-                        }}
-                      >
-                        <VStack align="start" spacing="4px">
-                          <HStack spacing="8px" w="full" justify="space-between">
-                            <Text fontSize="sm" fontWeight="600">
-                              {portfolio.name}
-                            </Text>
-                            <Badge colorScheme="green" fontSize="xs">
-                              {portfolio.stocks.length}
-                            </Badge>
-                          </HStack>
-                          <Text fontSize="xs" color="gray.600" noOfLines={1}>
-                            {portfolio.stocks.join(', ') || 'Empty'}
+                      <VStack align="start" spacing="4px">
+                        <HStack spacing="8px" w="full" justify="space-between">
+                          <Text fontSize="sm" fontWeight="600">
+                            {portfolio.name}
                           </Text>
-                        </VStack>
-                      </Box>
-
-                      <Menu>
-                        <MenuButton
-                          as={IconButton}
-                          icon={<Icon as={MdMoreVert} />}
-                          size="sm"
-                          variant="ghost"
-                          aria-label="Portfolio options"
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                        <MenuList>
-                          <MenuItem
-                            icon={<Icon as={MdEdit} />}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEditingPortfolio(portfolio);
-                              setSelectedStocks([...portfolio.stocks]);
-                              onPortfolioOpen();
-                            }}
-                          >
-                            Edit
-                          </MenuItem>
-                          <MenuItem
-                            icon={<Icon as={MdDelete} />}
-                            color="red.600"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (window.confirm(`Delete portfolio "${portfolio.name}"?`)) {
-                                handleDeletePortfolio(portfolio.id);
-                              }
-                            }}
-                          >
-                            Delete
-                          </MenuItem>
-                        </MenuList>
-                      </Menu>
-                    </HStack>
+                          <Badge colorScheme="green" fontSize="xs">
+                            {portfolio.stocks.length}
+                          </Badge>
+                        </HStack>
+                        <Text fontSize="xs" color="gray.600" noOfLines={1}>
+                          {portfolio.stocks.join(', ') || 'Empty'}
+                        </Text>
+                      </VStack>
+                    </Box>
+                    
+                    <Menu>
+                      <MenuButton
+                        as={IconButton}
+                        icon={<Icon as={MdMoreVert} />}
+                        size="sm"
+                        variant="ghost"
+                        aria-label="Portfolio options"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <MenuList>
+                        <MenuItem
+                          icon={<Icon as={MdEdit} />}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingPortfolio(portfolio);
+                            setSelectedStocks([...portfolio.stocks]);
+                            onPortfolioOpen();
+                          }}
+                        >
+                          Edit
+                        </MenuItem>
+                        <MenuItem
+                          icon={<Icon as={MdDelete} />}
+                          color="red.600"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (window.confirm(`Delete portfolio "${portfolio.name}"?`)) {
+                              handleDeletePortfolio(portfolio.id);
+                            }
+                          }}
+                        >
+                          Delete
+                        </MenuItem>
+                      </MenuList>
+                    </Menu>
+                  </HStack>
                   ))
                 )}
               </VStack>
@@ -3221,87 +3351,87 @@ function PipelineBuilderInner() {
                 maxH="400px"
                 overflowY="auto"
               >
-                {availableAgents.map((agent) => (
+              {availableAgents.map((agent) => (
+                <HStack
+                  key={agent.id}
+                  p="10px"
+                  bg="white"
+                  borderRadius="8px"
+                  border="1px solid"
+                  borderColor="gray.200"
+                  _hover={{ bg: 'blue.50', borderColor: 'blue.400', boxShadow: 'sm' }}
+                  w="full"
+                  spacing="8px"
+                >
                   <HStack
-                    key={agent.id}
-                    p="10px"
-                    bg="white"
-                    borderRadius="8px"
-                    border="1px solid"
-                    borderColor="gray.200"
-                    _hover={{ bg: 'blue.50', borderColor: 'blue.400', boxShadow: 'sm' }}
-                    w="full"
-                    spacing="8px"
+                    flex="1"
+                    spacing="10px"
+                    cursor="grab"
+                    _active={{ cursor: 'grabbing' }}
+                    onMouseDown={(e) => handleAgentMouseDown(e, agent)}
                   >
-                    <HStack
-                      flex="1"
-                      spacing="10px"
-                      cursor="grab"
-                      _active={{ cursor: 'grabbing' }}
-                      onMouseDown={(e) => handleAgentMouseDown(e, agent)}
-                    >
-                      <RobotHead description={agent.description || agent.name} size={24} />
-                      <Text fontSize="sm" fontWeight="600" flex="1">
-                        {agent.name}
-                      </Text>
-                      {agent.isBuiltin && (
-                        <Badge colorScheme="blue" fontSize="xs">
-                          Built-in
-                        </Badge>
-                      )}
-                      {agent.isLibrary && (
-                        <Badge colorScheme="teal" fontSize="xs">
-                          Library
-                        </Badge>
-                      )}
-                    </HStack>
-
-                    {!agent.isBuiltin && !agent.isLibrary && (
-                      <Menu>
-                        <MenuButton
-                          as={IconButton}
-                          icon={<Icon as={MdMoreVert} />}
-                          size="sm"
-                          variant="ghost"
-                          aria-label="Agent options"
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                        <MenuList>
-                          <MenuItem
-                            icon={<Icon as={MdEdit} />}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEditingAgent(agent);
-                              setNewAgent({
-                                name: agent.name,
-                                description: agent.description,
-                                category: agent.category,
-                                system: agent.system,
-                                model: agent.model,
-                                systemPrompt: agent.systemPrompt || '',
-                              });
-                              onAgentOpen();
-                            }}
-                          >
-                            Edit
-                          </MenuItem>
-                          <MenuItem
-                            icon={<Icon as={MdDelete} />}
-                            color="red.600"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (window.confirm(`Delete agent "${agent.name}"?`)) {
-                                handleDeleteAgent(agent.id);
-                              }
-                            }}
-                          >
-                            Delete
-                          </MenuItem>
-                        </MenuList>
-                      </Menu>
+                    <RobotHead description={agent.description || agent.name} size={24} />
+                    <Text fontSize="sm" fontWeight="600" flex="1">
+                      {agent.name}
+                    </Text>
+                    {agent.isBuiltin && (
+                      <Badge colorScheme="blue" fontSize="xs">
+                        Built-in
+                      </Badge>
+                    )}
+                    {agent.isLibrary && (
+                      <Badge colorScheme="teal" fontSize="xs">
+                        Library
+                      </Badge>
                     )}
                   </HStack>
-                ))}
+
+                  {!agent.isBuiltin && !agent.isLibrary && (
+                    <Menu>
+                      <MenuButton
+                        as={IconButton}
+                        icon={<Icon as={MdMoreVert} />}
+                        size="sm"
+                        variant="ghost"
+                        aria-label="Agent options"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <MenuList>
+                        <MenuItem
+                          icon={<Icon as={MdEdit} />}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingAgent(agent);
+                            setNewAgent({
+                              name: agent.name,
+                              description: agent.description,
+                              category: agent.category,
+                              system: agent.system,
+                              model: agent.model,
+                              systemPrompt: agent.systemPrompt || '',
+                            });
+                            onAgentOpen();
+                          }}
+                        >
+                          Edit
+                        </MenuItem>
+                        <MenuItem
+                          icon={<Icon as={MdDelete} />}
+                          color="red.600"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (window.confirm(`Delete agent "${agent.name}"?`)) {
+                              handleDeleteAgent(agent.id);
+                            }
+                          }}
+                        >
+                          Delete
+                        </MenuItem>
+                      </MenuList>
+                    </Menu>
+                  )}
+                </HStack>
+              ))}
               </VStack>
             </Box>
           )}
@@ -3497,8 +3627,8 @@ function PipelineBuilderInner() {
 
       {/* Main Canvas */}
       <Box h="100%" position="relative" transition="all 0.3s">
-        <ReactFlowErrorBoundary
-          nodes={nodes}
+        <ReactFlowErrorBoundary 
+          nodes={nodes} 
           onError={(error) => {
             console.log('[ReactFlowErrorBoundary] Error handler called, triggering refetch');
             setReactFlowError(error);
@@ -3509,7 +3639,13 @@ function PipelineBuilderInner() {
             edges={edges}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
+            onNodesDelete={onNodesDelete}
+            onEdgesDelete={onEdgesDelete}
             onConnect={onConnect}
+            onConnectStart={onConnectStart}
+            onConnectEnd={onConnectEnd}
+            isValidConnection={isValidConnection}
+            className={isConnecting ? 'connecting' : ''}
             onNodeClick={handleNodeClick}
             onNodeDoubleClick={handleNodeDoubleClick}
             onNodeDrag={handleNodeDrag}
@@ -3519,15 +3655,23 @@ function PipelineBuilderInner() {
             defaultViewport={{ x: 0, y: 0, zoom: 0.9 }}
             minZoom={0.1}
             maxZoom={2}
-            panOnDrag={[0]}
-            selectionKeyCode="Shift"
+            panOnDrag={[1, 2]}
+            panOnScroll={true}
+            selectionOnDrag={true}
+            selectionKeyCode={null}
             multiSelectionKeyCode="Shift"
             selectionMode={SelectionMode.Partial}
-            deleteKeyCode={null}
+            nodesDraggable={true}
+            nodesConnectable={true}
+            elementsSelectable={true}
+            deleteKeyCode={['Delete', 'Backspace']}
+            snapToGrid={true}
+            snapGrid={[GRID_SIZE, GRID_SIZE]}
+            style={{ backgroundColor: '#faf9f7' }}
           >
-            <Controls style={{ marginLeft: "220px" }} />
-            <MiniMap position='bottom-left' />
-            <Background variant="dots" gap={16} size={1} />
+            <Controls style={{marginLeft: "220px"}} />
+            <MiniMap position='bottom-left'/>
+            <Background variant="dots" gap={GRID_SIZE} size={4} color="rgba(0,0,0,0.5)" />
 
             <Panel position="top-right">
               <HStack spacing={2}>
@@ -3562,509 +3706,512 @@ function PipelineBuilderInner() {
       {/* Floating Agent Configuration Panel */}
       {selectedNode && selectedNode.type === 'agentNode' && (
         <>
-          <Box
-            position="absolute"
-            top="0"
-            left="0"
-            w="100%"
-            h="100%"
-            bg="blackAlpha.400"
-            zIndex="19"
-            onClick={() => {
-              setSelectedNode(null);
-              setNodes((nds) =>
-                nds.map((n) => ({ ...n, selected: false }))
-              );
-            }}
-          />
-          <Box
-            position="absolute"
-            top="50%"
-            left="50%"
-            transform="translate(-50%, -50%)"
-            w="500px"
-            maxH="80vh"
-            bg="white"
-            borderRadius="20px"
-            overflowY="auto"
-            zIndex="20"
-            boxShadow="2xl"
-          >
-            <VStack spacing="0" align="stretch" h="full">
-              {/* Header */}
-              <Box
-                p="20px"
-                borderBottom="2px solid"
-                borderColor="gray.200"
-                bg="teal.50"
-                borderTopRadius="20px"
-              >
-                <HStack justify="space-between">
-                  <HStack spacing="10px" flex="1">
-                    <Icon as={MdSmartToy} color="teal.600" boxSize="24px" />
-                    <Input
-                      value={nodeConfig.name}
-                      onChange={(e) =>
-                        setNodeConfig({ ...nodeConfig, name: e.target.value })
-                      }
-                      placeholder="Node Configuration"
-                      fontSize="lg"
-                      fontWeight="bold"
-                      color="teal.900"
-                      variant="unstyled"
-                      _placeholder={{ color: 'teal.400' }}
-                    />
-                  </HStack>
-                  <IconButton
-                    icon={<Icon as={MdClose} />}
-                    size="sm"
-                    variant="ghost"
-                    colorScheme="gray"
-                    aria-label="Close panel"
-                    onClick={() => {
-                      setSelectedNode(null);
-                      setNodes((nds) =>
-                        nds.map((n) => ({ ...n, selected: false }))
-                      );
-                    }}
+        <Box
+          position="absolute"
+          top="0"
+          left="0"
+          w="100%"
+          h="100%"
+          bg="blackAlpha.400"
+          zIndex="19"
+          onClick={() => {
+            setSelectedNode(null);
+            setNodes((nds) =>
+              nds.map((n) => ({ ...n, selected: false }))
+            );
+          }}
+        />
+        <Box
+          position="absolute"
+          top="50%"
+          left="50%"
+          transform="translate(-50%, -50%)"
+          w="500px"
+          maxH="80vh"
+          bg="white"
+          borderRadius="20px"
+          overflowY="auto"
+          zIndex="20"
+          boxShadow="2xl"
+        >
+          <VStack spacing="0" align="stretch" h="full">
+            {/* Header */}
+            <Box
+              p="20px"
+              borderBottom="2px solid"
+              borderColor="gray.200"
+              bg="teal.50"
+              borderTopRadius="20px"
+            >
+              <HStack justify="space-between">
+                <HStack spacing="10px" flex="1">
+                  <Icon as={MdSmartToy} color="teal.600" boxSize="24px" />
+                  <Input
+                    value={nodeConfig.name}
+                    onChange={(e) =>
+                      setNodeConfig({ ...nodeConfig, name: e.target.value })
+                    }
+                    placeholder="Node Configuration"
+                    fontSize="lg"
+                    fontWeight="bold"
+                    color="teal.900"
+                    variant="unstyled"
+                    _placeholder={{ color: 'teal.400' }}
                   />
                 </HStack>
-              </Box>
+                <IconButton
+                  icon={<Icon as={MdClose} />}
+                  size="sm"
+                  variant="ghost"
+                  colorScheme="gray"
+                  aria-label="Close panel"
+                  onClick={() => {
+                    setSelectedNode(null);
+                    setNodes((nds) =>
+                      nds.map((n) => ({ ...n, selected: false }))
+                    );
+                  }}
+                />
+              </HStack>
+            </Box>
 
-              {/* Configuration Form */}
-              <Box flex="1" p="20px">
-                <VStack spacing="20px" align="stretch">
-                  {/* Description */}
-                  <FormControl>
-                    <FormLabel fontSize="sm" fontWeight="600">
-                      Description
+            {/* Configuration Form */}
+            <Box flex="1" p="20px">
+              <VStack spacing="20px" align="stretch">
+                {/* Description */}
+                <FormControl>
+                  <FormLabel fontSize="sm" fontWeight="600">
+                    Description
+                  </FormLabel>
+                  <Textarea
+                    placeholder="What does this agent do?"
+                    value={nodeConfig.description}
+                    onChange={(e) =>
+                      setNodeConfig({
+                        ...nodeConfig,
+                        description: e.target.value,
+                      })
+                    }
+                    size="sm"
+                    rows={3}
+                  />
+                </FormControl>
+
+                {/* System Prompt - show for all agents */}
+                <FormControl>
+                  <HStack justify="space-between" mb="8px">
+                    <FormLabel fontSize="sm" fontWeight="600" mb="0">
+                      System Prompt
                     </FormLabel>
-                    <Textarea
-                      placeholder="What does this agent do?"
-                      value={nodeConfig.description}
-                      onChange={(e) =>
-                        setNodeConfig({
-                          ...nodeConfig,
-                          description: e.target.value,
-                        })
-                      }
-                      size="sm"
-                      rows={3}
-                    />
-                  </FormControl>
-
-                  {/* System Prompt - show for all agents */}
-                  <FormControl>
-                    <HStack justify="space-between" mb="8px">
-                      <FormLabel fontSize="sm" fontWeight="600" mb="0">
-                        System Prompt
-                      </FormLabel>
-                      {selectedNode?.data?.agent && !selectedNode.data.agent.isBuiltin && !selectedNode.data.agent.isLibrary && (
-                        <Button
-                          size="xs"
-                          leftIcon={<Icon as={MdRefresh} />}
-                          variant="outline"
-                          colorScheme="purple"
-                          isLoading={isGeneratingPrompt}
-                          loadingText="Generating..."
-                          isDisabled={isGeneratingPrompt}
-                          onClick={async () => {
-                            if (!nodeConfig.name || !nodeConfig.description) {
+                    {selectedNode?.data?.agent && !selectedNode.data.agent.isBuiltin && !selectedNode.data.agent.isLibrary && (
+                      <Button
+                        size="xs"
+                        leftIcon={<Icon as={MdRefresh} />}
+                        variant="outline"
+                        colorScheme="purple"
+                        isLoading={isGeneratingPrompt}
+                        loadingText="Generating..."
+                        isDisabled={isGeneratingPrompt}
+                        onClick={async () => {
+                          if (!nodeConfig.name || !nodeConfig.description) {
+                            toast({
+                              title: 'Missing information',
+                              description: 'Please enter name and description first',
+                              status: 'warning',
+                              duration: 3000,
+                              isClosable: true,
+                            });
+                            return;
+                          }
+                          setIsGeneratingPrompt(true);
+                          try {
+                            const response = await generateAgentSystemPrompt(
+                              nodeConfig.name,
+                              nodeConfig.description,
+                              selectedNode.data.agent.stage || selectedNode.data.agent.category
+                            );
+                            if (response.success && response.data?.systemPrompt) {
+                              setNodeConfig({
+                                ...nodeConfig,
+                                systemPrompt: response.data.systemPrompt,
+                              });
                               toast({
-                                title: 'Missing information',
-                                description: 'Please enter name and description first',
-                                status: 'warning',
-                                duration: 3000,
+                                title: 'System prompt regenerated',
+                                status: 'success',
+                                duration: 2000,
                                 isClosable: true,
                               });
-                              return;
                             }
-                            setIsGeneratingPrompt(true);
-                            try {
-                              const response = await generateAgentSystemPrompt(
-                                nodeConfig.name,
-                                nodeConfig.description,
-                                selectedNode.data.agent.stage || selectedNode.data.agent.category
-                              );
-                              if (response.success && response.data?.systemPrompt) {
-                                setNodeConfig({
-                                  ...nodeConfig,
-                                  systemPrompt: response.data.systemPrompt,
-                                });
-                                toast({
-                                  title: 'System prompt regenerated',
-                                  status: 'success',
-                                  duration: 2000,
-                                  isClosable: true,
-                                });
-                              }
-                            } catch (error) {
-                              toast({
-                                title: 'Failed to regenerate',
-                                description: error.message,
-                                status: 'error',
-                                duration: 3000,
-                                isClosable: true,
-                              });
-                            } finally {
-                              setIsGeneratingPrompt(false);
-                            }
-                          }}
-                        >
-                          Regenerate
-                        </Button>
-                      )}
-                    </HStack>
-                    <Textarea
-                      value={nodeConfig.systemPrompt}
-                      onChange={(e) =>
-                        setNodeConfig({ ...nodeConfig, systemPrompt: e.target.value })
-                      }
-                      rows={6}
-                      fontSize="sm"
-                      placeholder={
-                        selectedNode?.data?.agent?.isBuiltin
-                          ? "Built-in agent — pre-configured system prompts"
-                          : selectedNode?.data?.agent?.isLibrary
-                            ? "Library agent — pre-configured system prompts"
-                            : "Define the agent's behavior..."
-                      }
-                      isReadOnly={selectedNode?.data?.agent?.isBuiltin || selectedNode?.data?.agent?.isLibrary}
-                      bg={selectedNode?.data?.agent?.isBuiltin || selectedNode?.data?.agent?.isLibrary ? 'gray.50' : 'white'}
-                    />
-                    <Text fontSize="xs" color="gray.500" mt="4px">
-                      {selectedNode?.data?.agent?.isBuiltin
-                        ? 'Built-in agents have pre-configured system prompts (read-only)'
+                          } catch (error) {
+                            toast({
+                              title: 'Failed to regenerate',
+                              description: error.message,
+                              status: 'error',
+                              duration: 3000,
+                              isClosable: true,
+                            });
+                          } finally {
+                            setIsGeneratingPrompt(false);
+                          }
+                        }}
+                      >
+                        Regenerate
+                      </Button>
+                    )}
+                  </HStack>
+                  <Textarea
+                    value={nodeConfig.systemPrompt}
+                    onChange={(e) =>
+                      setNodeConfig({ ...nodeConfig, systemPrompt: e.target.value })
+                    }
+                    rows={6}
+                    fontSize="sm"
+                    placeholder={
+                      selectedNode?.data?.agent?.isBuiltin
+                        ? "Built-in agent — pre-configured system prompts"
                         : selectedNode?.data?.agent?.isLibrary
-                          ? 'Library agents have pre-configured system prompts (read-only)'
-                          : 'The core instruction that defines this agent\'s behavior. Click "Regenerate" after changing the description.'}
-                    </Text>
-                  </FormControl>
-                </VStack>
-              </Box>
+                        ? "Library agent — pre-configured system prompts"
+                        : "Define the agent's behavior..."
+                    }
+                    isReadOnly={selectedNode?.data?.agent?.isBuiltin || selectedNode?.data?.agent?.isLibrary}
+                    bg={selectedNode?.data?.agent?.isBuiltin || selectedNode?.data?.agent?.isLibrary ? 'gray.50' : 'white'}
+                  />
+                  <Text fontSize="xs" color="gray.500" mt="4px">
+                    {selectedNode?.data?.agent?.isBuiltin
+                      ? 'Built-in agents have pre-configured system prompts (read-only)'
+                      : selectedNode?.data?.agent?.isLibrary
+                      ? 'Library agents have pre-configured system prompts (read-only)'
+                      : 'The core instruction that defines this agent\'s behavior. Click "Regenerate" after changing the description.'}
+                  </Text>
+                </FormControl>
+              </VStack>
+            </Box>
 
-              {/* Footer with Save Button */}
-              <Box
-                p="20px"
-                borderTop="2px solid"
-                borderColor="gray.200"
-                bg="gray.50"
-                borderBottomRadius="20px"
+            {/* Footer with Save Button */}
+            <Box
+              p="20px"
+              borderTop="2px solid"
+              borderColor="gray.200"
+              bg="gray.50"
+              borderBottomRadius="20px"
+            >
+              <Button
+                leftIcon={<Icon as={MdSave} />}
+                colorScheme="teal"
+                size="md"
+                w="full"
+                onClick={handleSaveNodeConfig}
+                fontWeight="600"
               >
-                <Button
-                  leftIcon={<Icon as={MdSave} />}
-                  colorScheme="teal"
-                  size="md"
-                  w="full"
-                  onClick={handleSaveNodeConfig}
-                  fontWeight="600"
-                >
-                  Save Configuration
-                </Button>
-              </Box>
-            </VStack>
-          </Box>
+                Save Configuration
+              </Button>
+            </Box>
+          </VStack>
+        </Box>
         </>
       )}
 
       {/* Floating Portfolio Configuration Panel */}
       {selectedNode && selectedNode.type === 'portfolioNode' && (
         <>
-          <Box
-            position="absolute"
-            top="0"
-            left="0"
-            w="100%"
-            h="100%"
-            bg="blackAlpha.400"
-            zIndex="19"
-            onClick={() => {
-              setSelectedNode(null);
-              setNodes((nds) =>
-                nds.map((n) => ({ ...n, selected: false }))
-              );
-            }}
-          />
-          <Box
-            position="absolute"
-            top="50%"
-            left="50%"
-            transform="translate(-50%, -50%)"
-            w="500px"
-            maxH="80vh"
-            bg="white"
-            borderRadius="20px"
-            overflowY="auto"
-            zIndex="20"
-            boxShadow="2xl"
-          >
-            <VStack spacing="0" align="stretch" h="full">
-              {/* Header */}
-              <Box
-                p="20px"
-                borderBottom="2px solid"
-                borderColor="gray.200"
-                bg="green.50"
-                borderTopRadius="20px"
-              >
-                <HStack justify="space-between">
-                  <HStack spacing="10px" flex="1">
-                    <Icon as={MdShowChart} color="green.600" boxSize="24px" />
-                    <Input
-                      value={portfolioConfig.name}
-                      onChange={(e) =>
-                        setPortfolioConfig({ ...portfolioConfig, name: e.target.value })
-                      }
-                      placeholder="Portfolio Configuration"
-                      fontSize="lg"
-                      fontWeight="bold"
-                      color="green.900"
-                      variant="unstyled"
-                      _placeholder={{ color: 'green.400' }}
-                    />
-                  </HStack>
-                  <IconButton
-                    icon={<Icon as={MdClose} />}
-                    size="sm"
-                    variant="ghost"
-                    colorScheme="gray"
-                    aria-label="Close panel"
-                    onClick={() => {
-                      setSelectedNode(null);
-                      setNodes((nds) =>
-                        nds.map((n) => ({ ...n, selected: false }))
-                      );
-                    }}
+        <Box
+          position="absolute"
+          top="0"
+          left="0"
+          w="100%"
+          h="100%"
+          bg="blackAlpha.400"
+          zIndex="19"
+          onClick={() => {
+            setSelectedNode(null);
+            setNodes((nds) =>
+              nds.map((n) => ({ ...n, selected: false }))
+            );
+          }}
+        />
+        <Box
+          position="absolute"
+          top="50%"
+          left="50%"
+          transform="translate(-50%, -50%)"
+          w="500px"
+          maxH="80vh"
+          bg="white"
+          borderRadius="20px"
+          overflowY="auto"
+          zIndex="20"
+          boxShadow="2xl"
+        >
+          <VStack spacing="0" align="stretch" h="full">
+            {/* Header */}
+            <Box
+              p="20px"
+              borderBottom="2px solid"
+              borderColor="gray.200"
+              bg="green.50"
+              borderTopRadius="20px"
+            >
+              <HStack justify="space-between">
+                <HStack spacing="10px" flex="1">
+                  <Icon as={MdShowChart} color="green.600" boxSize="24px" />
+                  <Input
+                    value={portfolioConfig.name}
+                    onChange={(e) =>
+                      setPortfolioConfig({ ...portfolioConfig, name: e.target.value })
+                    }
+                    placeholder="Portfolio name (optional)"
+                    fontSize="lg"
+                    fontWeight="bold"
+                    color="green.900"
+                    variant="unstyled"
+                    _placeholder={{ color: 'green.400' }}
                   />
                 </HStack>
-              </Box>
-
-              {/* Configuration Form */}
-              <Box flex="1" p="20px">
-                <VStack spacing="20px" align="stretch">
-                  {/* Description */}
-                  <FormControl>
-                    <FormLabel fontSize="sm" fontWeight="600">
-                      Description
-                    </FormLabel>
-                    <Textarea
-                      placeholder="Describe this portfolio..."
-                      value={portfolioConfig.description}
-                      onChange={(e) =>
-                        setPortfolioConfig({
-                          ...portfolioConfig,
-                          description: e.target.value,
-                        })
-                      }
-                      size="sm"
-                      rows={3}
-                    />
-                  </FormControl>
-
-                  <Divider />
-
-                  {/* Stocks Management */}
-                  <FormControl>
-                    <FormLabel fontSize="sm" fontWeight="600">
-                      Search Stocks / Assets
-                    </FormLabel>
-                    <Input
-                      placeholder="Search by ticker or name (e.g., AAPL, Apple)..."
-                      value={portfolioSearch}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        setPortfolioSearch(value);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && portfolioSearch.trim()) {
-                          const ticker = portfolioSearch.trim().toUpperCase();
-                          if (!selectedStocks.includes(ticker)) {
-                            setSelectedStocks([...selectedStocks, ticker]);
-                            setPortfolioSearch('');
-                          }
-                        }
-                      }}
-                      size="sm"
-                    />
-                  </FormControl>
-
-                  {/* Suggestions - Badge style like Selected Stocks */}
-                  <VStack spacing="8px" align="stretch">
-                    <Text fontSize="xs" fontWeight="600" color="gray.500">
-                      {portfolioSearch.length > 0 ? 'Search Results' : 'Popular Stocks'}
-                    </Text>
-                    <Box
-                      maxH="150px"
-                      overflowY="auto"
-                    >
-                      <Box display="flex" flexWrap="wrap" gap="4px" rowGap="4px">
-                        {(portfolioSearch.length > 0
-                          ? searchSecurities(portfolioSearch)
-                          : SECURITIES.slice(0, 20)
-                        ).map((security) => (
-                          <Box
-                            key={security.symbol}
-                            px="10px"
-                            py="6px"
-                            bg="white"
-                            border="1px solid"
-                            borderColor="gray.300"
-                            borderRadius="6px"
-                            fontSize="xs"
-                            fontWeight="600"
-                            cursor="pointer"
-                            _hover={{
-                              bg: 'green.50',
-                              borderColor: 'green.400',
-                              transform: 'translateY(-1px)',
-                              boxShadow: 'sm'
-                            }}
-                            transition="all 0.2s"
-                            onClick={() => {
-                              if (!selectedStocks.includes(security.symbol)) {
-                                setSelectedStocks([...selectedStocks, security.symbol]);
-                              }
-                              setPortfolioSearch('');
-                            }}
-                          >
-                            {security.symbol}
-                          </Box>
-                        ))}
-                      </Box>
-                    </Box>
-                  </VStack>
-
-                  {/* Selected Stocks */}
-                  {selectedStocks.length > 0 && (
-                    <VStack spacing="8px" align="stretch">
-                      <HStack justify="space-between">
-                        <Text fontSize="xs" fontWeight="600" color="gray.500">
-                          Selected Stocks ({selectedStocks.length})
-                        </Text>
-                        <Button
-                          size="xs"
-                          variant="ghost"
-                          colorScheme="red"
-                          onClick={() => setSelectedStocks([])}
-                        >
-                          Clear All
-                        </Button>
-                      </HStack>
-                      <HStack spacing="6px" flexWrap="wrap">
-                        {selectedStocks.map((stock) => (
-                          <Badge
-                            key={stock}
-                            colorScheme="green"
-                            fontSize="xs"
-                            px="10px"
-                            py="8px"
-                            borderRadius="4px"
-                            cursor="pointer"
-                            onClick={() => setSelectedStocks(selectedStocks.filter(s => s !== stock))}
-                          >
-                            {stock} ×
-                          </Badge>
-                        ))}
-                      </HStack>
-                    </VStack>
-                  )}
-                </VStack>
-              </Box>
-
-              {/* Footer with Save Button */}
-              <Box
-                p="20px"
-                borderTop="2px solid"
-                borderColor="gray.200"
-                bg="gray.50"
-                borderBottomRadius="20px"
-              >
-                <Button
-                  leftIcon={<Icon as={MdSave} />}
-                  colorScheme="green"
-                  size="md"
-                  w="full"
-                  isDisabled={!portfolioConfig.name.trim() || selectedStocks.length === 0}
-                  onClick={async () => {
-                    try {
-                      const portfolioData = {
-                        name: portfolioConfig.name.trim(),
-                        description: portfolioConfig.description.trim(),
-                        stocks: [...selectedStocks],
-                      };
-
-                      // Check if portfolio exists in DB (has valid MongoDB ID)
-                      const existingPortfolio = selectedNode.data.portfolio;
-                      let savedPortfolio;
-
-                      if (existingPortfolio && existingPortfolio.id && String(existingPortfolio.id).match(/^[0-9a-fA-F]{24}$/)) {
-                        // Update existing portfolio in DB
-                        const response = await portfolioApi.update(existingPortfolio.id, portfolioData);
-                        if (response.success) {
-                          savedPortfolio = response.data;
-
-                          // Update portfolios list
-                          setPortfolios(portfolios.map(p =>
-                            p.id === existingPortfolio.id ? savedPortfolio : p
-                          ));
-                        }
-                      } else {
-                        // Create new portfolio in DB
-                        const response = await portfolioApi.create(currentHorizonId, portfolioData);
-                        if (response.success) {
-                          savedPortfolio = response.data;
-
-                          // Add to portfolios list
-                          setPortfolios([...portfolios, savedPortfolio]);
-                        }
-                      }
-
-                      // Update node with saved portfolio data
-                      setNodes((nds) =>
-                        nds.map((node) => {
-                          if (node.id === selectedNode.id) {
-                            return {
-                              ...node,
-                              data: {
-                                ...node.data,
-                                portfolio: savedPortfolio,
-                              },
-                            };
-                          }
-                          return node;
-                        })
-                      );
-
-                      toast({
-                        title: 'Portfolio configuration saved',
-                        description: `${portfolioData.name} with ${selectedStocks.length} stocks`,
-                        status: 'success',
-                        duration: 2000,
-                        isClosable: true,
-                      });
-
-                      setSelectedNode(null);
-                      setNodes((nds) =>
-                        nds.map((n) => ({ ...n, selected: false }))
-                      );
-                    } catch (error) {
-                      console.error('[Portfolio] Save configuration error:', error);
-                      toast({
-                        title: 'Failed to save portfolio',
-                        description: error.message || 'An error occurred',
-                        status: 'error',
-                        duration: 3000,
-                        isClosable: true,
-                      });
-                    }
+                <IconButton
+                  icon={<Icon as={MdClose} />}
+                  size="sm"
+                  variant="ghost"
+                  colorScheme="gray"
+                  aria-label="Close panel"
+                  onClick={() => {
+                    setSelectedNode(null);
+                    setNodes((nds) =>
+                      nds.map((n) => ({ ...n, selected: false }))
+                    );
                   }}
-                  fontWeight="600"
-                >
-                  Save Configuration
-                </Button>
-              </Box>
-            </VStack>
-          </Box>
+                />
+              </HStack>
+            </Box>
+
+            {/* Configuration Form */}
+            <Box flex="1" p="20px">
+              <VStack spacing="20px" align="stretch">
+                {/* Description */}
+                <FormControl>
+                  <FormLabel fontSize="sm" fontWeight="600">
+                    Description
+                  </FormLabel>
+                  <Textarea
+                    placeholder="Describe this portfolio..."
+                    value={portfolioConfig.description}
+                    onChange={(e) =>
+                      setPortfolioConfig({
+                        ...portfolioConfig,
+                        description: e.target.value,
+                      })
+                    }
+                    size="sm"
+                    rows={3}
+                  />
+                </FormControl>
+
+                <Divider />
+
+                {/* Stocks Management */}
+                <FormControl>
+                  <FormLabel fontSize="sm" fontWeight="600">
+                    Search Stocks / Assets
+                  </FormLabel>
+                  <Input
+                    placeholder="Search by ticker or name (e.g., AAPL, Apple)..."
+                    value={portfolioSearch}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setPortfolioSearch(value);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && portfolioSearch.trim()) {
+                        const ticker = portfolioSearch.trim().toUpperCase();
+                        if (!selectedStocks.includes(ticker)) {
+                          setSelectedStocks([...selectedStocks, ticker]);
+                          setPortfolioSearch('');
+                        }
+                      }
+                    }}
+                    size="sm"
+                  />
+                </FormControl>
+
+                {/* Suggestions - Badge style like Selected Stocks */}
+                <VStack spacing="8px" align="stretch">
+                  <Text fontSize="xs" fontWeight="600" color="gray.500">
+                    {portfolioSearch.length > 0 ? 'Search Results' : 'Popular Stocks'}
+                  </Text>
+                  <Box
+                    maxH="150px"
+                    overflowY="auto"
+                  >
+                    <Box display="flex" flexWrap="wrap" gap="4px" rowGap="4px">
+                      {(portfolioSearch.length > 0 
+                        ? searchSecurities(portfolioSearch) 
+                        : SECURITIES.slice(0, 20)
+                      ).map((security) => (
+                        <Box
+                          key={security.symbol}
+                          px="10px"
+                          py="6px"
+                          bg="white"
+                          border="1px solid"
+                          borderColor="gray.300"
+                          borderRadius="6px"
+                          fontSize="xs"
+                          fontWeight="600"
+                          cursor="pointer"
+                          _hover={{ 
+                            bg: 'green.50', 
+                            borderColor: 'green.400',
+                            transform: 'translateY(-1px)',
+                            boxShadow: 'sm'
+                          }}
+                          transition="all 0.2s"
+                          onClick={() => {
+                            if (!selectedStocks.includes(security.symbol)) {
+                              setSelectedStocks([...selectedStocks, security.symbol]);
+                            }
+                            setPortfolioSearch('');
+                          }}
+                        >
+                          {security.symbol}
+                        </Box>
+                      ))}
+                    </Box>
+                  </Box>
+                </VStack>
+
+                {/* Selected Stocks */}
+                {selectedStocks.length > 0 && (
+                  <VStack spacing="8px" align="stretch">
+                    <HStack justify="space-between">
+                      <Text fontSize="xs" fontWeight="600" color="gray.500">
+                        Selected Stocks ({selectedStocks.length})
+                      </Text>
+                      <Button
+                        size="xs"
+                        variant="ghost"
+                        colorScheme="red"
+                        onClick={() => setSelectedStocks([])}
+                      >
+                        Clear All
+                      </Button>
+                    </HStack>
+                    <HStack spacing="6px" flexWrap="wrap">
+                      {selectedStocks.map((stock) => (
+                        <Badge
+                          key={stock}
+                          colorScheme="green"
+                          fontSize="xs"
+                          px="10px"
+                          py="8px"
+                          borderRadius="4px"
+                          cursor="pointer"
+                          onClick={() => setSelectedStocks(selectedStocks.filter(s => s !== stock))}
+                        >
+                          {stock} ×
+                        </Badge>
+                      ))}
+                    </HStack>
+                  </VStack>
+                )}
+              </VStack>
+            </Box>
+
+            {/* Footer with Save Button */}
+            <Box
+              p="20px"
+              borderTop="2px solid"
+              borderColor="gray.200"
+              bg="gray.50"
+              borderBottomRadius="20px"
+            >
+              <Button
+                leftIcon={<Icon as={MdSave} />}
+                colorScheme="green"
+                size="md"
+                w="full"
+                isDisabled={selectedStocks.length === 0}
+                onClick={async () => {
+                  try {
+                    // Auto-generate name if empty
+                    const portfolioName = portfolioConfig.name.trim() || generateUntitledPortfolioName();
+
+                    const portfolioData = {
+                      name: portfolioName,
+                      description: portfolioConfig.description.trim(),
+                      stocks: [...selectedStocks],
+                    };
+
+                    // Check if portfolio exists in DB (has valid MongoDB ID)
+                    const existingPortfolio = selectedNode.data.portfolio;
+                    let savedPortfolio;
+
+                    if (existingPortfolio && existingPortfolio.id && String(existingPortfolio.id).match(/^[0-9a-fA-F]{24}$/)) {
+                      // Update existing portfolio in DB
+                      const response = await portfolioApi.update(existingPortfolio.id, portfolioData);
+                      if (response.success) {
+                        savedPortfolio = response.data;
+                        
+                        // Update portfolios list
+                        setPortfolios(portfolios.map(p => 
+                          p.id === existingPortfolio.id ? savedPortfolio : p
+                        ));
+                      }
+                    } else {
+                      // Create new portfolio in DB
+                      const response = await portfolioApi.create(currentHorizonId, portfolioData);
+                      if (response.success) {
+                        savedPortfolio = response.data;
+                        
+                        // Add to portfolios list
+                        setPortfolios([...portfolios, savedPortfolio]);
+                      }
+                    }
+
+                    // Update node with saved portfolio data
+                    setNodes((nds) =>
+                      nds.map((node) => {
+                        if (node.id === selectedNode.id) {
+                          return {
+                            ...node,
+                            data: {
+                              ...node.data,
+                              portfolio: savedPortfolio,
+                            },
+                          };
+                        }
+                        return node;
+                      })
+                    );
+
+                    toast({
+                      title: 'Portfolio configuration saved',
+                      description: `${portfolioData.name} with ${selectedStocks.length} stocks`,
+                      status: 'success',
+                      duration: 2000,
+                      isClosable: true,
+                    });
+
+                    setSelectedNode(null);
+                    setNodes((nds) =>
+                      nds.map((n) => ({ ...n, selected: false }))
+                    );
+                  } catch (error) {
+                    console.error('[Portfolio] Save configuration error:', error);
+                    toast({
+                      title: 'Failed to save portfolio',
+                      description: error.message || 'An error occurred',
+                      status: 'error',
+                      duration: 3000,
+                      isClosable: true,
+                    });
+                  }
+                }}
+                fontWeight="600"
+              >
+                Save Configuration
+              </Button>
+            </Box>
+          </VStack>
+        </Box>
         </>
       )}
 
@@ -4260,7 +4407,7 @@ function PipelineBuilderInner() {
                   Portfolio Name
                 </FormLabel>
                 <Input
-                  placeholder="Enter portfolio name..."
+                  placeholder="Enter portfolio name (optional - auto-generates if empty)..."
                   value={portfolioConfig.name}
                   onChange={(e) => setPortfolioConfig({ ...portfolioConfig, name: e.target.value })}
                   size="md"
@@ -4413,13 +4560,16 @@ function PipelineBuilderInner() {
                 colorScheme="green"
                 size="md"
                 w="full"
-                isDisabled={selectedStocks.length === 0 || !portfolioConfig.name.trim()}
+                isDisabled={selectedStocks.length === 0}
                 onClick={async () => {
                   try {
+                    // Auto-generate name if empty
+                    const portfolioName = portfolioConfig.name.trim() || generateUntitledPortfolioName();
+
                     if (editingPortfolio) {
                       // Update existing portfolio via API
                       const response = await portfolioApi.update(editingPortfolio.id, {
-                        name: portfolioConfig.name.trim(),
+                        name: portfolioName,
                         description: portfolioConfig.description.trim(),
                         stocks: [...selectedStocks],
                       });
@@ -4437,12 +4587,12 @@ function PipelineBuilderInner() {
                             nds.map((n) =>
                               n.id === editingPortfolioNodeId
                                 ? {
-                                  ...n,
-                                  data: {
-                                    ...n.data,
-                                    portfolio: response.data,
-                                  },
-                                }
+                                    ...n,
+                                    data: {
+                                      ...n.data,
+                                      portfolio: response.data,
+                                    },
+                                  }
                                 : n
                             )
                           );
@@ -4460,14 +4610,14 @@ function PipelineBuilderInner() {
                     } else {
                       // Create new portfolio via API
                       const response = await portfolioApi.create(currentHorizonId, {
-                        name: portfolioConfig.name.trim(),
+                        name: portfolioName,
                         description: portfolioConfig.description.trim(),
                         stocks: [...selectedStocks],
                       });
 
                       if (response.success) {
                         setPortfolios([...portfolios, response.data]);
-
+                        
                         toast({
                           title: 'Portfolio Created',
                           description: `${response.data.name} with ${selectedStocks.length} stocks`,
@@ -4506,7 +4656,7 @@ function PipelineBuilderInner() {
       {/* Custom Data Agent Needed Modal */}
       <Modal
         isOpen={isDataAgentOpen}
-        onClose={() => { }}
+        onClose={() => {}}
         closeOnOverlayClick={false}
         isCentered
         size="lg"
@@ -4669,7 +4819,7 @@ function PipelineBuilderInner() {
             zIndex="15"
             onClick={() => setSelectedOutputNode(null)}
           />
-
+          
           {/* Sidebar panel */}
           <Box
             position="absolute"
@@ -4731,10 +4881,10 @@ function PipelineBuilderInner() {
                       onClick={async () => {
                         const currentOutput = revisions[selectedRevisionIndex];
                         const outputNodeId = currentOutput._id;
-
+                        
                         try {
                           await nodeApi.reactivate(outputNodeId);
-
+                          
                           toast({
                             title: 'Added to workflow',
                             description: 'This revision is now active in the pipeline',
@@ -4793,7 +4943,7 @@ function PipelineBuilderInner() {
                     const symbols = output.data?.metadata?.symbols || output.data?.result?.symbols || [];
                     const period = output.data?.metadata?.period || output.data?.result?.period || 'N/A';
                     const isActive = output.isActive === true;
-
+                    
                     return (
                       <Box
                         key={output._id || output.id}
@@ -4833,10 +4983,10 @@ function PipelineBuilderInner() {
                               onClick={async (e) => {
                                 e.stopPropagation();
                                 const outputNodeId = output._id;
-
+                                
                                 try {
                                   await nodeApi.reactivate(outputNodeId);
-
+                                  
                                   toast({
                                     title: 'Added to workflow',
                                     description: 'This revision is now active in the pipeline',
@@ -4874,15 +5024,15 @@ function PipelineBuilderInner() {
                             </Badge>
                           </HStack>
                         </HStack>
-                        <VStack
-                          align="start"
+                        <VStack 
+                          align="start" 
                           spacing="4px"
                           cursor="pointer"
                           onClick={() => {
                             setSelectedRevisionIndex(index);
                             setSidebarView(SIDEBAR_VIEW.DETAIL);
                           }}
-                          _hover={{
+                          _hover={{ 
                             opacity: 0.8,
                           }}
                         >
@@ -4904,7 +5054,7 @@ function PipelineBuilderInner() {
                     // Get the current output node (revision) data to display
                     const currentOutput = revisions[selectedRevisionIndex];
                     const displayResult = currentOutput?.data?.result;
-
+                    
                     return (
                       <>
                         {/* Summary Info */}
@@ -4980,13 +5130,13 @@ function PipelineBuilderInner() {
 
                             // Try known agent-specific fields first
                             const knownField = result.chart_data_by_symbol ||
-                              result.earnings_data_by_symbol ||
-                              result.news_data_by_symbol ||
-                              result.technical_data_by_symbol ||
-                              result.fundamentals_data_by_symbol ||
-                              result.chart_data ||
-                              result.data?.chart_data_by_symbol ||
-                              result.result?.chart_data_by_symbol;
+                                   result.earnings_data_by_symbol ||
+                                   result.news_data_by_symbol ||
+                                   result.technical_data_by_symbol ||
+                                   result.fundamentals_data_by_symbol ||
+                                   result.chart_data ||
+                                   result.data?.chart_data_by_symbol ||
+                                   result.result?.chart_data_by_symbol;
 
                             if (knownField) return knownField;
 
@@ -5427,9 +5577,9 @@ function PipelineBuilderInner() {
                                   // If dataBySymbol has multiple keys, render each separately
                                   // Otherwise render the whole result
                                   const isMultiSymbol = symbolData != null &&
-                                    typeof symbolData === 'object' &&
-                                    !Array.isArray(symbolData) &&
-                                    Object.keys(symbolData).length > 1;
+                                                        typeof symbolData === 'object' &&
+                                                        !Array.isArray(symbolData) &&
+                                                        Object.keys(symbolData).length > 1;
 
                                   if (isMultiSymbol) {
                                     return <CustomAgentRenderer key={symbol} symbol={symbol} data={symbolData} />;
@@ -5460,41 +5610,41 @@ function PipelineBuilderInner() {
                               })}
                             </VStack>
                           );
-                        })()}
+                      })()}
 
-                        {/* Raw JSON Data - Only show chart_data_by_symbol */}
-                        <Box>
-                          <Text fontSize="md" fontWeight="700" color="gray.800" mb="12px">
-                            Raw Output Data
-                          </Text>
-                          <Box
-                            p="16px"
-                            bg="gray.50"
-                            borderRadius="12px"
-                            border="1px solid"
-                            borderColor="gray.200"
-                            maxH="400px"
-                            overflowY="auto"
-                            fontSize="xs"
-                            fontFamily="monospace"
-                          >
-                            <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                              {JSON.stringify(
-                                displayResult?.chart_data_by_symbol ||
-                                displayResult?.chart_data ||
-                                displayResult?.data?.chart_data_by_symbol ||
-                                displayResult?.result?.chart_data_by_symbol ||
-                                { error: 'No chart data available' },
-                                null,
-                                2
-                              )}
-                            </pre>
-                          </Box>
+                      {/* Raw JSON Data - Only show chart_data_by_symbol */}
+                      <Box>
+                        <Text fontSize="md" fontWeight="700" color="gray.800" mb="12px">
+                          Raw Output Data
+                        </Text>
+                        <Box
+                          p="16px"
+                          bg="gray.50"
+                          borderRadius="12px"
+                          border="1px solid"
+                          borderColor="gray.200"
+                          maxH="400px"
+                          overflowY="auto"
+                          fontSize="xs"
+                          fontFamily="monospace"
+                        >
+                          <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                            {JSON.stringify(
+                              displayResult?.chart_data_by_symbol || 
+                              displayResult?.chart_data || 
+                              displayResult?.data?.chart_data_by_symbol ||
+                              displayResult?.result?.chart_data_by_symbol ||
+                              { error: 'No chart data available' },
+                              null,
+                              2
+                            )}
+                          </pre>
                         </Box>
-                      </>
-                    );
-                  })()}
-                </VStack>
+                      </Box>
+                    </>
+                  );
+                })()}
+              </VStack>
               )}
             </Box>
           </Box>

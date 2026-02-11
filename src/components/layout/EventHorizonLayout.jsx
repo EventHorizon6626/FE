@@ -17,6 +17,7 @@ import {
   PopoverBody,
   Avatar,
   Divider,
+  useColorModeValue,
 } from '@chakra-ui/react';
 import {
   MdAccountTree,
@@ -34,6 +35,13 @@ import { useAuth } from 'context/AuthContext';
 import { IDshorten } from 'utils'
 
 const SidebarItem = ({ icon, label, onClick, isActive, isCollapsed, onExpand }) => {
+  const activeColor = useColorModeValue('teal.600', 'teal.300');
+  const inactiveColor = useColorModeValue('gray.700', 'gray.400');
+  const iconColor = useColorModeValue('gray.600', 'gray.500');
+  const hoverColor = useColorModeValue('gray.900', 'white');
+  const activeBg = useColorModeValue('teal.50', 'whiteAlpha.200');
+  const hoverBg = useColorModeValue('gray.50', 'whiteAlpha.100');
+
   const handleClick = () => {
     if (isCollapsed) {
       // If collapsed, expand the sidebar first
@@ -53,9 +61,9 @@ const SidebarItem = ({ icon, label, onClick, isActive, isCollapsed, onExpand }) 
         py="12px"
         px="8px"
         cursor="pointer"
-        color={isActive ? 'teal.600' : 'gray.600'}
-        bg={isActive ? 'teal.50' : 'transparent'}
-        _hover={{ color: 'gray.900', bg: isActive ? 'teal.50' : 'gray.50' }}
+        color={isActive ? activeColor : iconColor}
+        bg={isActive ? activeBg : 'transparent'}
+        _hover={{ color: hoverColor, bg: isActive ? activeBg : hoverBg }}
         borderRadius="8px"
         transition="all 0.2s"
         onClick={handleClick}
@@ -74,9 +82,9 @@ const SidebarItem = ({ icon, label, onClick, isActive, isCollapsed, onExpand }) 
       py="10px"
       px="12px"
       cursor="pointer"
-      color={isActive ? 'teal.600' : 'gray.700'}
-      bg={isActive ? 'teal.50' : 'transparent'}
-      _hover={{ color: 'gray.900', bg: isActive ? 'teal.50' : 'gray.50' }}
+      color={isActive ? activeColor : inactiveColor}
+      bg={isActive ? activeBg : 'transparent'}
+      _hover={{ color: hoverColor, bg: isActive ? activeBg : hoverBg }}
       borderRadius="8px"
       transition="all 0.2s"
       onClick={handleClick}
@@ -93,6 +101,12 @@ const SidebarItem = ({ icon, label, onClick, isActive, isCollapsed, onExpand }) 
 
 const AccountMenu = ({ isCollapsed }) => {
   const { user = {}, logout } = useAuth();
+  const hoverBg = useColorModeValue('gray.50', 'whiteAlpha.100');
+  const textColor = useColorModeValue('gray.800', 'white');
+  const textColorLight = useColorModeValue('gray.500', 'gray.400');
+  const iconColor = useColorModeValue('gray.600', 'gray.400');
+  const popoverBg = useColorModeValue('white', 'gray.800');
+  const logoutHoverBg = useColorModeValue('red.50', 'rgba(245, 101, 101, 0.1)');
 
   const {
     email = '',
@@ -112,7 +126,7 @@ const AccountMenu = ({ isCollapsed }) => {
           cursor="pointer"
           p={isCollapsed ? "8px" : "10px"}
           borderRadius="8px"
-          _hover={{ bg: 'gray.50' }}
+          _hover={{ bg: hoverBg }}
           transition="all 0.2s"
           w="full"
         >
@@ -124,10 +138,10 @@ const AccountMenu = ({ isCollapsed }) => {
             <HStack spacing="10px" w="full" >
               <Avatar src={avatar} size="sm" name={name || email} bg="teal.500" />
               <VStack align="start" spacing="0" flex="1">
-                <Text fontSize="13px" fontWeight="600" color="gray.800">
+                <Text fontSize="13px" fontWeight="600" color={textColor}>
                   Account
                 </Text>
-                <Text fontSize="11px" color="gray.500">
+                <Text fontSize="11px" color={textColorLight}>
                   {IDshorten(email)}
                 </Text>
               </VStack>
@@ -135,20 +149,20 @@ const AccountMenu = ({ isCollapsed }) => {
           )}
         </Box>
       </PopoverTrigger>
-      <PopoverContent w="200px" borderRadius="12px" boxShadow="lg">
+      <PopoverContent w="200px" borderRadius="12px" boxShadow="lg" bg={popoverBg}>
         <PopoverBody p="8px">
           <VStack spacing="4px" align="stretch">
             <Box
               as="button"
               p="10px"
               borderRadius="8px"
-              _hover={{ bg: 'gray.50' }}
+              _hover={{ bg: hoverBg }}
               transition="all 0.2s"
               onClick={() => navigate('/profile')}
             >
               <HStack spacing="10px">
-                <Icon as={MdSettings} boxSize="18px" color="gray.600" />
-                <Text fontSize="14px" color="gray.800">
+                <Icon as={MdSettings} boxSize="18px" color={iconColor} />
+                <Text fontSize="14px" color={textColor}>
                   Settings
                 </Text>
               </HStack>
@@ -158,12 +172,12 @@ const AccountMenu = ({ isCollapsed }) => {
               as="button"
               p="10px"
               borderRadius="8px"
-              _hover={{ bg: 'gray.50' }}
+              _hover={{ bg: hoverBg }}
               transition="all 0.2s"
             >
               <HStack spacing="10px">
-                <Icon as={MdLanguage} boxSize="18px" color="gray.600" />
-                <Text fontSize="14px" color="gray.800">
+                <Icon as={MdLanguage} boxSize="18px" color={iconColor} />
+                <Text fontSize="14px" color={textColor}>
                   Language
                 </Text>
               </HStack>
@@ -175,7 +189,7 @@ const AccountMenu = ({ isCollapsed }) => {
               as="button"
               p="10px"
               borderRadius="8px"
-              _hover={{ bg: 'red.50' }}
+              _hover={{ bg: logoutHoverBg }}
               transition="all 0.2s"
               onClick={handleLogout}
             >
@@ -194,6 +208,11 @@ const AccountMenu = ({ isCollapsed }) => {
 };
 
 const SidebarContent = ({ navigate, currentPath, isCollapsed, onToggleCollapse }) => {
+  const textColor = useColorModeValue('gray.800', 'white');
+  const iconColor = useColorModeValue('gray.600', 'gray.400');
+  const hoverBg = useColorModeValue('gray.100', 'whiteAlpha.200');
+  const hoverColor = useColorModeValue('teal.600', 'teal.300');
+
   const handleExpand = () => {
     if (isCollapsed) {
       onToggleCollapse();
@@ -214,8 +233,8 @@ const SidebarContent = ({ navigate, currentPath, isCollapsed, onToggleCollapse }
               variant="ghost"
               onClick={handleExpand}
               aria-label="Expand sidebar"
-              color="gray.600"
-              _hover={{ bg: 'gray.100' }}
+              color={iconColor}
+              _hover={{ bg: hoverBg }}
             />
           </VStack>
         ) : (
@@ -224,10 +243,10 @@ const SidebarContent = ({ navigate, currentPath, isCollapsed, onToggleCollapse }
             <Text
               fontSize="16px"
               fontWeight="700"
-              color="gray.800"
+              color={textColor}
               cursor="pointer"
               onClick={() => navigate('/')}
-              _hover={{ color: 'teal.600' }}
+              _hover={{ color: hoverColor }}
               transition="color 0.2s"
             >
               Event Horizon
@@ -238,8 +257,8 @@ const SidebarContent = ({ navigate, currentPath, isCollapsed, onToggleCollapse }
               variant="ghost"
               onClick={onToggleCollapse}
               aria-label="Collapse sidebar"
-              color="gray.600"
-              _hover={{ bg: 'gray.100' }}
+              color={iconColor}
+              _hover={{ bg: hoverBg }}
             />
           </HStack>
         )}
