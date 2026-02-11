@@ -1,19 +1,30 @@
 import { Handle, Position } from 'reactflow';
+import { useGridLayoutContext } from 'contexts/GridLayoutContext';
 
-const positions = [
+// 4-direction handles (grid layout mode)
+const positions4Way = [
   { pos: Position.Top, id: 'top' },
   { pos: Position.Right, id: 'right' },
   { pos: Position.Bottom, id: 'bottom' },
   { pos: Position.Left, id: 'left' },
 ];
 
+// 2-direction handles (classic layout mode)
+const positions2Way = [
+  { pos: Position.Right, id: 'right' },
+  { pos: Position.Left, id: 'left' },
+];
+
 /**
- * Renders 4 connection handles (top, right, bottom, left).
+ * Renders connection handles - auto-detects layout mode from context
  *
  * @param {"bidirectional"|"source-only"|"target-only"} role
  * @param {string} color  Handle background colour
  */
 export function NodeHandles({ role = 'bidirectional', color = '#555' }) {
+  const { isGridLayoutEnabled } = useGridLayoutContext();
+  const positions = isGridLayoutEnabled ? positions4Way : positions2Way;
+  
   return (
     <>
       {positions.map(({ pos, id }) => {

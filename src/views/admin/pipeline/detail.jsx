@@ -64,7 +64,9 @@ import {
   MdSpeed,
   MdTrendingUp,
   MdWarning,
-  MdAccountTree
+  MdAccountTree,
+  MdGridOn,
+  MdGridOff
 } from 'react-icons/md';
 import ReactFlow, {
   addEdge,
@@ -80,6 +82,7 @@ import ReactFlow, {
   BaseEdge,
   EdgeLabelRenderer,
   getSmoothStepPath,
+  getBezierPath,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import '../../../assets/css/ReactFlowCustom.css';
@@ -98,21 +101,18 @@ import Chart from 'react-apexcharts';
 import StockAnalysisCard from 'views/admin/portfolio/components/StockAnalysisCard';
 import { IDshorten } from 'utils';
 import { getActivatedDataAgents, getActivatedAnalyzerAgents, getActivatedAgentIds } from 'data/libraryAgents';
+import { GridLayoutContext, useGridLayoutContext } from 'contexts/GridLayoutContext';
 import {
   GRID_SIZE,
-  DEFAULT_NODE_WIDTH,
-  DEFAULT_NODE_HEIGHT,
   LAYOUT_COL_SPACING,
   LAYOUT_ROW_SPACING,
-  snapPositionToGrid,
-  snapDimension,
-  getNodeDimensions,
-  buildOccupancyList,
-  findNearestFreePosition,
   layoutGridToPosition,
+  getNodeDimensions,
+  DEFAULT_NODE_WIDTH,
+  DEFAULT_NODE_HEIGHT,
   migratePositionsToGrid,
 } from 'utils/gridUtils';
-
+import { useGridLayout } from 'hooks/useGridLayout';
 
 // Sidebar view modes
 const SIDEBAR_VIEW = {
@@ -431,14 +431,26 @@ function CustomPortfolioNode({ data, id, selected }) {
 }
 
 function CustomEdge({ id, source, target, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, data }) {
-  const routingMode = data?.routingMode || 'elbow';
+  const { isGridLayoutEnabled } = useGridLayoutContext();
+  
+  // Auto-detect routing mode based on grid layout
+  // Grid OFF: Bezier curves (classic mode)
+  // Grid ON: User can toggle between elbow/straight
+  const routingMode = data?.routingMode || (isGridLayoutEnabled ? 'elbow' : 'bezier');
 
   let edgePath, labelX, labelY;
-  if (routingMode === 'straight') {
+  if (routingMode === 'bezier') {
+    // Classic mode - smooth Bezier curves
+    [edgePath, labelX, labelY] = getBezierPath({
+      sourceX, sourceY, sourcePosition,
+      targetX, targetY, targetPosition,
+    });
+  } else if (routingMode === 'straight') {
     edgePath = `M ${sourceX},${sourceY} L ${targetX},${targetY}`;
     labelX = (sourceX + targetX) / 2;
     labelY = (sourceY + targetY) / 2;
   } else {
+    // Elbow mode - Manhattan routing
     [edgePath, labelX, labelY] = getSmoothStepPath({
       sourceX, sourceY, sourcePosition,
       targetX, targetY, targetPosition,
@@ -465,6 +477,7 @@ function CustomEdge({ id, source, target, sourceX, sourceY, targetX, targetY, so
 
   const handleToggleRouting = (e) => {
     e.stopPropagation();
+    if (!isGridLayoutEnabled) return; // Cannot toggle in classic mode
     const newMode = routingMode === 'elbow' ? 'straight' : 'elbow';
     setEdges((eds) =>
       eds.map((edge) =>
@@ -481,7 +494,7 @@ function CustomEdge({ id, source, target, sourceX, sourceY, targetX, targetY, so
 
   return (
     <>
-      <BaseEdge path={edgePath} style={{ strokeWidth: 5 }} />
+      <BaseEdge path={edgePath} style={{ strokeWidth: isGridLayoutEnabled ? 4 : 1 }} />
       <EdgeLabelRenderer>
         <div
           style={{
@@ -916,6 +929,10 @@ function PipelineBuilderInner() {
   
   // Ref for Console Log
   const consoleLogRef = useRef(null);
+  
+  // Grid layout hook - ALL grid logic centralized here
+  const gridLayout = useGridLayout();
+  const { isGridLayoutEnabled, toggleGridLayout, snapPosition, findFreePosition, getReactFlowProps } = gridLayout;
   
   useEffect(() => {
     if (editingPortfolio) {
@@ -1391,9 +1408,8 @@ function PipelineBuilderInner() {
 
     // Place child one layout-column to the right, same vertical position
     // No collision avoidance - nodes appear exactly at the calculated position
-    const position = snapPositionToGrid(
-      { x: sourceNode.position.x + LAYOUT_COL_SPACING, y: sourceNode.position.y },
-    );
+    const rawPosition = { x: sourceNode.position.x + LAYOUT_COL_SPACING, y: sourceNode.position.y };
+    const position = snapPosition(rawPosition);
 
     try {
       const response = await nodeApi.create({
@@ -1631,9 +1647,9 @@ function PipelineBuilderInner() {
       const currentNodes = getNodes();
       const currentEdges = getEdges();
 
-      // Snap top-left corner to grid
+      // Snap top-left corner to grid (if enabled)
       const { width, height } = getNodeDimensions(node);
-      const snappedPosition = snapPositionToGrid(node.position);
+      const snappedPosition = snapPosition(node.position);
 
       // --- Block-drop check BEFORE collision avoidance ---
       // Only eligible if not a block/output node and has no connections
@@ -2254,7 +2270,7 @@ function PipelineBuilderInner() {
         x: event.clientX,
         y: event.clientY,
       });
-      const position = snapPositionToGrid(rawPosition);
+      const position = snapPosition(rawPosition);
 
       // Update preview node position
       setNodes((nds) =>
@@ -2267,13 +2283,12 @@ function PipelineBuilderInner() {
     };
 
     const handleMouseUp = async (event) => {
-      // Get final position, snap to grid & resolve occupancy
+      // Get final position, snap to grid & resolve occupancy (if grid enabled)
       const previewNode = getNodes().find(n => n.id === dragPreviewNodeId);
       const rawFinalPos = previewNode?.position || { x: 0, y: 0 };
-      const snappedPos = snapPositionToGrid(rawFinalPos);
+      const snappedPos = snapPosition(rawFinalPos);
       const otherNodes = getNodes().filter(n => n.id !== dragPreviewNodeId);
-      const occupancy = buildOccupancyList(otherNodes);
-      const finalPosition = findNearestFreePosition(snappedPos, occupancy, DEFAULT_NODE_WIDTH, DEFAULT_NODE_HEIGHT);
+      const finalPosition = findFreePosition(snappedPos, otherNodes);
 
       // Remove preview node
       setNodes((nds) => nds.filter((n) => n.id !== dragPreviewNodeId));
@@ -3112,7 +3127,8 @@ function PipelineBuilderInner() {
 
   // Canvas View - Working on a horizon
   return (
-    <Box h="100vh" position="relative" bg="gray.50">
+    <GridLayoutContext.Provider value={{ isGridLayoutEnabled }}>
+      <Box h="100vh" position="relative" bg="gray.50">
       {/* Floating Sidebar Sections */}
       <VStack
         position="absolute"
@@ -3665,16 +3681,31 @@ function PipelineBuilderInner() {
             nodesConnectable={true}
             elementsSelectable={true}
             deleteKeyCode={['Delete', 'Backspace']}
-            snapToGrid={true}
-            snapGrid={[GRID_SIZE, GRID_SIZE]}
+            {...getReactFlowProps()}
             style={{ backgroundColor: '#faf9f7' }}
           >
             <Controls style={{marginLeft: "220px"}} />
             <MiniMap position='bottom-left'/>
-            <Background variant="dots" gap={GRID_SIZE} size={4} color="rgba(0,0,0,0.5)" />
+            <Background 
+              variant="dots" 
+              gap={isGridLayoutEnabled ? GRID_SIZE : 16} 
+              size={isGridLayoutEnabled ? 4 : 1} 
+              color={isGridLayoutEnabled ? "rgba(0,0,0,0.5)" : "rgba(0,0,0,0.5)"} 
+            />
 
             <Panel position="top-right">
               <HStack spacing={2}>
+                <Tooltip label={isGridLayoutEnabled ? "Disable Grid Layout" : "Enable Grid Layout"} placement="left" hasArrow>
+                  <IconButton
+                    icon={<Icon as={isGridLayoutEnabled ? MdGridOn : MdGridOff} />}
+                    size="md"
+                    colorScheme={isGridLayoutEnabled ? "green" : "gray"}
+                    variant="solid"
+                    aria-label="Toggle grid layout"
+                    onClick={toggleGridLayout}
+                    boxShadow="lg"
+                  />
+                </Tooltip>
                 <Tooltip label="Auto Layout" placement="left" hasArrow>
                   <IconButton
                     icon={<Icon as={MdAccountTree} />}
@@ -5656,6 +5687,7 @@ function PipelineBuilderInner() {
       <ConsoleLog ref={consoleLogRef} />
 
     </Box>
+    </GridLayoutContext.Provider>
   );
 }
 // Wrap the component with ReactFlowProvider
