@@ -1,6 +1,7 @@
 // Chakra imports
 import ProtectedRoute from 'auth/ProtectedRoute';
 import EventHorizonLayout from 'components/layout/EventHorizonLayout';
+import FixedPlugin from 'components/fixedPlugin/FixedPlugin';
 import React from 'react';
 import { Route, Routes } from 'react-router-dom';
 import routes from 'routes.js';
@@ -26,8 +27,11 @@ export default function Dashboard(props) {
 
   // All pages use Event Horizon layout (including landing)
   return (
-    <EventHorizonLayout>
-      <Routes>{getRoutes(routes)}</Routes>
-    </EventHorizonLayout>
+    <>
+      <EventHorizonLayout>
+        <Routes>{getRoutes(routes)}</Routes>
+      </EventHorizonLayout>
+      <FixedPlugin />
+    </>
   );
 }

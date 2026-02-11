@@ -70,10 +70,8 @@ import ReactFlow, {
   addEdge,
   Background,
   Controls,
-  Handle,
   MiniMap,
   Panel,
-  Position,
   ReactFlowProvider,
   SelectionMode,
   useEdgesState,
@@ -81,9 +79,8 @@ import ReactFlow, {
   useReactFlow,
   BaseEdge,
   EdgeLabelRenderer,
-  getBezierPath,
+  getSmoothStepPath,
 } from 'reactflow';
-import dagre from 'dagre';
 import 'reactflow/dist/style.css';
 import '../../../assets/css/ReactFlowCustom.css';
 import { searchSecurities, SECURITIES } from 'data/securities';
@@ -94,12 +91,28 @@ import horizonAgentApi from 'lib/horizonAgentApi';
 import nodeApi from 'lib/nodeApi';
 import { CustomAgentNode } from 'components/pipeline/CustomAgentNode';
 import { CustomBlockNode } from 'components/pipeline/CustomBlockNode';
+import { NodeHandles } from 'components/pipeline/NodeHandles';
 import { RobotHead } from 'components/pipeline/RobotHead';
 import ConsoleLog from 'components/pipeline/ConsoleLog';
 import Chart from 'react-apexcharts';
 import StockAnalysisCard from 'views/admin/portfolio/components/StockAnalysisCard';
 import { IDshorten } from 'utils';
 import { getActivatedDataAgents, getActivatedAnalyzerAgents, getActivatedAgentIds } from 'data/libraryAgents';
+import {
+  GRID_SIZE,
+  DEFAULT_NODE_WIDTH,
+  DEFAULT_NODE_HEIGHT,
+  LAYOUT_COL_SPACING,
+  LAYOUT_ROW_SPACING,
+  snapPositionToGrid,
+  snapDimension,
+  getNodeDimensions,
+  buildOccupancyList,
+  findNearestFreePosition,
+  layoutGridToPosition,
+  migratePositionsToGrid,
+} from 'utils/gridUtils';
+
 
 // Sidebar view modes
 const SIDEBAR_VIEW = {
@@ -232,11 +245,7 @@ function CustomPortfolioNode({ data, id, selected }) {
 
   return (
     <Box position="relative" className={`custom-portfolio-node${showAddOptions ? ' add-options-open' : ''}`}>
-      <Handle
-        type="source"
-        position={Position.Right}
-        style={{ background: '#38A169', width: '12px', height: '12px' }}
-      />
+      <NodeHandles role="source-only" color="#38A169" />
 
       {/* Add child node button — invisible hover zone near right edge */}
       {data.onAddChildNode && (
@@ -335,13 +344,13 @@ function CustomPortfolioNode({ data, id, selected }) {
 
       <Box
         p="16px"
-        bg="white"
+        bg="rgba(255,255,255,0.7)"
         borderRadius="12px"
-        border={selected ? "3px solid" : "3px dashed"}
-        borderColor={selected ? "green.500" : "green.300"}
+        border={selected ? "5px solid" : "5px dashed"}
+        borderColor={selected ? "green.500" : "rgba(72,187,120,0.5)"}
         boxShadow={selected ? "0 4px 12px rgba(56, 161, 105, 0.4)" : "md"}
-        minW="220px"
-        maxW="300px"
+        minW="240px"
+        maxW="280px"
         transition="all 0.2s"
       >
         <VStack align="start" spacing="8px">
@@ -422,17 +431,23 @@ function CustomPortfolioNode({ data, id, selected }) {
 }
 
 function CustomEdge({ id, source, target, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, data }) {
-  const [edgePath, labelX, labelY] = getBezierPath({
-    sourceX,
-    sourceY,
-    sourcePosition,
-    targetX,
-    targetY,
-    targetPosition,
-  });
+  const routingMode = data?.routingMode || 'elbow';
+
+  let edgePath, labelX, labelY;
+  if (routingMode === 'straight') {
+    edgePath = `M ${sourceX},${sourceY} L ${targetX},${targetY}`;
+    labelX = (sourceX + targetX) / 2;
+    labelY = (sourceY + targetY) / 2;
+  } else {
+    [edgePath, labelX, labelY] = getSmoothStepPath({
+      sourceX, sourceY, sourcePosition,
+      targetX, targetY, targetPosition,
+      borderRadius: 8,
+    });
+  }
 
   const [showOutput, setShowOutput] = useState(false);
-  const { getNode } = useReactFlow();
+  const { getNode, setEdges } = useReactFlow();
 
   const sourceNode = getNode(source);
   const targetNode = getNode(target);
@@ -448,83 +463,117 @@ function CustomEdge({ id, source, target, sourceX, sourceY, targetX, targetY, so
     setShowOutput(!showOutput);
   };
 
+  const handleToggleRouting = (e) => {
+    e.stopPropagation();
+    const newMode = routingMode === 'elbow' ? 'straight' : 'elbow';
+    setEdges((eds) =>
+      eds.map((edge) =>
+        edge.id === id
+          ? { ...edge, data: { ...edge.data, routingMode: newMode } }
+          : edge
+      )
+    );
+  };
+
   const iconColorScheme = isDataToAnalyzer && !hasOutput ? 'gray' : 'teal';
   const iconOpacity = isDataToAnalyzer && !hasOutput ? 0.3 : 1;
   const iconCursor = isDataToAnalyzer && !hasOutput ? 'default' : 'pointer';
 
   return (
     <>
-      <BaseEdge path={edgePath} />
-      {isDataToAnalyzer && (
-        <EdgeLabelRenderer>
+      <BaseEdge path={edgePath} style={{ strokeWidth: 5 }} />
+      <EdgeLabelRenderer>
+        <div
+          style={{
+            position: 'absolute',
+            transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
+            pointerEvents: 'all',
+            display: 'flex',
+            gap: '4px',
+            alignItems: 'center',
+          }}
+        >
+          {/* Routing mode toggle */}
+          <IconButton
+            icon={<Icon as={routingMode === 'elbow' ? MdTrendingUp : MdAccountTree} boxSize="12px" />}
+            size="xs"
+            variant="ghost"
+            borderRadius="full"
+            aria-label="Toggle edge routing"
+            onClick={handleToggleRouting}
+            opacity={0.4}
+            minW="20px"
+            h="20px"
+            _hover={{ opacity: 1, bg: 'gray.100' }}
+          />
+          {isDataToAnalyzer && (
+            <>
+              <IconButton
+                icon={<Icon as={MdArticle} />}
+                size="xs"
+                colorScheme={iconColorScheme}
+                variant="solid"
+                borderRadius="full"
+                aria-label="Inspect data"
+                onClick={handleInspect}
+                boxShadow="md"
+                opacity={iconOpacity}
+                cursor={iconCursor}
+                _hover={{ transform: !hasOutput ? 'none' : 'scale(1.2)' }}
+              />
+            </>
+          )}
+        </div>
+        {isDataToAnalyzer && showOutput && data?.output && (
           <div
             style={{
               position: 'absolute',
-              transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
+              transform: `translate(-50%, 0) translate(${labelX}px,${labelY + 15}px)`,
               pointerEvents: 'all',
             }}
           >
-            <IconButton
-              icon={<Icon as={MdArticle} />}
-              size="xs"
-              colorScheme={iconColorScheme}
-              variant="solid"
-              borderRadius="full"
-              aria-label="Inspect data"
-              onClick={handleInspect}
-              boxShadow="md"
-              opacity={iconOpacity}
-              cursor={iconCursor}
-              _hover={{ transform: !hasOutput ? 'none' : 'scale(1.2)' }}
-            />
-            {showOutput && data?.output && (
+            <Box
+              bg="white"
+              border="2px solid"
+              borderColor="teal.400"
+              borderRadius="8px"
+              p="12px"
+              minW="300px"
+              maxW="500px"
+              maxH="400px"
+              overflowY="auto"
+              boxShadow="lg"
+              zIndex="1000"
+            >
+              <HStack justify="space-between" mb="8px">
+                <Text fontSize="xs" fontWeight="700" color="teal.600">
+                  Data Flow
+                </Text>
+                <IconButton
+                  icon={<Icon as={MdClose} />}
+                  size="xs"
+                  variant="ghost"
+                  onClick={handleInspect}
+                  aria-label="Close"
+                />
+              </HStack>
               <Box
-                position="absolute"
-                top="30px"
-                left="50%"
-                transform="translateX(-50%)"
-                bg="white"
-                border="2px solid"
-                borderColor="teal.400"
-                borderRadius="8px"
-                p="12px"
-                minW="300px"
-                maxW="500px"
-                maxH="400px"
-                overflowY="auto"
-                boxShadow="lg"
-                zIndex="1000"
+                fontSize="xs"
+                fontFamily="monospace"
+                bg="gray.50"
+                p="8px"
+                borderRadius="4px"
+                userSelect="text"
+                cursor="text"
               >
-                <HStack justify="space-between" mb="8px">
-                  <Text fontSize="xs" fontWeight="700" color="teal.600">
-                    Data Flow
-                  </Text>
-                  <IconButton
-                    icon={<Icon as={MdClose} />}
-                    size="xs"
-                    variant="ghost"
-                    onClick={handleInspect}
-                    aria-label="Close"
-                  />
-                </HStack>
-                <Box
-                  fontSize="xs"
-                  fontFamily="monospace"
-                  bg="gray.50"
-                  p="8px"
-                  borderRadius="4px"
-                  userSelect="text"
-                  cursor="text"
-                >
-                  <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', userSelect: 'text' }}>
-                    {JSON.stringify(data.output, null, 2)}
-                  </pre>
-                </Box>
+                <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', userSelect: 'text' }}>
+                  {JSON.stringify(data.output, null, 2)}
+                </pre>
               </Box>
-            )}
+            </Box>
           </div>
-        </EdgeLabelRenderer>
-      )}
+        )}
+      </EdgeLabelRenderer>
     </>
   );
 }
@@ -535,11 +584,7 @@ function CustomOutputNode({ data, id, selected }) {
 
   return (
     <Box position="relative" className="custom-output-node">
-      <Handle
-        type="target"
-        position={Position.Left}
-        style={{ background: '#38B2AC', width: '12px', height: '12px' }}
-      />
+      <NodeHandles role="target-only" color="#38B2AC" />
 
       <Box
         p="16px"
@@ -742,38 +787,13 @@ function PipelineBuilderInner() {
   const [edges, setEdges, onEdgesChangeDefault] = useEdgesState(initialEdges);
   const [reactFlowError, setReactFlowError] = useState(null);
   
-  // Custom onNodesChange to ensure only one node is selected at a time (unless Shift is held)
-  const shiftHeldRef = useRef(false);
-  useEffect(() => {
-    const down = (e) => { if (e.key === 'Shift') shiftHeldRef.current = true; };
-    const up = (e) => { if (e.key === 'Shift') shiftHeldRef.current = false; };
-    window.addEventListener('keydown', down);
-    window.addEventListener('keyup', up);
-    return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); };
-  }, []);
-
+  // Custom onNodesChange - just apply all changes normally
   const onNodesChange = useCallback(
     (changes) => {
       try {
-        // Check if any selection changes
-        const selectionChanges = changes.filter(change =>
-          change.type === 'select' && change.selected === true
-        );
-
-        if (selectionChanges.length === 1 && !shiftHeldRef.current) {
-          // Single click without Shift — keep single-select behavior
-          const selectedNodeId = selectionChanges[0].id;
-
-          setNodes((nds) =>
-            nds.map((node) => ({
-              ...node,
-              selected: node.id === selectedNodeId,
-            }))
-          );
-        } else {
-          // Shift+click, multi-select (Shift+drag box), or no selection changes — let React Flow handle it natively
-          onNodesChangeDefault(changes);
-        }
+        console.log('[onNodesChange] ✨ Changes:', changes);
+        // Just apply all changes - React Flow handles selection
+        onNodesChangeDefault(changes);
       } catch (error) {
         if (error?.message?.includes('Parent node') && error?.message?.includes('not found')) {
           console.warn('[onNodesChange] Caught orphaned parentId error, triggering refetch:', error.message);
@@ -783,7 +803,7 @@ function PipelineBuilderInner() {
         }
       }
     },
-    [onNodesChangeDefault, setNodes]
+    [onNodesChangeDefault]
   );
   
   // Custom onEdgesChange to handle edge deletion
@@ -878,6 +898,7 @@ function PipelineBuilderInner() {
   const [draggedItem, setDraggedItem] = useState(null);
   const [dragPreviewNodeId, setDragPreviewNodeId] = useState(null);
   const dragStartPosRef = useRef(null); // Track mouse start position to require minimum drag distance
+  const shiftHeldRef = useRef(false); // Track if Shift key is currently held
 
   // State for block node
   const [selectedBlockId, setSelectedBlockId] = useState(null);
@@ -905,6 +926,26 @@ function PipelineBuilderInner() {
       });
     }
   }, [editingPortfolio]);
+
+  // Track Shift key state for multi-selection during drag
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Shift') {
+        shiftHeldRef.current = true;
+      }
+    };
+    const handleKeyUp = (e) => {
+      if (e.key === 'Shift') {
+        shiftHeldRef.current = false;
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
 
   const toast = useToast();
   const { screenToFlowPosition } = useReactFlow();
@@ -1012,6 +1053,19 @@ function PipelineBuilderInner() {
     [toast, refetchHorizon]
   );
 
+  // Connection validation: allow free connections between any nodes
+  const isValidConnection = useCallback((connection) => {
+    // Only prevent self-connections
+    if (connection.source === connection.target) return false;
+    // Allow all other connections (free branching)
+    return true;
+  }, []);
+
+  // Track connection drag to toggle .connecting class (shows handles on all nodes)
+  const [isConnecting, setIsConnecting] = useState(false);
+  const onConnectStart = useCallback(() => setIsConnecting(true), []);
+  const onConnectEnd = useCallback(() => setIsConnecting(false), []);
+
   // Config panel is shown only on double-click (see handleNodeDoubleClick)
   // Single click just selects the node for moving/deleting
 
@@ -1038,69 +1092,13 @@ function PipelineBuilderInner() {
         return;
       }
 
-      const target = event.target;
-      const isInputField = target.tagName === 'INPUT' ||
-                          target.tagName === 'TEXTAREA' ||
-                          target.isContentEditable ||
-                          target.closest('[contenteditable="true"]');
-
-      if (isInputField) {
-        return;
-      }
-
-      if (event.key === 'Delete' || event.key === 'Backspace') {
-        const selectedNodes = nodes.filter((node) => node.selected);
-        if (selectedNodes.length > 0) {
-          const deletableNodes = selectedNodes.filter(
-            (node) => !['data-pipeline', 'team1', 'team2', 'team3', 'team4'].includes(node.id)
-          );
-          
-          if (deletableNodes.length > 0) {
-            // Track locally-deleted IDs to prevent ghost nodes
-            deletableNodes.forEach(n => deletedNodeIdsRef.current.add(n.id));
-
-            // Remove from local React Flow state immediately
-            setNodes((nds) => nds.filter(n => !deletableNodes.some(d => d.id === n.id)));
-
-            // Delete nodes via backend API (wait for all to complete)
-            Promise.all(
-              deletableNodes.map(async (node) => {
-                try {
-                  await nodeApi.delete(node.id);
-                  console.log(`[KeyboardDelete] Deleted node: ${node.id}`);
-                } catch (error) {
-                  console.error(`[KeyboardDelete] Failed to delete node ${node.id}:`, error);
-                  toast({
-                    title: 'Delete failed',
-                    description: `Could not delete node`,
-                    status: 'error',
-                    duration: 2000,
-                    isClosable: true,
-                  });
-                }
-              })
-            ).then(() => {
-              // Refetch to get updated data after all deletes complete
-              if (refetchHorizon) {
-                refetchHorizon();
-              }
-              consoleLogRef.current?.addLog('success', `${deletableNodes.length} node(s) deleted`);
-              // toast({
-              //   title: 'Nodes deleted',
-              //   description: `${deletableNodes.length} node(s) removed`,
-              //   status: 'success',
-              //   duration: 2000,
-              //   isClosable: true,
-              // });
-            });
-          }
-        }
-      }
+      // Note: Delete/Backspace key handling is now done via ReactFlow's built-in
+      // onNodesDelete and onEdgesDelete handlers for proper backend synchronization
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [nodes, toast, isAddingToBlock, refetchHorizon]);
+  }, [toast, isAddingToBlock, setNodes]);
 
   const handleNodeDoubleClick = useCallback((event, node) => {
     if (node.type === 'agentNode') {
@@ -1187,10 +1185,22 @@ function PipelineBuilderInner() {
   }, [isAddingToBlock, selectedBlockId, getNodes, getEdges, setNodes]);
 
   const handleNodeClick = useCallback(async (event, node) => {
+    console.log('[handleNodeClick] ✨ Clicked node:', node.id, 'Current selected:', node.selected);
+
     // Handle block selection mode
     if (isAddingToBlock && node.type !== 'block' && node.type !== 'outputNode') {
       handleNodeClickForBlock(node.id);
       return;
+    }
+
+    // If not in special mode, ensure the node gets selected
+    // React Flow's default selection should handle this, but we'll make it explicit
+    if (!node.selected && !event.shiftKey) {
+      console.log('[handleNodeClick] ✨ Manually selecting node');
+      setNodes(nds => nds.map(n => ({
+        ...n,
+        selected: n.id === node.id
+      })));
     }
 
     if (node.type === 'outputNode') {
@@ -1248,37 +1258,142 @@ function PipelineBuilderInner() {
   }, [toast, setNodes, currentHorizonId, isAddingToBlock, handleNodeClickForBlock]);
 
   const handleNodeDelete = useCallback(async (nodeId) => {
+    console.log('[handleNodeDelete] ✨ DELETE CALLED for node:', nodeId);
+    console.log('[handleNodeDelete] ✨ deletedNodeIdsRef BEFORE:', Array.from(deletedNodeIdsRef.current));
     try {
       deletedNodeIdsRef.current.add(nodeId);
+      console.log('[handleNodeDelete] ✨ deletedNodeIdsRef AFTER add:', Array.from(deletedNodeIdsRef.current));
       // Remove from local state immediately for responsiveness
       setNodes((nds) => nds.filter(n => n.id !== nodeId));
 
+      console.log('[handleNodeDelete] ✨ Calling nodeApi.delete...');
       await nodeApi.delete(nodeId);
+      console.log('[handleNodeDelete] ✨ nodeApi.delete SUCCESS');
 
       // Refetch horizon data to get updated nodes with cleaned parentId references
       await refetchHorizon();
 
+      console.log('[handleNodeDelete] ✨ Calling refetchHorizon...');
       console.log('[Delete] Adding log, ref:', consoleLogRef.current);
       consoleLogRef.current?.addLog('info', `Node deleted: ${nodeId}`);
     } catch (error) {
-      // Rollback tracking on failure
+      console.log('[handleNodeDelete] ✨ DELETE FAILED:', error);
+      // Delete failed → node still exists in backend
+      // Remove from tracking FIRST, then refetch to restore it in UI
       deletedNodeIdsRef.current.delete(nodeId);
+      console.log('[handleNodeDelete] ✨ Removed from deletedNodeIdsRef after failure');
+      try { await refetchHorizon(); } catch (_) {}
       console.error('Failed to delete node:', error);
       consoleLogRef.current?.addLog('error', `Failed to delete node: ${error.message}`);
+      toast({
+        title: 'Delete failed',
+        description: 'Could not delete node. It has been restored.',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
     }
-  }, [refetchHorizon, setNodes]);
+  }, [refetchHorizon, setNodes, toast]);
 
+  // ReactFlow's built-in delete handlers (called when deleteKeyCode is triggered)
+  const onNodesDelete = useCallback(async (nodesToDelete) => {
+    console.log('[onNodesDelete] ✨ ReactFlow delete triggered for nodes:', nodesToDelete.map(n => n.id));
+
+    // Filter out non-deletable nodes
+    const deletableNodes = nodesToDelete.filter(
+      (node) => !['data-pipeline', 'team1', 'team2', 'team3', 'team4'].includes(node.id)
+    );
+
+    if (deletableNodes.length === 0) {
+      console.log('[onNodesDelete] ✨ No deletable nodes');
+      return;
+    }
+
+    console.log('[onNodesDelete] ✨ Deletable nodes:', deletableNodes.map(n => n.id));
+
+    // Track deleted nodes
+    deletableNodes.forEach(n => deletedNodeIdsRef.current.add(n.id));
+    console.log('[onNodesDelete] ✨ deletedNodeIdsRef updated:', Array.from(deletedNodeIdsRef.current));
+
+    // Delete via backend API
+    try {
+      await Promise.all(
+        deletableNodes.map(async (node) => {
+          try {
+            await nodeApi.delete(node.id);
+            console.log(`[onNodesDelete] ✨ Backend delete SUCCESS for node: ${node.id}`);
+          } catch (error) {
+            console.error(`[onNodesDelete] ✨ Backend delete FAILED for node ${node.id}:`, error);
+            // Remove from tracking if delete failed
+            deletedNodeIdsRef.current.delete(node.id);
+            throw error;
+          }
+        })
+      );
+
+      // Refetch to get updated data
+      console.log('[onNodesDelete] ✨ All deletes complete, refetching...');
+      await refetchHorizon();
+      consoleLogRef.current?.addLog('success', `${deletableNodes.length} node(s) deleted`);
+    } catch (error) {
+      console.error('[onNodesDelete] ✨ Delete operation failed:', error);
+      toast({
+        title: 'Delete failed',
+        description: 'Could not delete one or more nodes',
+        status: 'error',
+        duration: 2000,
+        isClosable: true,
+      });
+      // Refetch to restore failed nodes
+      await refetchHorizon();
+    }
+  }, [refetchHorizon, toast]);
+
+  const onEdgesDelete = useCallback(async (edgesToDelete) => {
+    console.log('[onEdgesDelete] ✨ ReactFlow delete triggered for edges:', edgesToDelete.map(e => e.id));
+
+    // Delete via backend API
+    try {
+      await Promise.all(
+        edgesToDelete.map(async (edge) => {
+          try {
+            await edgeApi.delete(edge.id);
+            console.log(`[onEdgesDelete] ✨ Backend delete SUCCESS for edge: ${edge.id}`);
+          } catch (error) {
+            console.error(`[onEdgesDelete] ✨ Backend delete FAILED for edge ${edge.id}:`, error);
+            throw error;
+          }
+        })
+      );
+
+      // Refetch to get updated data
+      console.log('[onEdgesDelete] ✨ All edge deletes complete, refetching...');
+      await refetchHorizon();
+      consoleLogRef.current?.addLog('success', `${edgesToDelete.length} edge(s) deleted`);
+    } catch (error) {
+      console.error('[onEdgesDelete] ✨ Delete operation failed:', error);
+      toast({
+        title: 'Delete failed',
+        description: 'Could not delete one or more edges',
+        status: 'error',
+        duration: 2000,
+        isClosable: true,
+      });
+      // Refetch to restore failed edges
+      await refetchHorizon();
+    }
+  }, [refetchHorizon, toast]);
 
   // Add a child node from the "+" button on a node's outbound side
   const handleAddChildNode = useCallback(async (sourceNodeId, agentTemplate) => {
     const sourceNode = getNodes().find(n => n.id === sourceNodeId);
     if (!sourceNode || !currentHorizonId) return;
 
-    const sourceW = sourceNode.width || 250;
-    const position = {
-      x: sourceNode.position.x + sourceW + 80,
-      y: sourceNode.position.y,
-    };
+    // Place child one layout-column to the right, same vertical position
+    // No collision avoidance - nodes appear exactly at the calculated position
+    const position = snapPositionToGrid(
+      { x: sourceNode.position.x + LAYOUT_COL_SPACING, y: sourceNode.position.y },
+    );
 
     try {
       const response = await nodeApi.create({
@@ -1310,14 +1425,11 @@ function PipelineBuilderInner() {
     }
   }, [getNodes, currentHorizonId, setNodes, setEdges, handleNodeDelete, refetchHorizon]);
 
-  // Auto-layout: barycenter method — centers parents with children, spaces subtrees
+  // Auto-layout: layer-based grid layout — each node gets a grid cell
   const handleAutoLayout = useCallback(() => {
     const currentNodes = getNodes();
     const currentEdges = getEdges();
     if (currentNodes.length === 0) return;
-
-    const RANK_SEP = 120;
-    const NODE_SEP = 50;
 
     // Separate connected vs disconnected
     const connectedIds = new Set();
@@ -1335,12 +1447,6 @@ function PipelineBuilderInner() {
       }
     });
 
-    // Node dimensions
-    const nodeMap = {};
-    currentNodes.forEach(n => { nodeMap[n.id] = n; });
-    const getW = (id) => nodeMap[id]?.width || 250;
-    const getH = (id) => nodeMap[id]?.height || 120;
-
     // Find roots
     const roots = [...connectedIds].filter(id => !parentsOf[id] || parentsOf[id].length === 0);
     if (roots.length === 0 && connectedIds.size > 0) roots.push([...connectedIds][0]);
@@ -1355,7 +1461,7 @@ function PipelineBuilderInner() {
     roots.forEach(r => assignLayer(r, 0));
     connectedIds.forEach(id => { if (layers[id] === undefined) layers[id] = 0; });
 
-    // Group by layer
+    // Group by layer and sort by barycenter (parent Y average)
     const layerGroups = {};
     connectedIds.forEach(id => {
       const l = layers[id];
@@ -1364,92 +1470,68 @@ function PipelineBuilderInner() {
     });
     const maxLayer = Math.max(...Object.values(layers), 0);
 
-    // X offset per layer
-    const layerX = {};
-    let xPos = 0;
-    for (let l = 0; l <= maxLayer; l++) {
-      const ids = layerGroups[l] || [];
-      const maxW = ids.length > 0 ? Math.max(...ids.map(id => getW(id))) : 250;
-      layerX[l] = xPos;
-      xPos += maxW + RANK_SEP;
-    }
-
-    // Initial Y: evenly spaced per layer
+    // Assign grid positions: layer → column, order within layer → row
     const positions = {};
     for (let l = 0; l <= maxLayer; l++) {
-      let y = 0;
-      (layerGroups[l] || []).forEach(id => {
-        positions[id] = { x: layerX[l], y };
-        y += getH(id) + NODE_SEP;
+      const ids = layerGroups[l] || [];
+      ids.forEach((id, index) => {
+        positions[id] = layoutGridToPosition(l, index);
       });
     }
 
-    // Resolve overlaps within a sorted layer, then re-center the group
-    function resolveOverlaps(sortedIds) {
-      if (sortedIds.length <= 1) return;
-      const desiredCenter = sortedIds.reduce((s, id) => s + positions[id].y + getH(id) / 2, 0) / sortedIds.length;
-      for (let i = 1; i < sortedIds.length; i++) {
-        const prev = sortedIds[i - 1];
-        const curr = sortedIds[i];
-        const minY = positions[prev].y + getH(prev) + NODE_SEP;
-        if (positions[curr].y < minY) positions[curr].y = minY;
-      }
-      const actualCenter = sortedIds.reduce((s, id) => s + positions[id].y + getH(id) / 2, 0) / sortedIds.length;
-      const shift = desiredCenter - actualCenter;
-      sortedIds.forEach(id => { positions[id].y += shift; });
-    }
-
-    // Barycenter: 8 passes forward + backward
-    for (let pass = 0; pass < 8; pass++) {
-      // Forward: position each layer based on parents
+    // Barycenter reordering: 4 passes forward + backward to minimize crossings
+    for (let pass = 0; pass < 4; pass++) {
       for (let l = 1; l <= maxLayer; l++) {
         const ids = [...(layerGroups[l] || [])];
         const bary = {};
         ids.forEach(id => {
           const pars = (parentsOf[id] || []).filter(p => positions[p]);
           bary[id] = pars.length > 0
-            ? pars.reduce((s, p) => s + positions[p].y + getH(p) / 2, 0) / pars.length
-            : positions[id].y + getH(id) / 2;
+            ? pars.reduce((s, p) => s + positions[p].y, 0) / pars.length
+            : positions[id].y;
         });
         ids.sort((a, b) => bary[a] - bary[b]);
-        ids.forEach(id => { positions[id].y = bary[id] - getH(id) / 2; });
-        resolveOverlaps(ids);
+        ids.forEach((id, index) => { positions[id] = layoutGridToPosition(l, index); });
         layerGroups[l] = ids;
       }
-      // Backward: position each layer based on children
       for (let l = maxLayer - 1; l >= 0; l--) {
         const ids = [...(layerGroups[l] || [])];
         const bary = {};
         ids.forEach(id => {
           const kids = (childrenOf[id] || []).filter(k => positions[k]);
           bary[id] = kids.length > 0
-            ? kids.reduce((s, k) => s + positions[k].y + getH(k) / 2, 0) / kids.length
-            : positions[id].y + getH(id) / 2;
+            ? kids.reduce((s, k) => s + positions[k].y, 0) / kids.length
+            : positions[id].y;
         });
         ids.sort((a, b) => bary[a] - bary[b]);
-        ids.forEach(id => { positions[id].y = bary[id] - getH(id) / 2; });
-        resolveOverlaps(ids);
+        ids.forEach((id, index) => { positions[id] = layoutGridToPosition(l, index); });
         layerGroups[l] = ids;
       }
     }
 
-    // Apply positions
-    let maxTreeY = 0;
+    // Find max row index used by connected nodes
+    let maxRow = 0;
+    connectedIds.forEach(id => {
+      if (positions[id]) {
+        const row = Math.round(positions[id].y / LAYOUT_ROW_SPACING);
+        if (row > maxRow) maxRow = row;
+      }
+    });
+
+    // Apply positions to connected nodes
     const finalNodes = currentNodes.map(node => {
       if (connectedIds.has(node.id) && positions[node.id]) {
-        const pos = { x: Math.round(positions[node.id].x), y: Math.round(positions[node.id].y) };
-        maxTreeY = Math.max(maxTreeY, pos.y + getH(node.id));
-        return { ...node, position: pos };
+        return { ...node, position: positions[node.id] };
       }
       return node;
     });
 
-    // Disconnected nodes in a row below
-    let dx = 0;
+    // Disconnected nodes placed in row below main tree, each in its own column
+    let dcCol = 0;
     const result = finalNodes.map(node => {
       if (!connectedIds.has(node.id)) {
-        const pos = { x: dx, y: maxTreeY + 100 };
-        dx += 260;
+        const pos = layoutGridToPosition(dcCol, maxRow + 1);
+        dcCol++;
         return { ...node, position: pos };
       }
       return node;
@@ -1459,16 +1541,14 @@ function PipelineBuilderInner() {
     result.forEach(node => {
       nodeApi.update(node.id, { position: node.position }).catch(() => {});
     });
-    setTimeout(() => fitView({ padding: 0.15, duration: 400 }), 50);
-  }, [getNodes, getEdges, setNodes, fitView]);
+    // Camera stays in place - no automatic fitView after layout
+  }, [getNodes, getEdges, setNodes]);
 
   // Check if two nodes overlap based on position and size
   const checkNodeOverlap = useCallback((node1, node2) => {
-    // Get node dimensions (use measured width/height or defaults)
-    const node1Width = node1.width || 250;
-    const node1Height = node1.height || 120;
-    const node2Width = node2.width || 300;
-    const node2Height = node2.height || 150;
+    // Get node dimensions from data/style or defaults
+    const { width: node1Width, height: node1Height } = getNodeDimensions(node1);
+    const { width: node2Width, height: node2Height } = getNodeDimensions(node2);
 
     // Calculate boundaries
     const node1Left = node1.position.x;
@@ -1548,93 +1628,111 @@ function PipelineBuilderInner() {
     setHighlightedBlockId(null);
 
     try {
-      // Check if node was dropped onto a block
       const currentNodes = getNodes();
       const currentEdges = getEdges();
 
-      // Skip if this is a block node or output node
-      if (node.type === 'block' || node.type === 'outputNode') {
-        await nodeApi.update(node.id, {
-          position: node.position,
-        });
-        return;
-      }
+      // Snap top-left corner to grid
+      const { width, height } = getNodeDimensions(node);
+      const snappedPosition = snapPositionToGrid(node.position);
 
-      // Check if node has connections
-      const hasConnection = currentEdges.some(
-        e => e.source === node.id || e.target === node.id
-      );
+      // --- Block-drop check BEFORE collision avoidance ---
+      // Only eligible if not a block/output node and has no connections
+      const isBlockDropEligible =
+        node.type !== 'block' &&
+        node.type !== 'outputNode' &&
+        !currentEdges.some(e => e.source === node.id || e.target === node.id);
 
-      if (hasConnection) {
-        // Node has connections, just save position
-        await nodeApi.update(node.id, {
-          position: node.position,
-        });
-        return;
-      }
-
-      // Find all block nodes
-      const blockNodes = currentNodes.filter(n => n.type === 'block');
-
-      // Check if dropped node overlaps with any block
-      let targetBlock = null;
-      for (const blockNode of blockNodes) {
-        if (checkNodeOverlap(node, blockNode)) {
-          targetBlock = blockNode;
-          break;
+      if (isBlockDropEligible) {
+        const blockNodes = currentNodes.filter(n => n.type === 'block');
+        let targetBlock = null;
+        for (const blockNode of blockNodes) {
+          if (checkNodeOverlap({ ...node, position: snappedPosition }, blockNode)) {
+            targetBlock = blockNode;
+            break;
+          }
         }
-      }
 
-      if (targetBlock) {
-        // Node was dropped onto a block - add it to the block using new design
-        console.log(`[DragDrop] Node ${node.id} dropped onto block ${targetBlock.id}`);
-        
-        const currentChildNodeIds = targetBlock.data?.childNodeIds || [];
+        if (targetBlock) {
+          // Node was dropped onto a block - add it to the block
+          console.log(`[DragDrop] Node ${node.id} dropped onto block ${targetBlock.id}`);
 
-        // Check if node is already in this block
-        if (currentChildNodeIds.includes(node.id)) {
-          // Just update position
+          // Update position in state (use snapped position, no collision avoidance)
+          setNodes((nds) =>
+            nds.map((n) => n.id === node.id ? { ...n, position: snappedPosition } : n)
+          );
+
+          const currentChildNodeIds = targetBlock.data?.childNodeIds || [];
+
+          // Check if node is already in this block
+          if (currentChildNodeIds.includes(node.id)) {
+            await nodeApi.update(node.id, {
+              position: snappedPosition,
+            });
+            return;
+          }
+
+          const updatedChildNodeIds = [...currentChildNodeIds, node.id];
+
+          // Update block node with new child ID
+          await nodeApi.update(targetBlock.id, {
+            childNodeIds: updatedChildNodeIds,
+          });
+
+          // Update node to set its blockId
           await nodeApi.update(node.id, {
-            position: node.position,
+            blockId: targetBlock.id,
+            position: snappedPosition,
+          });
+
+          // Refetch horizon to get updated data
+          await refetchHorizon();
+
+          toast({
+            title: 'Node added to block',
+            description: `Successfully moved node into block container`,
+            status: 'success',
+            duration: 2000,
+            isClosable: true,
           });
           return;
         }
-
-        const updatedChildNodeIds = [...currentChildNodeIds, node.id];
-
-        // Update block node with new child ID
-        await nodeApi.update(targetBlock.id, {
-          childNodeIds: updatedChildNodeIds,
-        });
-
-        // Update node to set its blockId
-        await nodeApi.update(node.id, {
-          blockId: targetBlock.id,
-          position: node.position,
-        });
-
-        // Refetch horizon to get updated data
-        await refetchHorizon();
-
-        toast({
-          title: 'Node added to block',
-          description: `Successfully moved node into block container`,
-          status: 'success',
-          duration: 2000,
-          isClosable: true,
-        });
-      } else {
-        // Normal drag - just save position
-        await nodeApi.update(node.id, {
-          position: node.position,
-        });
-        console.log(`[NodeDrag] Saved position for node ${node.id}:`, node.position);
       }
+
+      // --- Normal path: use the snapped position directly (no collision avoidance for manual drag) ---
+      // User can see where they're dropping, so honor that position
+      setNodes((nds) =>
+        nds.map((n) => n.id === node.id ? { ...n, position: snappedPosition } : n)
+      );
+
+      await nodeApi.update(node.id, {
+        position: snappedPosition,
+      });
+      console.log(`[NodeDrag] Saved position for node ${node.id}:`, snappedPosition);
     } catch (error) {
       console.error('Failed to save node position:', error);
       consoleLogRef.current?.addLog('error', 'Failed to save node position');
     }
   }, [getNodes, getEdges, checkNodeOverlap, setNodes]);
+
+  // Handle node resize — snap dimensions & persist
+  const handleNodeResize = useCallback((nodeId, { width, height }) => {
+    const snappedW = snapDimension(width);
+    const snappedH = snapDimension(height);
+
+    setNodes((nds) =>
+      nds.map((n) =>
+        n.id === nodeId
+          ? {
+              ...n,
+              style: { ...n.style, width: snappedW, height: snappedH },
+              data: { ...n.data, width: snappedW, height: snappedH },
+            }
+          : n
+      )
+    );
+
+    nodeApi.update(nodeId, { width: snappedW, height: snappedH }).catch(() => {});
+  }, [setNodes]);
 
   // Start adding nodes to block
   const handleAddToBlock = useCallback((blockId) => {
@@ -2152,10 +2250,11 @@ function PipelineBuilderInner() {
     if (!isDragging || !dragPreviewNodeId) return;
 
     const handleMouseMove = (event) => {
-      const position = screenToFlowPosition({
+      const rawPosition = screenToFlowPosition({
         x: event.clientX,
         y: event.clientY,
       });
+      const position = snapPositionToGrid(rawPosition);
 
       // Update preview node position
       setNodes((nds) =>
@@ -2168,9 +2267,13 @@ function PipelineBuilderInner() {
     };
 
     const handleMouseUp = async (event) => {
-      // Get final position
+      // Get final position, snap to grid & resolve occupancy
       const previewNode = getNodes().find(n => n.id === dragPreviewNodeId);
-      const finalPosition = previewNode?.position || { x: 0, y: 0 };
+      const rawFinalPos = previewNode?.position || { x: 0, y: 0 };
+      const snappedPos = snapPositionToGrid(rawFinalPos);
+      const otherNodes = getNodes().filter(n => n.id !== dragPreviewNodeId);
+      const occupancy = buildOccupancyList(otherNodes);
+      const finalPosition = findNearestFreePosition(snappedPos, occupancy, DEFAULT_NODE_WIDTH, DEFAULT_NODE_HEIGHT);
 
       // Remove preview node
       setNodes((nds) => nds.filter((n) => n.id !== dragPreviewNodeId));
@@ -2476,17 +2579,42 @@ function PipelineBuilderInner() {
     }
   };
 
+  // Generate auto-incrementing "Untitled X" name for portfolios
+  const generateUntitledPortfolioName = useCallback(() => {
+    const untitledPattern = /^Untitled( \d+)?$/;
+    const untitledNumbers = portfolios
+      .map(p => {
+        const match = p.name?.match(untitledPattern);
+        if (!match) return 0;
+        return match[1] ? parseInt(match[1].trim(), 10) : 1;
+      })
+      .filter(n => n > 0);
+
+    const maxNumber = untitledNumbers.length > 0 ? Math.max(...untitledNumbers) : 0;
+    return maxNumber === 0 ? 'Untitled' : `Untitled ${maxNumber + 1}`;
+  }, [portfolios]);
 
   const handleDeletePortfolio = async (portfolioId) => {
     try {
       await portfolioApi.delete(portfolioId);
-      
+
       // Remove from local state (use 'id' not '_id' since backend returns 'id')
       setPortfolios(portfolios.filter(p => p.id !== portfolioId));
-      
-      // Remove any nodes using this portfolio
+
+      // Find canvas nodes for this portfolio, track + delete them
+      const portfolioNodes = nodes.filter(node =>
+        (node.type === 'portfolioNode' || node.type === 'dataSource') &&
+        (node.data?.portfolio?.id === portfolioId || node.data?.portfolioId === portfolioId)
+      );
+      portfolioNodes.forEach(n => {
+        deletedNodeIdsRef.current.add(n.id);
+        nodeApi.delete(n.id).catch(() => {});
+      });
+
+      // Remove from local React Flow state
       setNodes((nds) => nds.filter(node => {
-        if (node.type === 'dataSource' && node.data?.portfolioId === portfolioId) {
+        if ((node.type === 'portfolioNode' || node.type === 'dataSource') &&
+            (node.data?.portfolio?.id === portfolioId || node.data?.portfolioId === portfolioId)) {
           return false;
         }
         return true;
@@ -2518,7 +2646,16 @@ function PipelineBuilderInner() {
       setAvailableAgents(availableAgents.filter(a => a.id !== agentId));
       setAnalyzerAgents(analyzerAgents.filter(a => a.id !== agentId));
 
-      // Remove any nodes using this agent
+      // Find canvas nodes for this agent, track + delete them
+      const agentNodes = nodes.filter(node =>
+        node.type === 'agentNode' && node.data?.agent?.id === agentId
+      );
+      agentNodes.forEach(n => {
+        deletedNodeIdsRef.current.add(n.id);
+        nodeApi.delete(n.id).catch(() => {});
+      });
+
+      // Remove from local React Flow state
       setNodes((nds) => nds.filter(node => {
         if (node.type === 'agentNode' && node.data?.agent?.id === agentId) {
           return false;
@@ -2704,6 +2841,7 @@ function PipelineBuilderInner() {
   const handleRemoveFromBlockRef = useRef(handleRemoveFromBlock);
   const handleConfigChildNodeRef = useRef(handleConfigChildNode);
   const handleExtractAndDragRef = useRef(handleExtractAndDrag);
+  const handleNodeResizeRef = useRef(handleNodeResize);
 
   useEffect(() => {
     handleNodeDeleteRef.current = handleNodeDelete;
@@ -2714,7 +2852,14 @@ function PipelineBuilderInner() {
     handleRemoveFromBlockRef.current = handleRemoveFromBlock;
     handleConfigChildNodeRef.current = handleConfigChildNode;
     handleExtractAndDragRef.current = handleExtractAndDrag;
+    handleNodeResizeRef.current = handleNodeResize;
   });
+
+  // Reset deleted nodes tracking when horizon changes
+  useEffect(() => {
+    console.log('[PipelineDetail] Horizon changed, resetting deletedNodeIdsRef');
+    deletedNodeIdsRef.current.clear();
+  }, [id]); // id is the horizon ID from useParams
 
   // Process horizon data when it changes
   useEffect(() => {
@@ -2723,10 +2868,26 @@ function PipelineBuilderInner() {
       console.log('[PipelineDetail] Horizon ID:', horizonData.id, 'URL ID:', id);
       
       // Debug: Log all nodes and their parentIds
-      console.log('[PipelineDetail] Nodes received from backend:', 
+      console.log('[PipelineDetail] Nodes received from backend:',
         horizonData.nodes.map(n => ({ id: n.id, type: n.type, parentId: n.parentId }))
       );
-      
+
+      // ✨ DEBUG: Check for soft-delete flags in backend data ✨
+      console.log('[PipelineDetail] DEBUG - Full node data from backend:',
+        horizonData.nodes.map(n => ({
+          id: n.id,
+          type: n.type,
+          deletedAt: n.deletedAt,
+          isDeleted: n.isDeleted,
+          deleted: n.deleted,
+          status: n.status,
+          allKeys: Object.keys(n)  // See all fields
+        }))
+      );
+      console.log('[PipelineDetail] DEBUG - deletedNodeIdsRef contains:',
+        Array.from(deletedNodeIdsRef.current)
+      );
+
       // Create a set of valid node IDs for quick lookup
       const validNodeIds = new Set((horizonData.nodes || []).map(node => node.id));
       
@@ -2764,14 +2925,27 @@ function PipelineBuilderInner() {
           );
         }
         
+        // For agent nodes, read persisted dimensions (fall back to defaults)
+        const isAgent = node.type === 'agentNode';
+        const nodeW = node.data?.width || node.width || DEFAULT_NODE_WIDTH;
+        const nodeH = node.data?.height || node.height || DEFAULT_NODE_HEIGHT;
+
         return {
           ...node,
           // Remove parentId if it points to non-existent node (React Flow validation)
           parentId: hasValidParent ? node.parentId : undefined,
+          // Set style.width/height so NodeResizer works correctly
+          ...(isAgent ? { style: { ...node.style, width: nodeW, height: nodeH } } : {}),
           data: {
             ...node.data,
+            // For agent nodes, pass dimensions + resize callback
+            ...(isAgent ? {
+              width: nodeW,
+              height: nodeH,
+              onResize: handleNodeResizeRef.current,
+            } : {}),
             // For block nodes, include childNodeIds and loaded childNodes in data
-            ...(node.type === 'block' ? { 
+            ...(node.type === 'block' ? {
               childNodeIds: node.childNodeIds || [],
               childNodes: childNodesData, // Pass actual node objects for rendering
             } : {}),
@@ -2801,22 +2975,52 @@ function PipelineBuilderInner() {
         visibleNodes.map(n => ({ id: n.id, type: n.type }))
       );
 
-      // Clean up confirmed deletions (nodes the backend no longer returns)
+      // Clean up deletedNodeIdsRef - remove IDs that no longer exist in backend
       const backendNodeIds = new Set((horizonData.nodes || []).map(n => n.id));
+      const idsToRemove = [];
       for (const deletedId of deletedNodeIdsRef.current) {
         if (!backendNodeIds.has(deletedId)) {
-          deletedNodeIdsRef.current.delete(deletedId);
+          idsToRemove.push(deletedId);
         }
       }
+      idsToRemove.forEach(id => deletedNodeIdsRef.current.delete(id));
 
-      // Filter out locally-deleted nodes that backend hasn't caught up with yet
+      console.log('[PipelineDetail] Cleaned up deleted IDs:', idsToRemove);
+
+      // Filter out locally-deleted nodes — keep tracking IDs for the entire session
+      // to guard against soft-deleted nodes reappearing from stale/cached backend data.
+      console.log('[PipelineDetail] DEBUG - Filtering deleted nodes:', {
+        horizonId: id,
+        visibleCount: visibleNodes.length,
+        deletedIdsTracked: Array.from(deletedNodeIdsRef.current),
+        deletedInThisHorizon: visibleNodes.filter(n => deletedNodeIdsRef.current.has(n.id)).map(n => n.id)
+      });
+
       const finalNodes = visibleNodes.filter(n => !deletedNodeIdsRef.current.has(n.id));
+
+      console.log('[PipelineDetail] DEBUG - After filtering:', {
+        horizonId: id,
+        finalCount: finalNodes.length,
+        filteredOut: visibleNodes.filter(n => deletedNodeIdsRef.current.has(n.id)).map(n => n.id)
+      });
+
+      // Migrate existing free-form positions to grid
+      const movedNodes = migratePositionsToGrid(finalNodes);
+      if (movedNodes.length > 0) {
+        movedNodes.forEach(node => {
+          nodeApi.update(node.id, { position: node.position }).catch(() => {});
+        });
+      }
 
       setNodes(finalNodes);
       setEdges(prevEdges => {
         const newEdges = horizonData.edges || [];
         const prevEdgeMap = new Map(prevEdges.map(e => [e.id, e]));
         return newEdges.map(newEdge => {
+          // Default old edges (with null handles) to right-source / left-target
+          if (!newEdge.sourceHandle) newEdge = { ...newEdge, sourceHandle: 'right-source' };
+          if (!newEdge.targetHandle) newEdge = { ...newEdge, targetHandle: 'left-target' };
+
           const prev = prevEdgeMap.get(newEdge.id);
           // Preserve existing output data if backend doesn't have it
           if (prev?.data?.output && !newEdge.data?.output) {
@@ -3435,7 +3639,13 @@ function PipelineBuilderInner() {
             edges={edges}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
+            onNodesDelete={onNodesDelete}
+            onEdgesDelete={onEdgesDelete}
             onConnect={onConnect}
+            onConnectStart={onConnectStart}
+            onConnectEnd={onConnectEnd}
+            isValidConnection={isValidConnection}
+            className={isConnecting ? 'connecting' : ''}
             onNodeClick={handleNodeClick}
             onNodeDoubleClick={handleNodeDoubleClick}
             onNodeDrag={handleNodeDrag}
@@ -3445,15 +3655,23 @@ function PipelineBuilderInner() {
             defaultViewport={{ x: 0, y: 0, zoom: 0.9 }}
             minZoom={0.1}
             maxZoom={2}
-            panOnDrag={[0]}
-            selectionKeyCode="Shift"
+            panOnDrag={[1, 2]}
+            panOnScroll={true}
+            selectionOnDrag={true}
+            selectionKeyCode={null}
             multiSelectionKeyCode="Shift"
             selectionMode={SelectionMode.Partial}
-            deleteKeyCode={null}
+            nodesDraggable={true}
+            nodesConnectable={true}
+            elementsSelectable={true}
+            deleteKeyCode={['Delete', 'Backspace']}
+            snapToGrid={true}
+            snapGrid={[GRID_SIZE, GRID_SIZE]}
+            style={{ backgroundColor: '#faf9f7' }}
           >
             <Controls style={{marginLeft: "220px"}} />
             <MiniMap position='bottom-left'/>
-            <Background variant="dots" gap={16} size={1} />
+            <Background variant="dots" gap={GRID_SIZE} size={4} color="rgba(0,0,0,0.5)" />
 
             <Panel position="top-right">
               <HStack spacing={2}>
@@ -3741,7 +3959,7 @@ function PipelineBuilderInner() {
                     onChange={(e) =>
                       setPortfolioConfig({ ...portfolioConfig, name: e.target.value })
                     }
-                    placeholder="Portfolio Configuration"
+                    placeholder="Portfolio name (optional)"
                     fontSize="lg"
                     fontWeight="bold"
                     color="green.900"
@@ -3910,11 +4128,14 @@ function PipelineBuilderInner() {
                 colorScheme="green"
                 size="md"
                 w="full"
-                isDisabled={!portfolioConfig.name.trim() || selectedStocks.length === 0}
+                isDisabled={selectedStocks.length === 0}
                 onClick={async () => {
                   try {
+                    // Auto-generate name if empty
+                    const portfolioName = portfolioConfig.name.trim() || generateUntitledPortfolioName();
+
                     const portfolioData = {
-                      name: portfolioConfig.name.trim(),
+                      name: portfolioName,
                       description: portfolioConfig.description.trim(),
                       stocks: [...selectedStocks],
                     };
@@ -4186,7 +4407,7 @@ function PipelineBuilderInner() {
                   Portfolio Name
                 </FormLabel>
                 <Input
-                  placeholder="Enter portfolio name..."
+                  placeholder="Enter portfolio name (optional - auto-generates if empty)..."
                   value={portfolioConfig.name}
                   onChange={(e) => setPortfolioConfig({ ...portfolioConfig, name: e.target.value })}
                   size="md"
@@ -4339,13 +4560,16 @@ function PipelineBuilderInner() {
                 colorScheme="green"
                 size="md"
                 w="full"
-                isDisabled={selectedStocks.length === 0 || !portfolioConfig.name.trim()}
+                isDisabled={selectedStocks.length === 0}
                 onClick={async () => {
                   try {
+                    // Auto-generate name if empty
+                    const portfolioName = portfolioConfig.name.trim() || generateUntitledPortfolioName();
+
                     if (editingPortfolio) {
                       // Update existing portfolio via API
                       const response = await portfolioApi.update(editingPortfolio.id, {
-                        name: portfolioConfig.name.trim(),
+                        name: portfolioName,
                         description: portfolioConfig.description.trim(),
                         stocks: [...selectedStocks],
                       });
@@ -4386,7 +4610,7 @@ function PipelineBuilderInner() {
                     } else {
                       // Create new portfolio via API
                       const response = await portfolioApi.create(currentHorizonId, {
-                        name: portfolioConfig.name.trim(),
+                        name: portfolioName,
                         description: portfolioConfig.description.trim(),
                         stocks: [...selectedStocks],
                       });
