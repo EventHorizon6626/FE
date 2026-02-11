@@ -11,7 +11,7 @@ import {
   Badge,
 } from '@chakra-ui/react';
 import { useState } from 'react';
-import { Handle, Position, useReactFlow } from 'reactflow';
+import { useReactFlow } from 'reactflow';
 import {
   MdContentCopy,
   MdAccountTree,
@@ -21,6 +21,7 @@ import {
   MdPlayArrow,
 } from 'react-icons/md';
 import { useRunBlock } from '../../hooks/useRunBlock';
+import { NodeHandles } from './NodeHandles';
 import { IDshorten } from 'utils';
 
 // Mini node component to render child nodes inside block
@@ -223,16 +224,7 @@ export function CustomBlockNode({ data, id, selected }) {
       className="custom-block-node"
     >
       {/* Handles */}
-      <Handle
-        type="target"
-        position={Position.Left}
-        style={{ background: '#805AD5', width: '12px', height: '12px' }}
-      />
-      <Handle
-        type="source"
-        position={Position.Right}
-        style={{ background: '#805AD5', width: '12px', height: '12px' }}
-      />
+      <NodeHandles role="bidirectional" color="#805AD5" />
 
       {/* Play button — only show when block has children */}
       {childNodes.length > 0 && (

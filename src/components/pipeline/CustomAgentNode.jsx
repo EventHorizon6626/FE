@@ -11,9 +11,10 @@ import {
 } from '@chakra-ui/react';
 import { useState } from 'react';
 import { MdPlayArrow, MdContentCopy, MdAdd, MdClose } from 'react-icons/md';
-import { Handle, Position, useReactFlow } from 'reactflow';
+import { useReactFlow } from 'reactflow';
 import { useRunAgent } from '../../hooks/useRunAgent';
 import { RobotHead } from './RobotHead';
+import { NodeHandles } from './NodeHandles';
 import { IDshorten } from '../../utils';
 
 export const CustomAgentNode = ({ data, id, selected }) => {
@@ -45,16 +46,7 @@ export const CustomAgentNode = ({ data, id, selected }) => {
 
   return (
     <Box position="relative" className={`custom-agent-node${showAddOptions ? ' add-options-open' : ''}`}>
-      <Handle
-        type="target"
-        position={Position.Left}
-        style={{ background: '#555', width: '12px', height: '12px' }}
-      />
-      <Handle
-        type="source"
-        position={Position.Right}
-        style={{ background: '#555', width: '12px', height: '12px' }}
-      />
+      <NodeHandles role="bidirectional" color="#555" />
 
       {/* Play button */}
       <Box
