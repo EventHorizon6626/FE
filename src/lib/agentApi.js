@@ -39,8 +39,8 @@ export const generateAgentSystemPrompt = async (name, description, category) => 
 // ===== Custom Agent Execution =====
 
 export const runCustomAgentApi = async (stocks, systemPrompt, userPrompt = null, context = {}) => {
-  // Use 240 second timeout for custom AI agent execution (thinking loop with tool calls needs time)
-  const response = await request.withTimeout(240000).post('/ai/agents/custom', {
+  // Use 500 second timeout for custom AI agent execution (thinking loop with tool calls needs time)
+  const response = await request.withTimeout(500000).post('/ai/agents/custom', {
     stocks,
     system_prompt: systemPrompt,
     user_prompt: userPrompt,
@@ -208,8 +208,8 @@ export const runTraderAgent = async (stocks, data, context = {}) => {
 // ===== Thinking Agent (ReAct-style iterative reasoning) =====
 
 export const runThinkingAgent = async (stocks, systemPrompt, inputData = null, maxIterations = 5) => {
-  // Use 60 second timeout for thinking agent (iterative reasoning with multiple tool calls can take longer)
-  const response = await request.withTimeout(60000).post('/ai/agents/think', {
+  // Use 500 second timeout for thinking agent (iterative reasoning with multiple tool calls can take longer)
+  const response = await request.withTimeout(500000).post('/ai/agents/think', {
     stocks,
     system_prompt: systemPrompt,
     input_data: inputData,

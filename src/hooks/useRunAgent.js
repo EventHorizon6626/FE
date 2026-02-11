@@ -31,6 +31,9 @@ export const useRunAgent = ({
   const isDataAgentWiredToAnalyzer = (nodeId, edges, nodes) => {
     const node = nodes.find(n => n.id === nodeId);
     if (node?.data?.agent?.system !== 'data') return false;
+    // Auto-created data agents (spawned by needs_data) are always wired to their parent,
+    // whether the parent is an analyzer OR a custom data-coordinator agent
+    if (node?.data?.agent?.isAutoCreated) return true;
     return edges.some(e =>
       e.source === nodeId &&
       nodes.find(n => n.id === e.target)?.data?.agent?.system === 'analyzer'
@@ -242,6 +245,7 @@ export const useRunAgent = ({
         target: agent.nodeId,
         type: 'custom',
         animated: true,
+        data: { output: null },
       });
       // Edge: data agent -> custom agent
       newEdges.push({
@@ -250,6 +254,7 @@ export const useRunAgent = ({
         target: customAgentNodeId,
         type: 'custom',
         animated: true,
+        data: { output: null },
       });
     }
 
@@ -332,8 +337,18 @@ export const useRunAgent = ({
         agentPosition: srcNode.position || { x: 0, y: 0 },
       } : {};
 
+      // Pass upstream agent output as input_data
+      if (srcInputData.data && Object.keys(srcInputData.data).length > 0) {
+        srcContext.input_data = srcInputData.data;
+      }
+
       if (srcType === 'custom_agent' && srcAgent?.system === 'data') {
         srcContext.execution_mode = 'fetch_data';
+        // Exotic (analyzer-spawned) data agents only need web_search —
+        // standard tools are already fetched by dedicated pipeline agents
+        if (srcAgent.isAutoCreated && !srcAgent.isBuiltin) {
+          srcContext.available_tools = ['web_search'];
+        }
       }
 
       // Skip BE outputNode save if this data agent is wired to an analyzer
@@ -477,9 +492,20 @@ export const useRunAgent = ({
         agentPosition: node?.position || { x: 0, y: 0 },
       } : {};
 
+      // Pass upstream agent output as input_data so the EH endpoint
+      // takes Path A (direct analysis) instead of re-entering discovery
+      if (inputData.data && Object.keys(inputData.data).length > 0) {
+        executionContext.input_data = inputData.data;
+      }
+
       // Custom DATA agents should only fetch data, not enter discovery/thinking loop
       if (agentType === 'custom_agent' && agent?.system === 'data') {
         executionContext.execution_mode = 'fetch_data';
+        // Exotic (analyzer-spawned) data agents only need web_search —
+        // standard tools are already fetched by dedicated pipeline agents
+        if (agent.isAutoCreated && !agent.isBuiltin) {
+          executionContext.available_tools = ['web_search'];
+        }
       }
 
       // Skip BE outputNode save if this data agent is wired to an analyzer

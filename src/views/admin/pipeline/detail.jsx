@@ -438,7 +438,7 @@ function CustomEdge({ id, source, target, sourceX, sourceY, targetX, targetY, so
   const targetNode = getNode(target);
   const isDataToAnalyzer =
     sourceNode?.data?.agent?.system === 'data' &&
-    targetNode?.data?.agent?.system === 'analyzer';
+    (targetNode?.data?.agent?.system === 'analyzer' || sourceNode?.data?.agent?.isAutoCreated);
 
   const hasOutput = !!data?.output;
 
@@ -1780,6 +1780,7 @@ function PipelineBuilderInner() {
       const blockNode = currentNodes.find(n => n.id === blockId);
       
       if (!blockNode || !blockNode.data.childNodeIds) {
+        console.warn('[EditChildNode] Block not found or has no childNodeIds');
         return;
       }
 
@@ -1787,12 +1788,14 @@ function PipelineBuilderInner() {
       
       // Check if child node exists in block
       if (!childNodeIds.includes(childNodeId)) {
+        console.warn('[EditChildNode] Child node not in block childNodeIds');
         return;
       }
 
-      // Find the child node data
-      const childNode = currentNodes.find(n => n.id === childNodeId);
+      // Find the child node data from block's childNodes
+      const childNode = blockNode.data.childNodes?.find(n => n.id === childNodeId);
       if (!childNode) {
+        console.warn('[EditChildNode] Child node not found in block.data.childNodes');
         return;
       }
       
@@ -1874,6 +1877,7 @@ function PipelineBuilderInner() {
     const blockNode = currentNodes.find(n => n.id === blockId);
     
     if (!blockNode || !blockNode.data.childNodeIds) {
+      console.warn('[ConfigChildNode] Block not found or has no childNodeIds');
       return;
     }
 
@@ -1881,12 +1885,14 @@ function PipelineBuilderInner() {
     
     // Check if child node exists in block
     if (!childNodeIds.includes(childNodeId)) {
+      console.warn('[ConfigChildNode] Child node not in block childNodeIds');
       return;
     }
 
-    // Find the actual child node
-    const childNode = currentNodes.find(n => n.id === childNodeId);
+    // Find the actual child node from block's childNodes data
+    const childNode = blockNode.data.childNodes?.find(n => n.id === childNodeId);
     if (!childNode) {
+      console.warn('[ConfigChildNode] Child node not found in block.data.childNodes');
       return;
     }
     
@@ -1937,6 +1943,7 @@ function PipelineBuilderInner() {
     const blockNode = currentNodes.find(n => n.id === blockId);
     
     if (!blockNode || !blockNode.data.childNodeIds) {
+      console.warn('[ExtractAndDrag] Block not found or has no childNodeIds');
       return;
     }
 
@@ -1944,12 +1951,14 @@ function PipelineBuilderInner() {
     
     // Check if child node exists in block
     if (!childNodeIds.includes(childNodeId)) {
+      console.warn('[ExtractAndDrag] Child node not in block childNodeIds');
       return;
     }
 
-    // Find the child node
-    const childNode = currentNodes.find(n => n.id === childNodeId);
+    // Find the child node from block's childNodes data (not from visible nodes)
+    const childNode = blockNode.data.childNodes?.find(n => n.id === childNodeId);
     if (!childNode) {
+      console.warn('[ExtractAndDrag] Child node not found in block.data.childNodes');
       return;
     }
 
