@@ -1086,11 +1086,10 @@ function PipelineBuilderInner() {
         await nodeApi.update(params.target, {
           parentId: params.source,
         });
-        
+
         console.log(`[onConnect] Updated node ${params.target} with parentId: ${params.source}`);
-        
-        // Refetch horizon to update UI
-        await refetchHorizon();
+
+        // No need to refetch - connection is already on canvas and saved to backend
       } catch (error) {
         console.error('[onConnect] Failed to update node relationship:', error);
         toast({
@@ -1447,9 +1446,8 @@ function PipelineBuilderInner() {
       })
     );
 
-    // Refetch to get updated data
-    console.log('[onEdgesDelete] ✨ Edge deletion complete, refetching...');
-    await refetchHorizon();
+    // No refetch needed - edge is already removed from canvas by React Flow
+    console.log('[onEdgesDelete] ✨ Edge deletion complete');
 
     if (failures.length === 0) {
       consoleLogRef.current?.addLog('success', `${edgesToDelete.length} edge(s) deleted`);
