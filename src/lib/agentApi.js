@@ -1,4 +1,5 @@
 import { request } from './api';
+import { DEFAULT_SYSTEM_PROMPTS } from '../data/agentConfig';
 
 export const pollJobUntilComplete = async (jobId, pollingInterval = 2000, maxPolls = 300) => {
   let polls = 0;
@@ -198,83 +199,117 @@ export const runWebSearchAgent = async (stocks, context = {}) => {
 // ===== System 2 Team 1: Analyst Agents =====
 
 export const runFundamentalsAnalystAgent = async (stocks, context = {}) => {
-  return await callAgentWithJobSupport('/ai/agents/fundamentals-analyst', {
+  return await runCustomAgentApi(
     stocks,
-    ...context,
-  });
+    DEFAULT_SYSTEM_PROMPTS.fundamentals_analyst,
+    null,
+    context
+  );
 };
 
 export const runSentimentAnalystAgent = async (stocks, context = {}) => {
-  return await callAgentWithJobSupport('/ai/agents/sentiment-analyst', {
+  return await runCustomAgentApi(
     stocks,
-    ...context,
-  });
+    DEFAULT_SYSTEM_PROMPTS.sentiment_analyst,
+    null,
+    context
+  );
 };
 
 export const runNewsAnalystAgent = async (stocks, context = {}) => {
-  return await callAgentWithJobSupport('/ai/agents/news-analyst', {
+  return await runCustomAgentApi(
     stocks,
-    ...context,
-  });
+    DEFAULT_SYSTEM_PROMPTS.news_analyst,
+    null,
+    context
+  );
 };
 
 export const runTechnicalAnalystAgent = async (stocks, context = {}) => {
-  return await callAgentWithJobSupport('/ai/agents/technical-analyst', {
+  return await runCustomAgentApi(
     stocks,
-    ...context,
-  });
+    DEFAULT_SYSTEM_PROMPTS.technical_analyst,
+    null,
+    context
+  );
 };
 
 // ===== System 2 Team 2: Researcher Agents =====
 
 export const runBullResearcherAgent = async (data, context = {}) => {
-  return await callAgentWithJobSupport('/ai/agents/bull-researcher', {
-    data,
-    ...context,
-  });
+  return await runCustomAgentApi(
+    data.stocks || [],
+    DEFAULT_SYSTEM_PROMPTS.bull_researcher,
+    null,
+    context
+  );
 };
 
 export const runBearResearcherAgent = async (data, context = {}) => {
-  return await callAgentWithJobSupport('/ai/agents/bear-researcher', {
-    data,
-    ...context,
-  });
+  return await runCustomAgentApi(
+    data.stocks || [],
+    DEFAULT_SYSTEM_PROMPTS.bear_researcher,
+    null,
+    context
+  );
 };
 
 export const runResearchManagerAgent = async (bullThesis, bearThesis, context = {}) => {
-  return await callAgentWithJobSupport('/ai/agents/research-manager', {
-    bull_thesis: bullThesis,
-    bear_thesis: bearThesis,
-    ...context,
-  });
+  // Research manager receives bull/bear analysis, not stocks
+  // Pass the analysis data through context.input_data
+  return await runCustomAgentApi(
+    context.stocks || [],
+    DEFAULT_SYSTEM_PROMPTS.research_manager,
+    null,
+    {
+      ...context,
+      input_data: {
+        bull_thesis: bullThesis,
+        bear_thesis: bearThesis,
+        ...(context.input_data || {}),
+      },
+    }
+  );
 };
 
 // ===== System 2 Team 3: Portfolio =====
 
 export const runPortfolioManagerAgent = async (stocks, data, context = {}) => {
-  return await callAgentWithJobSupport('/ai/agents/portfolio-manager', {
+  return await runCustomAgentApi(
     stocks,
-    data,
-    ...context,
-  });
+    DEFAULT_SYSTEM_PROMPTS.portfolio_manager,
+    null,
+    {
+      ...context,
+      input_data: data,
+    }
+  );
 };
 
 // ===== System 2 Team 4: Risk & Execution =====
 
 export const runRiskManagerAgent = async (stocks, data, context = {}) => {
-  return await callAgentWithJobSupport('/ai/agents/risk-manager', {
+  return await runCustomAgentApi(
     stocks,
-    data,
-    ...context,
-  });
+    DEFAULT_SYSTEM_PROMPTS.risk_manager,
+    null,
+    {
+      ...context,
+      input_data: data,
+    }
+  );
 };
 
 export const runTraderAgent = async (stocks, data, context = {}) => {
-  return await callAgentWithJobSupport('/ai/agents/trader', {
+  return await runCustomAgentApi(
     stocks,
-    data,
-    ...context,
-  });
+    DEFAULT_SYSTEM_PROMPTS.trader_agent,
+    null,
+    {
+      ...context,
+      input_data: data,
+    }
+  );
 };
 
 // ===== Thinking Agent (ReAct-style iterative reasoning) =====
