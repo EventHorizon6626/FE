@@ -28,7 +28,7 @@ export function NodeHandles({ role = 'bidirectional', color = '#555' }) {
                 position={pos}
                 id={`${id}-source`}
                 className="node-handle node-handle--source"
-                style={{ background: color }}
+                style={{ background: color, width: '12px', height: '12px' }}
               />
             )}
             {showTarget && (
@@ -37,7 +37,7 @@ export function NodeHandles({ role = 'bidirectional', color = '#555' }) {
                 position={pos}
                 id={`${id}-target`}
                 className="node-handle node-handle--target"
-                style={{ background: color }}
+                style={{ background: color, width: '12px', height: '12px' }}
               />
             )}
           </span>

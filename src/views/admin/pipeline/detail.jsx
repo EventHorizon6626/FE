@@ -343,14 +343,13 @@ function CustomPortfolioNode({ data, id, selected }) {
       )}
 
       <Box
-        p="16px"
+        p="12px"
         bg="rgba(255,255,255,0.7)"
         borderRadius="12px"
-        border={selected ? "5px solid" : "5px dashed"}
+        border={selected ? "4px solid" : "4px dashed"}
         borderColor={selected ? "green.500" : "rgba(72,187,120,0.5)"}
         boxShadow={selected ? "0 4px 12px rgba(56, 161, 105, 0.4)" : "md"}
-        minW="240px"
-        maxW="280px"
+        w="240px"
         transition="all 0.2s"
       >
         <VStack align="start" spacing="8px">
@@ -1353,41 +1352,53 @@ function PipelineBuilderInner() {
     console.log('[onEdgesDelete] ✨ ReactFlow delete triggered for edges:', edgesToDelete.map(e => e.id));
 
     // Delete via backend API
-    try {
-      await Promise.all(
-        edgesToDelete.map(async (edge) => {
-          try {
-            await edgeApi.delete(edge.id);
-            console.log(`[onEdgesDelete] ✨ Backend delete SUCCESS for edge: ${edge.id}`);
-          } catch (error) {
-            console.error(`[onEdgesDelete] ✨ Backend delete FAILED for edge ${edge.id}:`, error);
-            throw error;
+    const results = await Promise.allSettled(
+      edgesToDelete.map(async (edge) => {
+        try {
+          await edgeApi.delete(edge.id);
+          console.log(`[onEdgesDelete] ✨ Backend delete SUCCESS for edge: ${edge.id}`);
+          return { success: true, edgeId: edge.id };
+        } catch (error) {
+          // Ignore 404 errors (edge already deleted, possibly by backend when node was deleted)
+          if (error.response?.status === 404) {
+            console.log(`[onEdgesDelete] ✨ Edge ${edge.id} already deleted (404), ignoring`);
+            return { success: true, edgeId: edge.id, alreadyDeleted: true };
           }
-        })
-      );
+          console.error(`[onEdgesDelete] ✨ Backend delete FAILED for edge ${edge.id}:`, error);
+          return { success: false, edgeId: edge.id, error };
+        }
+      })
+    );
 
-      // Refetch to get updated data
-      console.log('[onEdgesDelete] ✨ All edge deletes complete, refetching...');
-      await refetchHorizon();
+    const failures = results.filter(r => r.status === 'rejected' || !r.value?.success);
+
+    // Refetch to get updated data
+    console.log('[onEdgesDelete] ✨ Edge deletion complete, refetching...');
+    await refetchHorizon();
+
+    if (failures.length === 0) {
       consoleLogRef.current?.addLog('success', `${edgesToDelete.length} edge(s) deleted`);
-    } catch (error) {
-      console.error('[onEdgesDelete] ✨ Delete operation failed:', error);
+    } else {
+      console.error('[onEdgesDelete] ✨ Some deletions failed:', failures);
       toast({
         title: 'Delete failed',
-        description: 'Could not delete one or more edges',
+        description: `Could not delete ${failures.length} edge(s)`,
         status: 'error',
         duration: 2000,
         isClosable: true,
       });
-      // Refetch to restore failed edges
-      await refetchHorizon();
     }
   }, [refetchHorizon, toast]);
 
   // Add a child node from the "+" button on a node's outbound side
   const handleAddChildNode = useCallback(async (sourceNodeId, agentTemplate) => {
+    console.log('[handleAddChildNode] 🚀 Called with:', { sourceNodeId, agentTemplate, horizonId: id });
     const sourceNode = getNodes().find(n => n.id === sourceNodeId);
-    if (!sourceNode || !currentHorizonId) return;
+    console.log('[handleAddChildNode] Source node found:', !!sourceNode);
+    if (!sourceNode || !id) {
+      console.warn('[handleAddChildNode] ❌ Early return - sourceNode:', !!sourceNode, 'horizonId:', !!id);
+      return;
+    }
 
     // Place child one layout-column to the right, same vertical position
     // No collision avoidance - nodes appear exactly at the calculated position
@@ -1397,7 +1408,7 @@ function PipelineBuilderInner() {
 
     try {
       const response = await nodeApi.create({
-        horizonId: currentHorizonId,
+        horizonId: id,
         type: 'agentNode',
         position,
         data: {
@@ -1414,16 +1425,19 @@ function PipelineBuilderInner() {
       });
 
       const savedNode = response.data;
-      
+      console.log('[handleAddChildNode] ✅ Node created:', savedNode.id);
+
       // Refetch horizon to get updated data
+      console.log('[handleAddChildNode] 🔄 Calling refetchHorizon...');
       await refetchHorizon();
+      console.log('[handleAddChildNode] ✅ Refetch complete');
 
       consoleLogRef.current?.addLog('success', `Node added: ${agentTemplate.name} connected to pipeline`);
     } catch (error) {
       console.error('Failed to add child node:', error);
       consoleLogRef.current?.addLog('error', `Failed to add node: ${error.message || 'Could not create node'}`);
     }
-  }, [getNodes, currentHorizonId, setNodes, setEdges, handleNodeDelete, refetchHorizon]);
+  }, [getNodes, id, refetchHorizon]);
 
   // Auto-layout: layer-based grid layout — each node gets a grid cell
   const handleAutoLayout = useCallback(() => {
@@ -2844,6 +2858,7 @@ function PipelineBuilderInner() {
   const handleNodeResizeRef = useRef(handleNodeResize);
 
   useEffect(() => {
+    console.log('[PipelineDetail] 🔄 Updating refs, handleAddChildNode:', typeof handleAddChildNode);
     handleNodeDeleteRef.current = handleNodeDelete;
     refetchHorizonRef.current = refetchHorizon;
     handleAddChildNodeRef.current = handleAddChildNode;
@@ -2853,7 +2868,18 @@ function PipelineBuilderInner() {
     handleConfigChildNodeRef.current = handleConfigChildNode;
     handleExtractAndDragRef.current = handleExtractAndDrag;
     handleNodeResizeRef.current = handleNodeResize;
-  });
+    console.log('[PipelineDetail] ✅ Refs updated, handleAddChildNodeRef.current:', typeof handleAddChildNodeRef.current);
+  }, [
+    handleNodeDelete,
+    refetchHorizon,
+    handleAddChildNode,
+    handleAddToBlock,
+    handleDropToBlock,
+    handleRemoveFromBlock,
+    handleConfigChildNode,
+    handleExtractAndDrag,
+    handleNodeResize,
+  ]);
 
   // Reset deleted nodes tracking when horizon changes
   useEffect(() => {
@@ -2964,6 +2990,14 @@ function PipelineBuilderInner() {
           }
         };
       });
+
+      console.log('[PipelineDetail] 🔍 Processed nodes with callbacks:',
+        nodesWithHorizonId.map(n => ({
+          id: n.id,
+          type: n.type,
+          hasOnAddChildNode: typeof n.data.onAddChildNode
+        }))
+      );
       
       // Filter out nodes that have blockId (they are rendered inside blocks)
       const visibleNodes = nodesWithHorizonId.filter(node => !node.blockId);
@@ -3652,6 +3686,12 @@ function PipelineBuilderInner() {
             onNodeDragStop={handleNodeDragStop}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
+            defaultEdgeOptions={{
+              type: 'smoothstep',
+              style: { strokeWidth: 2, stroke: '#b1b1b7' },
+            }}
+            connectionLineType="smoothstep"
+            connectionLineStyle={{ strokeWidth: 3, stroke: '#4299e1' }}
             defaultViewport={{ x: 0, y: 0, zoom: 0.9 }}
             minZoom={0.1}
             maxZoom={2}

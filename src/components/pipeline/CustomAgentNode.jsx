@@ -22,6 +22,12 @@ export const CustomAgentNode = ({ data, id, selected }) => {
   const { onCopy } = useClipboard(id);
   const [showAddOptions, setShowAddOptions] = useState(false);
 
+  console.log('[CustomAgentNode] Rendering:', {
+    id,
+    hasOnAddChildNode: !!data.onAddChildNode,
+    onAddChildNodeType: typeof data.onAddChildNode
+  });
+
   const runAgentMutation = useRunAgent({
     setNodes,
     setEdges,
@@ -141,13 +147,13 @@ export const CustomAgentNode = ({ data, id, selected }) => {
       )}
 
       <Box
-        p="20px"
+        p="16px"
         bg="white"
         borderRadius="16px"
-        border={selected ? "3px solid" : "3px solid"}
+        border={selected ? "4px solid" : "4px solid"}
         borderColor={selected ? "teal.500" : `${data.agent?.color || 'blue'}.400`}
         boxShadow={selected ? "0 4px 12px rgba(49, 151, 149, 0.4)" : "lg"}
-        minW="200px"
+        w="240px"
         transition="all 0.2s"
         opacity={isRunning ? 0.7 : 1}
       >
