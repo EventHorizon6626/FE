@@ -386,7 +386,22 @@ export const useRunAgent = ({
       // Handle _outputNode from backend (same logic as onSuccess)
       // Skip output node creation if this data agent is wired to an analyzer
       const savedOutputNode = srcResult?._outputNode;
-      if (savedOutputNode && !isDataAgentWiredToAnalyzer(srcNode.id, edges, nodes)) {
+      const isWiredCascade = isDataAgentWiredToAnalyzer(srcNode.id, edges, nodes);
+
+      console.log('[useRunAgent] 🎯 CASCADE OUTPUT NODE DECISION:', {
+        step1_hasSavedOutputNode: !!savedOutputNode,
+        step2_agentInfo: {
+          nodeId: srcNode.id,
+          name: srcName,
+          system: srcAgent?.system,
+          isAutoCreated: srcAgent?.isAutoCreated,
+        },
+        step3_isWiredToAnalyzer: isWiredCascade,
+        step4_willCreateOutput: !!savedOutputNode && !isWiredCascade,
+      });
+
+      if (savedOutputNode && !isWiredCascade) {
+        console.log('[useRunAgent] ✅ CREATING CASCADE OUTPUT NODE');
         const agentPos = srcNode.position || { x: 0, y: 0 };
         const newOutputNode = {
           id: savedOutputNode.id,
@@ -419,6 +434,14 @@ export const useRunAgent = ({
             animated: true,
           },
         ]);
+
+        console.log('[useRunAgent] ✅ CASCADE OUTPUT NODE CREATED:', newOutputNode.id);
+      } else {
+        console.log('[useRunAgent] ❌ SKIPPING CASCADE OUTPUT NODE:',
+          !savedOutputNode
+            ? '❌ Backend did not return _outputNode in result'
+            : '❌ Agent is wired to analyzer (data flows to analyzer instead)'
+        );
       }
 
       // Update edges with animation for this agent's outgoing edges
@@ -571,6 +594,19 @@ export const useRunAgent = ({
         toast.close(context.loadingToastId);
       }
 
+      // Step 2: Log backend response
+      console.log('[useRunAgent] 📦 Backend result received:', {
+        success: true,
+        hasOutputNode: !!result?._outputNode,
+        outputNodeId: result?._outputNode?.id,
+        resultFields: Object.keys(result || {}),
+        resultSample: {
+          status: result?.status,
+          output: result?.output ? `(${typeof result.output === 'string' ? result.output.substring(0, 50) : 'object'})` : undefined,
+          _outputNode: result?._outputNode ? { id: result._outputNode.id, createdAt: result._outputNode.createdAt } : undefined,
+        },
+      });
+
       // Check if agent needs data — auto-create flow
       if (result.status === 'needs_data' && result.required_agents?.length > 0) {
         console.log('[useRunAgent] Agent needs data, starting auto-create flow:', result.required_agents);
@@ -657,9 +693,24 @@ export const useRunAgent = ({
       // Handle backend-saved outputNode
       // Skip output node creation if this data agent is wired to an analyzer
       const savedOutputNode = result?._outputNode;
+      const executingNode = currentNodes.find(n => n.id === nodeId);
+      const isWired = isDataAgentWiredToAnalyzer(nodeId, currentEdges, currentNodes);
 
-      if (savedOutputNode && !isDataAgentWiredToAnalyzer(nodeId, currentEdges, currentNodes)) {
-        console.log('[useRunAgent] Backend saved outputNode:', savedOutputNode);
+      console.log('[useRunAgent] 🎯 OUTPUT NODE DECISION:', {
+        step1_hasSavedOutputNode: !!savedOutputNode,
+        step2_agentInfo: {
+          nodeId,
+          name: executingNode?.data?.agent?.name,
+          system: executingNode?.data?.agent?.system,
+          isAutoCreated: executingNode?.data?.agent?.isAutoCreated,
+        },
+        step3_isWiredToAnalyzer: isWired,
+        step4_willCreateOutput: !!savedOutputNode && !isWired,
+        savedOutputNode: savedOutputNode,
+      });
+
+      if (savedOutputNode && !isWired) {
+        console.log('[useRunAgent] ✅ CREATING OUTPUT NODE');
 
         // Remove old outputNode from canvas (if exists)
         const oldOutputNode = currentNodes.find(n =>
@@ -720,6 +771,14 @@ export const useRunAgent = ({
               : n
           )
         );
+
+        console.log('[useRunAgent] ✅ OUTPUT NODE CREATED:', newOutputNode.id);
+      } else {
+        console.log('[useRunAgent] ❌ SKIPPING OUTPUT NODE:',
+          !savedOutputNode
+            ? '❌ Backend did not return _outputNode in result'
+            : '❌ Agent is wired to analyzer (data flows to analyzer instead)'
+        );
       }
 
       // Call custom onSuccess callback if provided
@@ -731,7 +790,15 @@ export const useRunAgent = ({
       // Note: This ensures data sync even if CustomAgentNode doesn't call refetch
       // Skip for wired data agents — in-memory state + DB are already correct,
       // and refetch causes a race that wipes edge.data.output (teal icon).
-      if (refetchHorizon && !isDataAgentWiredToAnalyzer(nodeId, currentEdges, currentNodes)) {
+      const shouldRefetch = refetchHorizon && !isDataAgentWiredToAnalyzer(nodeId, currentEdges, currentNodes);
+      console.log('[useRunAgent] 🔄 REFETCH DECISION:', {
+        hasRefetchFunction: !!refetchHorizon,
+        isWiredToAnalyzer: isDataAgentWiredToAnalyzer(nodeId, currentEdges, currentNodes),
+        willRefetch: shouldRefetch,
+        note: shouldRefetch ? 'Refetching - output node should persist' : 'Skipping refetch',
+      });
+
+      if (shouldRefetch) {
         console.log('[useRunAgent] Refetching horizon data after agent execution');
         refetchHorizon();
       }
