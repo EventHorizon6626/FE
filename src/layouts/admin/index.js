@@ -1,7 +1,7 @@
 // Chakra imports
 import ProtectedRoute from 'auth/ProtectedRoute';
 import EventHorizonLayout from 'components/layout/EventHorizonLayout';
-import FixedPlugin from 'components/fixedPlugin/FixedPlugin';
+// import FixedPlugin from 'components/fixedPlugin/FixedPlugin';
 import React from 'react';
 import { Route, Routes } from 'react-router-dom';
 import routes from 'routes.js';
@@ -31,7 +31,7 @@ export default function Dashboard(props) {
       <EventHorizonLayout>
         <Routes>{getRoutes(routes)}</Routes>
       </EventHorizonLayout>
-      <FixedPlugin />
+      {/* <FixedPlugin /> */}
     </>
   );
 }
