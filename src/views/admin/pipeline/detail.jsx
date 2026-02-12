@@ -2998,7 +2998,7 @@ function PipelineBuilderInner() {
           hasOnAddChildNode: typeof n.data.onAddChildNode
         }))
       );
-      
+
       // Filter out nodes that have blockId (they are rendered inside blocks)
       const visibleNodes = nodesWithHorizonId.filter(node => !node.blockId);
       
