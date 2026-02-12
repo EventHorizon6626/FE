@@ -245,7 +245,7 @@ function CustomPortfolioNode({ data, id, selected }) {
 
   return (
     <Box position="relative" className={`custom-portfolio-node${showAddOptions ? ' add-options-open' : ''}`}>
-      <NodeHandles role="source-only" color="#38A169" />
+      <NodeHandles role="bidirectional" color="#38A169" />
 
       {/* Add child node button — invisible hover zone near right edge */}
       {data.onAddChildNode && (
