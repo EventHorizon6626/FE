@@ -77,6 +77,7 @@ import ReactFlow, {
   useEdgesState,
   useNodesState,
   useReactFlow,
+  useViewport,
   BaseEdge,
   EdgeLabelRenderer,
   getSmoothStepPath,
@@ -98,6 +99,7 @@ import Chart from 'react-apexcharts';
 import StockAnalysisCard from 'views/admin/portfolio/components/StockAnalysisCard';
 import { IDshorten } from 'utils';
 import { getActivatedDataAgents, getActivatedAnalyzerAgents, getActivatedAgentIds } from 'data/libraryAgents';
+import dagre from 'dagre';
 import {
   GRID_SIZE,
   DEFAULT_NODE_WIDTH,
@@ -785,7 +787,41 @@ function PipelineBuilderInner() {
   const [nodes, setNodes, onNodesChangeDefault] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChangeDefault] = useEdgesState(initialEdges);
   const [reactFlowError, setReactFlowError] = useState(null);
-  
+
+  // Get React Flow methods - must be before onNodesChange
+  const { getNodes, getEdges, fitView } = useReactFlow();
+
+  // Use reactive viewport hook for button positioning
+  const viewport = useViewport();
+
+  // Calculate bounding box for selected nodes
+  const calculateSelectionBounds = useCallback((selectedNodes) => {
+    if (selectedNodes.length === 0) return null;
+
+    let minX = Infinity, minY = Infinity;
+    let maxX = -Infinity, maxY = -Infinity;
+
+    selectedNodes.forEach(node => {
+      const x = node.position.x;
+      const y = node.position.y;
+      const width = node.width || node.data?.width || 240;
+      const height = node.height || node.data?.height || 120;
+
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x + width);
+      maxY = Math.max(maxY, y + height);
+    });
+
+    return {
+      x: minX,
+      y: minY,
+      width: maxX - minX,
+      height: maxY - minY,
+      selectedNodeIds: selectedNodes.map(n => n.id)
+    };
+  }, []);
+
   // Custom onNodesChange - just apply all changes normally
   const onNodesChange = useCallback(
     (changes) => {
@@ -804,6 +840,20 @@ function PipelineBuilderInner() {
     },
     [onNodesChangeDefault]
   );
+
+  // Watch for selection changes and update bounds
+  useEffect(() => {
+    const selectedNodes = nodes.filter(n => n.selected);
+    console.log('[useEffect] Selected nodes count:', selectedNodes.length);
+
+    if (selectedNodes.length >= 2) {
+      const bounds = calculateSelectionBounds(selectedNodes);
+      console.log('[useEffect] Calculated bounds:', bounds);
+      setSelectionBounds(bounds);
+    } else {
+      setSelectionBounds(null);
+    }
+  }, [nodes, calculateSelectionBounds]);
   
   // Custom onEdgesChange to handle edge deletion
   const onEdgesChange = useCallback(
@@ -891,7 +941,6 @@ function PipelineBuilderInner() {
     systemPrompt: '',
   });
 
-  const { getNodes, getEdges, fitView } = useReactFlow();
   // State for drag and drop
   const [isDragging, setIsDragging] = useState(false);
   const [draggedItem, setDraggedItem] = useState(null);
@@ -904,6 +953,10 @@ function PipelineBuilderInner() {
   const [isAddingToBlock, setIsAddingToBlock] = useState(false);
   const [draggingNodeId, setDraggingNodeId] = useState(null);
   const [highlightedBlockId, setHighlightedBlockId] = useState(null);
+
+  // State for contextual auto-layout
+  const [selectionBounds, setSelectionBounds] = useState(null);
+  // Format: { x, y, width, height, selectedNodeIds: [] }
   const [extractingChild, setExtractingChild] = useState(null); // { blockId, childNodeId, childNode }
 
   // State for right sidebar to show output node data
@@ -1062,8 +1115,14 @@ function PipelineBuilderInner() {
 
   // Track connection drag to toggle .connecting class (shows handles on all nodes)
   const [isConnecting, setIsConnecting] = useState(false);
-  const onConnectStart = useCallback(() => setIsConnecting(true), []);
-  const onConnectEnd = useCallback(() => setIsConnecting(false), []);
+  const onConnectStart = useCallback((event, params) => {
+    console.log('[onConnectStart] 🔵 Connection drag started!', params);
+    setIsConnecting(true);
+  }, []);
+  const onConnectEnd = useCallback((event) => {
+    console.log('[onConnectEnd] 🔴 Connection drag ended!');
+    setIsConnecting(false);
+  }, []);
 
   // Config panel is shown only on double-click (see handleNodeDoubleClick)
   // Single click just selects the node for moving/deleting
@@ -1372,6 +1431,22 @@ function PipelineBuilderInner() {
 
     const failures = results.filter(r => r.status === 'rejected' || !r.value?.success);
 
+    // Clear parentId relationships for successfully deleted edges
+    console.log('[onEdgesDelete] ✨ Clearing parentId relationships...');
+    await Promise.allSettled(
+      edgesToDelete.map(async (edge) => {
+        try {
+          // Clear parentId of the target node to break parent-child relationship
+          await nodeApi.update(edge.target, {
+            parentId: null,
+          });
+          console.log(`[onEdgesDelete] ✨ Cleared parentId for node ${edge.target}`);
+        } catch (error) {
+          console.error(`[onEdgesDelete] Failed to clear parentId for node ${edge.target}:`, error);
+        }
+      })
+    );
+
     // Refetch to get updated data
     console.log('[onEdgesDelete] ✨ Edge deletion complete, refetching...');
     await refetchHorizon();
@@ -1440,123 +1515,96 @@ function PipelineBuilderInner() {
   }, [getNodes, id, refetchHorizon]);
 
   // Auto-layout: layer-based grid layout — each node gets a grid cell
-  const handleAutoLayout = useCallback(() => {
+  const handleAutoLayout = useCallback((selectedNodeIds = null) => {
     const currentNodes = getNodes();
     const currentEdges = getEdges();
-    if (currentNodes.length === 0) return;
 
-    // Separate connected vs disconnected
-    const connectedIds = new Set();
-    currentEdges.forEach(e => { connectedIds.add(e.source); connectedIds.add(e.target); });
+    // Determine which nodes to layout
+    const nodesToLayout = selectedNodeIds
+      ? currentNodes.filter(n => selectedNodeIds.includes(n.id))
+      : currentNodes;
 
-    // Build adjacency
-    const childrenOf = {};
-    const parentsOf = {};
-    currentEdges.forEach(e => {
-      if (connectedIds.has(e.source) && connectedIds.has(e.target)) {
-        if (!childrenOf[e.source]) childrenOf[e.source] = [];
-        if (!childrenOf[e.source].includes(e.target)) childrenOf[e.source].push(e.target);
-        if (!parentsOf[e.target]) parentsOf[e.target] = [];
-        if (!parentsOf[e.target].includes(e.source)) parentsOf[e.target].push(e.source);
+    if (nodesToLayout.length === 0) return;
+
+    // Build graph for dagre (only using edges between selected nodes)
+    const g = new dagre.graphlib.Graph();
+    g.setGraph({
+      rankdir: 'TB', // Top to bottom
+      nodesep: 80,
+      ranksep: 120,
+      marginx: 50,
+      marginy: 50
+    });
+    g.setDefaultEdgeLabel(() => ({}));
+
+    // Add nodes to dagre
+    nodesToLayout.forEach(node => {
+      const width = node.width || node.data?.width || 240;
+      const height = node.height || node.data?.height || 120;
+      g.setNode(node.id, { width, height });
+    });
+
+    // Add edges (only between nodes in the layout set)
+    const nodeIdSet = new Set(nodesToLayout.map(n => n.id));
+    currentEdges.forEach(edge => {
+      if (nodeIdSet.has(edge.source) && nodeIdSet.has(edge.target)) {
+        g.setEdge(edge.source, edge.target);
       }
     });
 
-    // Find roots
-    const roots = [...connectedIds].filter(id => !parentsOf[id] || parentsOf[id].length === 0);
-    if (roots.length === 0 && connectedIds.size > 0) roots.push([...connectedIds][0]);
+    // Run dagre layout
+    dagre.layout(g);
 
-    // Assign layers via longest path
-    const layers = {};
-    function assignLayer(nodeId, layer) {
-      if (layers[nodeId] !== undefined && layers[nodeId] >= layer) return;
-      layers[nodeId] = layer;
-      (childrenOf[nodeId] || []).forEach(cid => assignLayer(cid, layer + 1));
-    }
-    roots.forEach(r => assignLayer(r, 0));
-    connectedIds.forEach(id => { if (layers[id] === undefined) layers[id] = 0; });
+    // If this is a selection layout, calculate offset to keep selection in place
+    let offsetX = 0, offsetY = 0;
+    if (selectedNodeIds && selectionBounds) {
+      // Calculate the bounding box of the new layout
+      const layoutNodes = nodesToLayout.map(node => g.node(node.id));
+      const minX = Math.min(...layoutNodes.map(n => n.x - n.width / 2));
+      const minY = Math.min(...layoutNodes.map(n => n.y - n.height / 2));
 
-    // Group by layer and sort by barycenter (parent Y average)
-    const layerGroups = {};
-    connectedIds.forEach(id => {
-      const l = layers[id];
-      if (!layerGroups[l]) layerGroups[l] = [];
-      layerGroups[l].push(id);
-    });
-    const maxLayer = Math.max(...Object.values(layers), 0);
-
-    // Assign grid positions: layer → column, order within layer → row
-    const positions = {};
-    for (let l = 0; l <= maxLayer; l++) {
-      const ids = layerGroups[l] || [];
-      ids.forEach((id, index) => {
-        positions[id] = layoutGridToPosition(l, index);
-      });
-    }
-
-    // Barycenter reordering: 4 passes forward + backward to minimize crossings
-    for (let pass = 0; pass < 4; pass++) {
-      for (let l = 1; l <= maxLayer; l++) {
-        const ids = [...(layerGroups[l] || [])];
-        const bary = {};
-        ids.forEach(id => {
-          const pars = (parentsOf[id] || []).filter(p => positions[p]);
-          bary[id] = pars.length > 0
-            ? pars.reduce((s, p) => s + positions[p].y, 0) / pars.length
-            : positions[id].y;
-        });
-        ids.sort((a, b) => bary[a] - bary[b]);
-        ids.forEach((id, index) => { positions[id] = layoutGridToPosition(l, index); });
-        layerGroups[l] = ids;
-      }
-      for (let l = maxLayer - 1; l >= 0; l--) {
-        const ids = [...(layerGroups[l] || [])];
-        const bary = {};
-        ids.forEach(id => {
-          const kids = (childrenOf[id] || []).filter(k => positions[k]);
-          bary[id] = kids.length > 0
-            ? kids.reduce((s, k) => s + positions[k].y, 0) / kids.length
-            : positions[id].y;
-        });
-        ids.sort((a, b) => bary[a] - bary[b]);
-        ids.forEach((id, index) => { positions[id] = layoutGridToPosition(l, index); });
-        layerGroups[l] = ids;
-      }
+      // Offset to keep selection roughly in same position
+      offsetX = selectionBounds.x - minX;
+      offsetY = selectionBounds.y - minY;
     }
 
-    // Find max row index used by connected nodes
-    let maxRow = 0;
-    connectedIds.forEach(id => {
-      if (positions[id]) {
-        const row = Math.round(positions[id].y / LAYOUT_ROW_SPACING);
-        if (row > maxRow) maxRow = row;
+    // Apply new positions
+    const updatedNodes = currentNodes.map(node => {
+      if (!nodeIdSet.has(node.id)) return node; // Keep non-selected nodes unchanged
+
+      const dagreNode = g.node(node.id);
+      return {
+        ...node,
+        position: {
+          x: dagreNode.x - dagreNode.width / 2 + offsetX,
+          y: dagreNode.y - dagreNode.height / 2 + offsetY
+        }
+      };
+    });
+
+    setNodes(updatedNodes);
+
+    // Save positions to backend
+    updatedNodes.forEach(async (node) => {
+      if (nodeIdSet.has(node.id)) {
+        try {
+          await nodeApi.update(node.id, {
+            position: node.position
+          });
+        } catch (error) {
+          console.error(`Failed to save position for node ${node.id}:`, error);
+        }
       }
     });
 
-    // Apply positions to connected nodes
-    const finalNodes = currentNodes.map(node => {
-      if (connectedIds.has(node.id) && positions[node.id]) {
-        return { ...node, position: positions[node.id] };
-      }
-      return node;
+    toast({
+      title: 'Layout applied',
+      description: `Organized ${nodesToLayout.length} node(s)`,
+      status: 'success',
+      duration: 2000,
+      isClosable: true,
     });
-
-    // Disconnected nodes placed in row below main tree, each in its own column
-    let dcCol = 0;
-    const result = finalNodes.map(node => {
-      if (!connectedIds.has(node.id)) {
-        const pos = layoutGridToPosition(dcCol, maxRow + 1);
-        dcCol++;
-        return { ...node, position: pos };
-      }
-      return node;
-    });
-
-    setNodes(result);
-    result.forEach(node => {
-      nodeApi.update(node.id, { position: node.position }).catch(() => {});
-    });
-    // Camera stays in place - no automatic fitView after layout
-  }, [getNodes, getEdges, setNodes]);
+  }, [getNodes, getEdges, setNodes, selectionBounds, toast]);
 
   // Check if two nodes overlap based on position and size
   const checkNodeOverlap = useCallback((node1, node2) => {
@@ -3692,6 +3740,7 @@ function PipelineBuilderInner() {
             }}
             connectionLineType="smoothstep"
             connectionLineStyle={{ strokeWidth: 3, stroke: '#4299e1' }}
+            connectionRadius={80}
             defaultViewport={{ x: 0, y: 0, zoom: 0.9 }}
             minZoom={0.1}
             maxZoom={2}
@@ -3713,19 +3762,43 @@ function PipelineBuilderInner() {
             <MiniMap position='bottom-left'/>
             <Background variant="dots" gap={GRID_SIZE} size={4} color="rgba(0,0,0,0.5)" />
 
+            {/* Contextual Auto-Layout Button - appears on selection */}
+            {selectionBounds && selectionBounds.selectedNodeIds.length >= 2 && (() => {
+              // Convert canvas coordinates to screen coordinates using reactive viewport
+              const screenX = (selectionBounds.x + selectionBounds.width) * viewport.zoom + viewport.x + 20;
+              const screenY = selectionBounds.y * viewport.zoom + viewport.y - 40;
+
+              return (
+                <Box
+                  position="absolute"
+                  left={`${screenX}px`}
+                  top={`${screenY}px`}
+                  zIndex={1000}
+                  pointerEvents="auto"
+                  transform={`scale(${viewport.zoom})`}
+                  transformOrigin="left top"
+                  transition="transform 0.2s"
+                >
+                  <Tooltip label="Auto-layout selected nodes" placement="left" hasArrow>
+                    <IconButton
+                      icon={<Icon as={MdAccountTree} />}
+                      size="md"
+                      colorScheme="purple"
+                      variant="solid"
+                      aria-label="Auto-layout selection"
+                      onClick={() => handleAutoLayout(selectionBounds.selectedNodeIds)}
+                      boxShadow="xl"
+                      _hover={{ transform: 'scale(1.05)' }}
+                      transition="all 0.2s"
+                    />
+                  </Tooltip>
+                </Box>
+              );
+            })()}
+
             <Panel position="top-right">
               <HStack spacing={2}>
-                <Tooltip label="Auto Layout" placement="left" hasArrow>
-                  <IconButton
-                    icon={<Icon as={MdAccountTree} />}
-                    size="md"
-                    colorScheme="purple"
-                    variant="solid"
-                    aria-label="Auto layout"
-                    onClick={handleAutoLayout}
-                    boxShadow="lg"
-                  />
-                </Tooltip>
+                {/* Auto-layout button removed - will be shown contextually on node selection */}
                 <Tooltip label="Back to Horizons" placement="left" hasArrow>
                   <IconButton
                     icon={<Icon as={MdHome} />}

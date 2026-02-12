@@ -10,7 +10,7 @@ export const MAX_NODE_WIDTH = 480;
 export const MAX_NODE_HEIGHT = 360;
 
 // ── Auto-layout spacing (independent of visual grid) ─────────────────────────
-export const LAYOUT_COL_SPACING = 320;
+export const LAYOUT_COL_SPACING = 100; // Reduced for closer node spacing
 export const LAYOUT_ROW_SPACING = 200;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

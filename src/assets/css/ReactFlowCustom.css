@@ -38,21 +38,39 @@
   cursor: crosshair;
 }
 
-/* Position handles with spacing from node edges */
-.react-flow__handle.react-flow__handle-top {
-  top: -16px;
+/* Position handles OUTSIDE node edges - well separated from borders */
+/* Target handles: inner ring (for receiving connections) */
+.react-flow__handle.react-flow__handle-top[type="target"] {
+  top: -30px !important;
 }
 
-.react-flow__handle.react-flow__handle-right {
-  right: -16px;
+.react-flow__handle.react-flow__handle-right[type="target"] {
+  right: -30px !important;
 }
 
-.react-flow__handle.react-flow__handle-bottom {
-  bottom: -16px;
+.react-flow__handle.react-flow__handle-bottom[type="target"] {
+  bottom: -30px !important;
 }
 
-.react-flow__handle.react-flow__handle-left {
-  left: -16px;
+.react-flow__handle.react-flow__handle-left[type="target"] {
+  left: -30px !important;
+}
+
+/* Source handles: outer ring (for starting connections) */
+.react-flow__handle.react-flow__handle-top[type="source"] {
+  top: -42px !important;
+}
+
+.react-flow__handle.react-flow__handle-right[type="source"] {
+  right: -42px !important;
+}
+
+.react-flow__handle.react-flow__handle-bottom[type="source"] {
+  bottom: -42px !important;
+}
+
+.react-flow__handle.react-flow__handle-left[type="source"] {
+  left: -42px !important;
 }
 
 /* Show handles when node is selected */
@@ -63,6 +81,37 @@
 /* Show handles when hovering over node */
 .react-flow__node:hover .react-flow__handle {
   opacity: 1;
+}
+
+/* Show handles when actively connecting (dragging connection line) */
+.react-flow.connecting .react-flow__handle {
+  opacity: 1 !important;
+  pointer-events: all !important;
+  display: block !important;
+  visibility: visible !important;
+}
+
+/* Keep pointer events enabled for all handles so they can receive connections */
+.react-flow__handle {
+  pointer-events: all !important;
+}
+
+/* Manage z-index for bidirectional handles (source on top so you can start connections) */
+.react-flow__handle[type="source"] {
+  z-index: 2;
+}
+
+.react-flow__handle[type="target"] {
+  z-index: 1;
+}
+
+/* FLIP z-index during connection drag: target on top so you can release on them! */
+.react-flow.connecting .react-flow__handle[type="source"] {
+  z-index: 1;
+}
+
+.react-flow.connecting .react-flow__handle[type="target"] {
+  z-index: 2;
 }
 
 .react-flow__handle:hover {
@@ -146,15 +195,17 @@
 /* Invisible hover zone near the right edge of the node to reveal "+" button */
 .add-node-zone {
   position: absolute;
-  right: -50px;
+  right: -80px; /* Moved further right to avoid overlapping handle at -28px */
   top: 0;
   bottom: 0;
   width: 60px;
   z-index: 9;
+  pointer-events: none; /* Don't block clicks on handles */
 }
 .add-node-zone .add-node-btn {
   opacity: 0;
   transition: opacity 0.2s;
+  pointer-events: all; /* But the button itself is still clickable */
 }
 .add-node-zone:hover .add-node-btn,
 .add-node-zone .add-node-btn--open {
