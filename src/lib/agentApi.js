@@ -449,6 +449,7 @@ export const runAgent = async (agentType, inputData, customAgentConfig = null, e
 // ===== Helper Function =====
 
 export const getAgentInputData = (node, edges, nodes) => {
+  console.log(node)
   console.log('[getAgentInputData] Node ID:', node.id);
   console.log('[getAgentInputData] Total edges:', edges.length);
   console.log('[getAgentInputData] All edges:', edges);

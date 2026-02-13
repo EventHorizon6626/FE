@@ -4,16 +4,16 @@ import { runAgent, getAgentInputData,
   //  runCustomAgentApi
    } from 'lib/agentApi';
 import nodeApi from 'lib/nodeApi';
-import { horizonAgentApi } from 'lib/horizonAgentApi';
+// import { horizonAgentApi } from 'lib/horizonAgentApi';
 
-const STANDARD_AGENT_DETAILS = {
-  candlestick: { name: 'Candlestick', color: 'blue', description: 'OHLCV price data — open, high, low, close, volume for each trading day' },
-  earnings:    { name: 'Earnings', color: 'green', description: 'Financial reports, quarterly earnings, EPS history, revenue data' },
-  news:        { name: 'News', color: 'orange', description: 'Recent news articles, headlines, and press releases' },
-  technical:   { name: 'Technical', color: 'purple', description: 'Technical indicators — SMA, RSI, MACD, Bollinger Bands' },
-  fundamentals:{ name: 'Fundamentals', color: 'teal', description: 'Fundamental metrics — P/E ratio, EPS, dividend yield, market cap' },
-  web_search:  { name: 'Web Search', color: 'cyan', description: 'Web search for sentiment, analyst ratings, industry context' },
-};
+// const STANDARD_AGENT_DETAILS = {
+//   candlestick: { name: 'Candlestick', color: 'blue', description: 'OHLCV price data — open, high, low, close, volume for each trading day' },
+//   earnings:    { name: 'Earnings', color: 'green', description: 'Financial reports, quarterly earnings, EPS history, revenue data' },
+//   news:        { name: 'News', color: 'orange', description: 'Recent news articles, headlines, and press releases' },
+//   technical:   { name: 'Technical', color: 'purple', description: 'Technical indicators — SMA, RSI, MACD, Bollinger Bands' },
+//   fundamentals:{ name: 'Fundamentals', color: 'teal', description: 'Fundamental metrics — P/E ratio, EPS, dividend yield, market cap' },
+//   web_search:  { name: 'Web Search', color: 'cyan', description: 'Web search for sentiment, analyst ratings, industry context' },
+// };
 
 export const useRunAgent = ({
   onSuccess,
@@ -41,89 +41,89 @@ export const useRunAgent = ({
   };
 
   // Traverse edges backward to find the connected portfolio node
-  const findConnectedPortfolio = (nodeId, edges, nodes) => {
-    const incomingEdges = edges.filter(e => e.target === nodeId);
-    for (const edge of incomingEdges) {
-      const sourceNode = nodes.find(n => n.id === edge.source);
-      if (!sourceNode) continue;
-      if (sourceNode.type === 'portfolioNode') return sourceNode;
-      // Recurse one level up (portfolio -> data agent -> custom agent)
-      const upstream = findConnectedPortfolio(sourceNode.id, edges, nodes);
-      if (upstream) return upstream;
-    }
-    return null;
-  };
+  // const findConnectedPortfolio = (nodeId, edges, nodes) => {
+  //   const incomingEdges = edges.filter(e => e.target === nodeId);
+  //   for (const edge of incomingEdges) {
+  //     const sourceNode = nodes.find(n => n.id === edge.source);
+  //     if (!sourceNode) continue;
+  //     if (sourceNode.type === 'portfolioNode') return sourceNode;
+  //     // Recurse one level up (portfolio -> data agent -> custom agent)
+  //     const upstream = findConnectedPortfolio(sourceNode.id, edges, nodes);
+  //     if (upstream) return upstream;
+  //   }
+  //   return null;
+  // };
 
   // Position data agents between portfolio and custom agent
-  const calculateDataAgentPosition = (customAgentNode, portfolioNode, index, total) => {
-    const midX = (portfolioNode.position.x + customAgentNode.position.x) / 2;
-    const spreadY = 120; // vertical spacing between data agents
-    const totalHeight = (total - 1) * spreadY;
-    const startY = customAgentNode.position.y - totalHeight / 2;
-    return {
-      x: midX,
-      y: startY + index * spreadY,
-    };
-  };
+  // const calculateDataAgentPosition = (customAgentNode, portfolioNode, index, total) => {
+  //   const midX = (portfolioNode.position.x + customAgentNode.position.x) / 2;
+  //   const spreadY = 120; // vertical spacing between data agents
+  //   const totalHeight = (total - 1) * spreadY;
+  //   const startY = customAgentNode.position.y - totalHeight / 2;
+  //   return {
+  //     x: midX,
+  //     y: startY + index * spreadY,
+  //   };
+  // };
 
   // Create a data agent node via API and add to canvas
-  const createDataAgentNode = async ({ agentSpec, portfolioNode, customAgentNode, index, total }) => {
-    const position = calculateDataAgentPosition(customAgentNode, portfolioNode, index, total);
+  // const createDataAgentNode = async ({ agentSpec, portfolioNode, customAgentNode, index, total }) => {
+  //   const position = calculateDataAgentPosition(customAgentNode, portfolioNode, index, total);
 
-    // Standard EH pipeline agents use their tool name as type (candlestick, earnings, etc.)
-    // Custom/exotic agents use 'custom_agent' type
-    const isStandard = agentSpec.source === 'eh_pipeline';
-    const details = isStandard ? STANDARD_AGENT_DETAILS[agentSpec.name] : null;
-    const agentType = isStandard ? agentSpec.name : 'custom_agent';
+  //   // Standard EH pipeline agents use their tool name as type (candlestick, earnings, etc.)
+  //   // Custom/exotic agents use 'custom_agent' type
+  //   const isStandard = agentSpec.source === 'eh_pipeline';
+  //   const details = isStandard ? STANDARD_AGENT_DETAILS[agentSpec.name] : null;
+  //   const agentType = isStandard ? agentSpec.name : 'custom_agent';
 
-    const agentData = {
-      name: details?.name || agentSpec.name,
-      type: agentType,
-      system: 'data',
-      description: details?.description || agentSpec.description || `Data agent: ${agentSpec.name}`,
-      color: details?.color || (isStandard ? 'blue' : 'purple'),
-      isAutoCreated: true,
-      isBuiltin: isStandard,
-    };
+  //   const agentData = {
+  //     name: details?.name || agentSpec.name,
+  //     type: agentType,
+  //     system: 'data',
+  //     description: details?.description || agentSpec.description || `Data agent: ${agentSpec.name}`,
+  //     color: details?.color || (isStandard ? 'blue' : 'purple'),
+  //     isAutoCreated: true,
+  //     isBuiltin: isStandard,
+  //   };
 
-    // Standard built-in agents: DON'T set systemPrompt.
-    // Their execution routes to dedicated endpoints, not the custom/thinking path.
-    // A systemPrompt here would cause runAgent() to misroute them to /agents/custom.
-    if (isStandard && details) {
-      agentData.description = `Built-in ${details.name} pipeline — ${details.description.toLowerCase()}`;
-    }
+  //   // Standard built-in agents: DON'T set systemPrompt.
+  //   // Their execution routes to dedicated endpoints, not the custom/thinking path.
+  //   // A systemPrompt here would cause runAgent() to misroute them to /agents/custom.
+  //   if (isStandard && details) {
+  //     agentData.description = `Built-in ${details.name} pipeline — ${details.description.toLowerCase()}`;
+  //   }
 
-    // Exotic agents: use the LLM-generated system prompt from EH
-    if (agentSpec.system_prompt) {
-      agentData.systemPrompt = agentSpec.system_prompt;
-    }
+  //   // Exotic agents: use the LLM-generated system prompt from EH
+  //   if (agentSpec.system_prompt) {
+  //     agentData.systemPrompt = agentSpec.system_prompt;
+  //   }
 
-    // Save to DB via nodeApi — include parentId so buildEdgesFromNodes() generates edges on refetch
-    const response = await nodeApi.create({
-      horizonId,
-      type: 'agentNode',
-      position,
-      data: { agent: agentData },
-      parentId: portfolioNode.id,
-    });
+  //   // Save to DB via nodeApi — include parentId so buildEdgesFromNodes() generates edges on refetch
+  //   const response = await nodeApi.create({
+  //     horizonId,
+  //     type: 'agentNode',
+  //     position,
+  //     data: { agent: agentData },
+  //     parentId: portfolioNode.id,
+  //   });
 
-    const savedNode = response.data || response;
-    const nodeId = savedNode.id || savedNode._id;
+  //   const savedNode = response.data || response;
+  //   const nodeId = savedNode.id || savedNode._id;
 
-    // Build ReactFlow node for the canvas
-    const reactFlowNode = {
-      id: nodeId,
-      type: 'agentNode',
-      position,
-      data: {
-        agent: agentData,
-        horizonId,
-        refetchHorizon,
-      },
-    };
+  //   // Build ReactFlow node for the canvas
+  //   const reactFlowNode = {
+  //     id: nodeId,
+  //     type: 'agentNode',
+  //     position,
+  //     data: {
+  //       agent: agentData,
+  //       horizonId,
+  //       refetchHorizon,
+  //     },
+  //   };
 
-    return { reactFlowNode, nodeId, agentSpec };
-  };
+  //   return { reactFlowNode, nodeId, agentSpec };
+  // };
 
   // Execute a data agent — route standard EH pipeline agents to their endpoints,
   // custom/exotic agents to the custom agent endpoint
@@ -145,147 +145,147 @@ export const useRunAgent = ({
   // };
 
   // Main orchestrator: create agents, execute them, re-run custom agent
-  const handleNeedsData = async ({ customAgentNodeId, requiredAgents, currentNodes, currentEdges, node, agentName, agentType }) => {
-    const portfolioNode = findConnectedPortfolio(customAgentNodeId, currentEdges, currentNodes);
-    if (!portfolioNode) {
-      toast({
-        title: 'Cannot auto-create data agents',
-        description: 'No portfolio node connected. Please connect a portfolio to this agent.',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
-      return;
-    }
+  // const handleNeedsData = async ({ customAgentNodeId, requiredAgents, currentNodes, currentEdges, node, agentName, agentType }) => {
+  //   const portfolioNode = findConnectedPortfolio(customAgentNodeId, currentEdges, currentNodes);
+  //   if (!portfolioNode) {
+  //     toast({
+  //       title: 'Cannot auto-create data agents',
+  //       description: 'No portfolio node connected. Please connect a portfolio to this agent.',
+  //       status: 'error',
+  //       duration: 5000,
+  //       isClosable: true,
+  //     });
+  //     return;
+  //   }
 
-    const stocks = portfolioNode.data.portfolio?.stocks || [];
-    if (stocks.length === 0) {
-      toast({
-        title: 'Cannot auto-create data agents',
-        description: 'Connected portfolio has no stocks. Please add stocks to the portfolio.',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
-      return;
-    }
+  //   const stocks = portfolioNode.data.portfolio?.stocks || [];
+  //   if (stocks.length === 0) {
+  //     toast({
+  //       title: 'Cannot auto-create data agents',
+  //       description: 'Connected portfolio has no stocks. Please add stocks to the portfolio.',
+  //       status: 'error',
+  //       duration: 5000,
+  //       isClosable: true,
+  //     });
+  //     return;
+  //   }
 
-    const customAgentNode = currentNodes.find(n => n.id === customAgentNodeId);
-    if (!customAgentNode) return;
+  //   const customAgentNode = currentNodes.find(n => n.id === customAgentNodeId);
+  //   if (!customAgentNode) return;
 
-    toast({
-      title: 'Auto-creating data agents',
-      description: `Creating ${requiredAgents.length} data agent(s) for missing data...`,
-      status: 'info',
-      duration: 3000,
-      isClosable: true,
-    });
+  //   toast({
+  //     title: 'Auto-creating data agents',
+  //     description: `Creating ${requiredAgents.length} data agent(s) for missing data...`,
+  //     status: 'info',
+  //     duration: 3000,
+  //     isClosable: true,
+  //   });
 
-    // 1. Create data agent nodes
-    const createdAgents = [];
-    for (let i = 0; i < requiredAgents.length; i++) {
-      try {
-        const created = await createDataAgentNode({
-          agentSpec: requiredAgents[i],
-          portfolioNode,
-          customAgentNode,
-          index: i,
-          total: requiredAgents.length,
-        });
-        createdAgents.push(created);
-      } catch (err) {
-        console.error(`[useRunAgent] Failed to create data agent node:`, err);
-        toast({
-          title: 'Failed to create data agent',
-          description: err.message,
-          status: 'error',
-          duration: 5000,
-          isClosable: true,
-        });
-        return;
-      }
-    }
+  //   // 1. Create data agent nodes
+  //   const createdAgents = [];
+  //   for (let i = 0; i < requiredAgents.length; i++) {
+  //     try {
+  //       const created = await createDataAgentNode({
+  //         agentSpec: requiredAgents[i],
+  //         portfolioNode,
+  //         customAgentNode,
+  //         index: i,
+  //         total: requiredAgents.length,
+  //       });
+  //       createdAgents.push(created);
+  //     } catch (err) {
+  //       console.error(`[useRunAgent] Failed to create data agent node:`, err);
+  //       toast({
+  //         title: 'Failed to create data agent',
+  //         description: err.message,
+  //         status: 'error',
+  //         duration: 5000,
+  //         isClosable: true,
+  //       });
+  //       return;
+  //     }
+  //   }
 
-    // 1b. Persist exotic agents to the agent library
-    // Uses the SAME system_prompt from EH's generate_data_agent_prompt()
-    for (const agent of createdAgents) {
-      if (agent.agentSpec.source !== 'eh_pipeline' && agent.agentSpec.system_prompt) {
-        try {
-          await horizonAgentApi.create(horizonId, {
-            name: agent.agentSpec.name,
-            description: agent.agentSpec.description || `Data agent: ${agent.agentSpec.name}`,
-            type: 'custom_agent',
-            system: 'data',
-            category: 'data_retriever',
-            systemPrompt: agent.agentSpec.system_prompt,
-            icon: 'MdSmartToy',
-            color: 'purple',
-            isBuiltin: false,
-            config: {
-              dataType: agent.agentSpec.data_type || 'specialized data',
-              source: 'web_search',
-              autoCreated: true,
-            },
-          });
-        } catch (err) {
-          console.warn(`[useRunAgent] Failed to save exotic agent to library:`, err.message);
-        }
-      }
-    }
+  //   // 1b. Persist exotic agents to the agent library
+  //   // Uses the SAME system_prompt from EH's generate_data_agent_prompt()
+  //   for (const agent of createdAgents) {
+  //     if (agent.agentSpec.source !== 'eh_pipeline' && agent.agentSpec.system_prompt) {
+  //       try {
+  //         await horizonAgentApi.create(horizonId, {
+  //           name: agent.agentSpec.name,
+  //           description: agent.agentSpec.description || `Data agent: ${agent.agentSpec.name}`,
+  //           type: 'custom_agent',
+  //           system: 'data',
+  //           category: 'data_retriever',
+  //           systemPrompt: agent.agentSpec.system_prompt,
+  //           icon: 'MdSmartToy',
+  //           color: 'purple',
+  //           isBuiltin: false,
+  //           config: {
+  //             dataType: agent.agentSpec.data_type || 'specialized data',
+  //             source: 'web_search',
+  //             autoCreated: true,
+  //           },
+  //         });
+  //       } catch (err) {
+  //         console.warn(`[useRunAgent] Failed to save exotic agent to library:`, err.message);
+  //       }
+  //     }
+  //   }
 
-    // 2. Add nodes + edges to canvas
-    const newNodes = createdAgents.map(a => a.reactFlowNode);
-    const newEdges = [];
+  //   // 2. Add nodes + edges to canvas
+  //   const newNodes = createdAgents.map(a => a.reactFlowNode);
+  //   const newEdges = [];
 
-    for (const agent of createdAgents) {
-      // Edge: portfolio -> data agent
-      newEdges.push({
-        id: `edge-${portfolioNode.id}-${agent.nodeId}`,
-        source: portfolioNode.id,
-        target: agent.nodeId,
-        type: 'custom',
-        animated: true,
-        data: { output: null },
-      });
-      // Edge: data agent -> custom agent
-      newEdges.push({
-        id: `edge-${agent.nodeId}-${customAgentNodeId}`,
-        source: agent.nodeId,
-        target: customAgentNodeId,
-        type: 'custom',
-        animated: true,
-        data: { output: null },
-      });
-    }
+  //   for (const agent of createdAgents) {
+  //     // Edge: portfolio -> data agent
+  //     newEdges.push({
+  //       id: `edge-${portfolioNode.id}-${agent.nodeId}`,
+  //       source: portfolioNode.id,
+  //       target: agent.nodeId,
+  //       type: 'custom',
+  //       animated: true,
+  //       data: { output: null },
+  //     });
+  //     // Edge: data agent -> custom agent
+  //     newEdges.push({
+  //       id: `edge-${agent.nodeId}-${customAgentNodeId}`,
+  //       source: agent.nodeId,
+  //       target: customAgentNodeId,
+  //       type: 'custom',
+  //       animated: true,
+  //       data: { output: null },
+  //     });
+  //   }
 
-    setNodes(nds => [...nds, ...newNodes]);
-    // Remove old portfolio→analyzer direct edge, add new edges through data agents
-    setEdges(eds => [
-      ...eds.filter(e => !(e.source === portfolioNode.id && e.target === customAgentNodeId)),
-      ...newEdges,
-    ]);
+  //   setNodes(nds => [...nds, ...newNodes]);
+  //   // Remove old portfolio→analyzer direct edge, add new edges through data agents
+  //   setEdges(eds => [
+  //     ...eds.filter(e => !(e.source === portfolioNode.id && e.target === customAgentNodeId)),
+  //     ...newEdges,
+  //   ]);
 
-    // Persist data agent → custom agent relationship for edge reconstruction on reload
-    const dataAgentNodeIds = createdAgents.map(a => a.nodeId);
-    try {
-      await nodeApi.update(customAgentNodeId, {
-        inputNodeIds: dataAgentNodeIds,
-        parentId: null,  // Remove direct portfolio→analyzer link so buildEdgesFromNodes() won't recreate it
-      });
-    } catch (err) {
-      console.warn('[useRunAgent] Failed to persist inputNodeIds:', err.message);
-    }
+  //   // Persist data agent → custom agent relationship for edge reconstruction on reload
+  //   const dataAgentNodeIds = createdAgents.map(a => a.nodeId);
+  //   try {
+  //     await nodeApi.update(customAgentNodeId, {
+  //       inputNodeIds: dataAgentNodeIds,
+  //       parentId: null,  // Remove direct portfolio→analyzer link so buildEdgesFromNodes() won't recreate it
+  //     });
+  //   } catch (err) {
+  //     console.warn('[useRunAgent] Failed to persist inputNodeIds:', err.message);
+  //   }
 
-    // Done — user will manually run each data agent, then re-run the analyzer
-    toast.closeAll();
-    toast({
-      title: 'Data agents created',
-      description: `${createdAgents.length} data agent(s) wired to ${agentName} — run them manually`,
-      status: 'success',
-      duration: 5000,
-      isClosable: true,
-    });
-  };
+  //   // Done — user will manually run each data agent, then re-run the analyzer
+  //   toast.closeAll();
+  //   toast({
+  //     title: 'Data agents created',
+  //     description: `${createdAgents.length} data agent(s) wired to ${agentName} — run them manually`,
+  //     status: 'success',
+  //     duration: 5000,
+  //     isClosable: true,
+  //   });
+  // };
 
   // Backward-cascade: recursively run unexecuted upstream agents depth-first
   const ensureUpstreamData = async (nodeId, edges, nodes, visited) => {
@@ -369,19 +369,19 @@ export const useRunAgent = ({
       }
 
       // Mutate the local nodes array so subsequent getAgentInputData calls see the output
-      nodes[srcIdx] = {
-        ...srcNode,
-        data: { ...srcNode.data, output: srcResult, lastRun: new Date().toISOString() },
-      };
+      // nodes[srcIdx] = {
+      //   ...srcNode,
+      //   data: { ...srcNode.data, output: srcResult, lastRun: new Date().toISOString() },
+      // };
 
-      // Push to React state so the canvas updates
-      setNodes(nds =>
-        nds.map(n =>
-          n.id === srcNode.id
-            ? { ...n, data: { ...n.data, output: srcResult, lastRun: new Date().toISOString() } }
-            : n
-        )
-      );
+      // // Push to React state so the canvas updates
+      // setNodes(nds =>
+      //   nds.map(n =>
+      //     n.id === srcNode.id
+      //       ? { ...n, data: { ...n.data, output: srcResult, lastRun: new Date().toISOString() } }
+      //       : n
+      //   )
+      // );
 
       // Handle _outputNode from backend (same logic as onSuccess)
       // Skip output node creation if this data agent is wired to an analyzer
@@ -400,58 +400,58 @@ export const useRunAgent = ({
         step4_willCreateOutput: !!savedOutputNode && !isWiredCascade,
       });
 
-      if (savedOutputNode && !isWiredCascade) {
-        console.log('[useRunAgent] ✅ CREATING CASCADE OUTPUT NODE');
-        const agentPos = srcNode.position || { x: 0, y: 0 };
-        const newOutputNode = {
-          id: savedOutputNode.id,
-          type: 'outputNode',
-          position: { x: agentPos.x + 350, y: agentPos.y },
-          data: {
-            result: srcResult,
-            agentName: srcName,
-            timestamp: savedOutputNode.createdAt,
-            sourceAgentNodeId: srcNode.id,
-          },
-        };
+      // if (savedOutputNode && !isWiredCascade) {
+      //   console.log('[useRunAgent] ✅ CREATING CASCADE OUTPUT NODE');
+      //   const agentPos = srcNode.position || { x: 0, y: 0 };
+      //   const newOutputNode = {
+      //     id: savedOutputNode.id,
+      //     type: 'outputNode',
+      //     position: { x: agentPos.x + 350, y: agentPos.y },
+      //     data: {
+      //       result: srcResult,
+      //       agentName: srcName,
+      //       timestamp: savedOutputNode.createdAt,
+      //       sourceAgentNodeId: srcNode.id,
+      //     },
+      //   };
 
-        setNodes(nds => {
-          // Remove old output node for this agent if it exists
-          const filtered = nds.filter(n =>
-            !(n.type === 'outputNode' && n.data?.sourceAgentNodeId === srcNode.id)
-          );
-          return [...filtered, newOutputNode];
-        });
+      //   setNodes(nds => {
+      //     // Remove old output node for this agent if it exists
+      //     const filtered = nds.filter(n =>
+      //       !(n.type === 'outputNode' && n.data?.sourceAgentNodeId === srcNode.id)
+      //     );
+      //     return [...filtered, newOutputNode];
+      //   });
 
-        setEdges(eds => [
-          ...eds,
-          {
-            id: `edge-${srcNode.id}-${savedOutputNode.id}`,
-            source: srcNode.id,
-            target: savedOutputNode.id,
-            type: 'custom',
-            data: { output: srcResult },
-            animated: true,
-          },
-        ]);
+      //   setEdges(eds => [
+      //     ...eds,
+      //     {
+      //       id: `edge-${srcNode.id}-${savedOutputNode.id}`,
+      //       source: srcNode.id,
+      //       target: savedOutputNode.id,
+      //       type: 'custom',
+      //       data: { output: srcResult },
+      //       animated: true,
+      //     },
+      //   ]);
 
-        console.log('[useRunAgent] ✅ CASCADE OUTPUT NODE CREATED:', newOutputNode.id);
-      } else {
-        console.log('[useRunAgent] ❌ SKIPPING CASCADE OUTPUT NODE:',
-          !savedOutputNode
-            ? '❌ Backend did not return _outputNode in result'
-            : '❌ Agent is wired to analyzer (data flows to analyzer instead)'
-        );
-      }
+      //   console.log('[useRunAgent] ✅ CASCADE OUTPUT NODE CREATED:', newOutputNode.id);
+      // } else {
+      //   console.log('[useRunAgent] ❌ SKIPPING CASCADE OUTPUT NODE:',
+      //     !savedOutputNode
+      //       ? '❌ Backend did not return _outputNode in result'
+      //       : '❌ Agent is wired to analyzer (data flows to analyzer instead)'
+      //   );
+      // }
 
       // Update edges with animation for this agent's outgoing edges
-      setEdges(eds =>
-        eds.map(e =>
-          e.source === srcNode.id
-            ? { ...e, data: { ...e.data, output: srcResult }, animated: true }
-            : e
-        )
-      );
+      // setEdges(eds =>
+      //   eds.map(e =>
+      //     e.source === srcNode.id
+      //       ? { ...e, data: { ...e.data, output: srcResult }, animated: true }
+      //       : e
+      //   )
+      // );
 
       // Persist output on the agent node for wired data agents (edge icon needs it on reload)
       if (isDataAgentWiredToAnalyzer(srcNode.id, edges, nodes)) {
@@ -464,6 +464,7 @@ export const useRunAgent = ({
         }
       }
     }
+    await refetchHorizon()
   };
 
   const mutation = useMutation({
@@ -608,66 +609,66 @@ export const useRunAgent = ({
       });
 
       // Check if agent needs data — auto-create flow
-      if (result.status === 'needs_data' && result.required_agents?.length > 0) {
-        console.log('[useRunAgent] Agent needs data, starting auto-create flow:', result.required_agents);
+      // if (result.status === 'needs_data' && result.required_agents?.length > 0) {
+      //   console.log('[useRunAgent] Agent needs data, starting auto-create flow:', result.required_agents);
 
-        toast({
-          title: 'Agent needs additional data',
-          description: `Auto-creating ${result.required_agents.length} data agent(s)...`,
-          status: 'info',
-          duration: 3000,
-          isClosable: true,
-        });
+      //   toast({
+      //     title: 'Agent needs additional data',
+      //     description: `Auto-creating ${result.required_agents.length} data agent(s)...`,
+      //     status: 'info',
+      //     duration: 3000,
+      //     isClosable: true,
+      //   });
 
-        // Update node to show it's in the auto-create flow
-        setNodes((nds) =>
-          nds.map((n) =>
-            n.id === nodeId
-              ? { ...n, data: { ...n.data, output: result, lastRun: new Date().toISOString() } }
-              : n
-          )
-        );
+      //   // Update node to show it's in the auto-create flow
+      //   setNodes((nds) =>
+      //     nds.map((n) =>
+      //       n.id === nodeId
+      //         ? { ...n, data: { ...n.data, output: result, lastRun: new Date().toISOString() } }
+      //         : n
+      //     )
+      //   );
 
-        await handleNeedsData({
-          customAgentNodeId: nodeId,
-          requiredAgents: result.required_agents,
-          currentNodes,
-          currentEdges,
-          node,
-          agentName,
-          agentType: node?.data?.agent?.type,
-        });
-        return;
-      }
+      //   await handleNeedsData({
+      //     customAgentNodeId: nodeId,
+      //     requiredAgents: result.required_agents,
+      //     currentNodes,
+      //     currentEdges,
+      //     node,
+      //     agentName,
+      //     agentType: node?.data?.agent?.type,
+      //   });
+      //   return;
+      // }
 
-      // Normal flow: update node with result
-      setNodes((nds) =>
-        nds.map((n) =>
-          n.id === nodeId
-            ? {
-                ...n,
-                data: {
-                  ...n.data,
-                  output: result,
-                  lastRun: new Date().toISOString(),
-                },
-              }
-            : n
-        )
-      );
+      // // Normal flow: update node with result
+      // setNodes((nds) =>
+      //   nds.map((n) =>
+      //     n.id === nodeId
+      //       ? {
+      //           ...n,
+      //           data: {
+      //             ...n.data,
+      //             output: result,
+      //             lastRun: new Date().toISOString(),
+      //           },
+      //         }
+      //       : n
+      //   )
+      // );
 
-      // Update edges with animation
-      setEdges((eds) =>
-        eds.map((edge) =>
-          edge.source === nodeId
-            ? {
-                ...edge,
-                data: { ...edge.data, output: result },
-                animated: true,
-              }
-            : edge
-        )
-      );
+      // // Update edges with animation
+      // setEdges((eds) =>
+      //   eds.map((edge) =>
+      //     edge.source === nodeId
+      //       ? {
+      //           ...edge,
+      //           data: { ...edge.data, output: result },
+      //           animated: true,
+      //         }
+      //       : edge
+      //   )
+      // );
 
       // Persist output on the agent node for wired data agents (edge icon needs it on reload)
       if (isDataAgentWiredToAnalyzer(nodeId, currentEdges, currentNodes)) {
@@ -726,53 +727,53 @@ export const useRunAgent = ({
         }
 
         // Add NEW outputNode to canvas (use id from backend)
-        const agentNodePosition = node?.position || { x: 0, y: 0 };
-        const newOutputNode = {
-          id: savedOutputNode.id, // Use backend _id
-          type: 'outputNode',
-          position: {
-            x: agentNodePosition.x + 350,
-            y: agentNodePosition.y,
-          },
-          data: {
-            result: result,
-            agentName: agentName,
-            timestamp: savedOutputNode.createdAt,
-            sourceAgentNodeId: nodeId,
-          },
-        };
+        // const agentNodePosition = node?.position || { x: 0, y: 0 };
+        // const newOutputNode = {
+        //   id: savedOutputNode.id, // Use backend _id
+        //   type: 'outputNode',
+        //   position: {
+        //     x: agentNodePosition.x + 350,
+        //     y: agentNodePosition.y,
+        //   },
+        //   data: {
+        //     result: result,
+        //     agentName: agentName,
+        //     timestamp: savedOutputNode.createdAt,
+        //     sourceAgentNodeId: nodeId,
+        //   },
+        // };
 
-        setNodes((nds) => [...nds, newOutputNode]);
+        // setNodes((nds) => [...nds, newOutputNode]);
 
-        // Create edge from agent to new output
-        const newOutputEdge = {
-          id: `edge-${nodeId}-${savedOutputNode.id}`,
-          source: nodeId,
-          target: savedOutputNode.id,
-          type: 'custom',
-          data: { output: result },
-          animated: true,
-        };
+        // // Create edge from agent to new output
+        // const newOutputEdge = {
+        //   id: `edge-${nodeId}-${savedOutputNode.id}`,
+        //   source: nodeId,
+        //   target: savedOutputNode.id,
+        //   type: 'custom',
+        //   data: { output: result },
+        //   animated: true,
+        // };
 
-        setEdges((eds) => [...eds, newOutputEdge]);
+        // setEdges((eds) => [...eds, newOutputEdge]);
 
-        // Update agentNode with current outputNodeId reference
-        setNodes((nds) =>
-          nds.map((n) =>
-            n.id === nodeId
-              ? {
-                  ...n,
-                  data: {
-                    ...n.data,
-                    currentOutputNodeId: savedOutputNode.id,
-                    lastExecutedAt: savedOutputNode.createdAt,
-                  },
-                }
-              : n
-          )
-        );
+        // // Update agentNode with current outputNodeId reference
+        // setNodes((nds) =>
+        //   nds.map((n) =>
+        //     n.id === nodeId
+        //       ? {
+        //           ...n,
+        //           data: {
+        //             ...n.data,
+        //             currentOutputNodeId: savedOutputNode.id,
+        //             lastExecutedAt: savedOutputNode.createdAt,
+        //           },
+        //         }
+        //       : n
+        //   )
+        // );
 
-        console.log('[useRunAgent] ✅ OUTPUT NODE CREATED:', newOutputNode.id);
+        // console.log('[useRunAgent] ✅ OUTPUT NODE CREATED:', newOutputNode.id);
       } else {
         console.log('[useRunAgent] ❌ SKIPPING OUTPUT NODE:',
           !savedOutputNode
