@@ -495,18 +495,18 @@ function CustomEdge({ id, source, target, sourceX, sourceY, targetX, targetY, so
           }}
         >
           {/* Routing mode toggle */}
-          {/* <IconButton
-            icon={<Icon as={routingMode === 'elbow' ? MdTrendingUp : MdAccountTree} boxSize="12px" />}
-            size="xs"
-            variant="ghost"
-            borderRadius="full"
-            aria-label="Toggle edge routing"
-            onClick={handleToggleRouting}
-            opacity={0.4}
-            minW="20px"
-            h="20px"
-            _hover={{ opacity: 1, bg: 'gray.100' }}
-          /> */}
+            {/* <IconButton
+              icon={<Icon as={routingMode === 'elbow' ? MdTrendingUp : MdAccountTree} boxSize="12px" />}
+              size="xs"
+              variant="ghost"
+              borderRadius="full"
+              aria-label="Toggle edge routing"
+              onClick={handleToggleRouting}
+              opacity={0.4}
+              minW="20px"
+              h="20px"
+              _hover={{ opacity: 1, bg: 'gray.100' }}
+            /> */}
           {isDataToAnalyzer && (
             <>
               <IconButton
