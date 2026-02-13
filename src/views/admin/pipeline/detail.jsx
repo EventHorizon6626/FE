@@ -5097,7 +5097,7 @@ function PipelineBuilderInner() {
             top="0"
             right="0"
             h="100%"
-            w="600px"
+            w="60vw"
             bg="white"
             boxShadow="2xl"
             zIndex="16"
@@ -5225,6 +5225,15 @@ function PipelineBuilderInner() {
                         borderColor={isActive ? "teal.400" : "gray.200"}
                         transition="all 0.2s"
                         position="relative"
+                        
+                          cursor="pointer"
+                        onClick={() => {
+                            setSelectedRevisionIndex(index);
+                            setSidebarView(SIDEBAR_VIEW.DETAIL);
+                          }}
+                        _hover={{ 
+                          opacity: 0.8,
+                        }}
                       >
                         <HStack justify="space-between" mb="8px">
                           <HStack spacing="8px">
@@ -5298,14 +5307,6 @@ function PipelineBuilderInner() {
                         <VStack 
                           align="start" 
                           spacing="4px"
-                          cursor="pointer"
-                          onClick={() => {
-                            setSelectedRevisionIndex(index);
-                            setSidebarView(SIDEBAR_VIEW.DETAIL);
-                          }}
-                          _hover={{ 
-                            opacity: 0.8,
-                          }}
                         >
                           <Text fontSize="xs" color="gray.600">
                             📅 {new Date(timestamp).toLocaleString()}
@@ -5520,9 +5521,9 @@ function PipelineBuilderInner() {
                                   <Text fontWeight="700" fontSize="md">{symbol}</Text>
                                   <Badge colorScheme="purple">{data.total_articles || 0} articles</Badge>
                                 </HStack>
-
-                                {data.articles?.slice(0, 5).map((article, idx) => (
-                                  <Box key={idx} p="12px" bg="gray.50" borderRadius="8px" w="full">
+                                {console.log(data.articles[0])}
+                                {data.articles?.map((article, idx) => (
+                                  <Box key={idx} p="12px" bg="gray.50" borderRadius="8px" w="full" as="a" target="_blank" href={article?.url}>
                                     <Text fontSize="sm" fontWeight="600" mb="4px" color="gray.800">
                                       {article.title}
                                     </Text>
@@ -5532,7 +5533,7 @@ function PipelineBuilderInner() {
                                     <HStack justify="space-between" fontSize="xs">
                                       <Text color="gray.500">{article.source}</Text>
                                       <Text color="gray.500">
-                                        {new Date(article.publishedAt || article.date).toLocaleDateString()}
+                                        {new Date(article?.published_at || article.date).toLocaleDateString()}
                                       </Text>
                                     </HStack>
                                   </Box>
@@ -5716,14 +5717,14 @@ function PipelineBuilderInner() {
                             );
                           };
 
-                          console.log('[Sidebar Render] Full result:', displayResult);
-                          console.log('[Sidebar Render] result keys:', displayResult && typeof displayResult === 'object' ? Object.keys(displayResult) : 'no result');
+                          // console.log('[Sidebar Render] Full result:', displayResult);
+                          // console.log('[Sidebar Render] result keys:', displayResult && typeof displayResult === 'object' ? Object.keys(displayResult) : 'no result');
 
                           const dataType = detectDataType(displayResult);
                           const dataBySymbol = extractDataBySymbol(displayResult);
 
-                          console.log('[Sidebar Render] Detected type:', dataType);
-                          console.log('[Sidebar Render] Data by symbol keys:', Object.keys(dataBySymbol));
+                          // console.log('[Sidebar Render] Detected type:', dataType);
+                          // console.log('[Sidebar Render] Data by symbol keys:', Object.keys(dataBySymbol));
 
                           if (!dataBySymbol || Object.keys(dataBySymbol).length === 0) {
                             return (
