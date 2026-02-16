@@ -48,8 +48,11 @@ import {
   MdArticle,
   MdClose,
   MdContentCopy,
+  MdDataset,
   MdDelete,
   MdEdit,
+  MdExpandLess,
+  MdExpandMore,
   MdGroups,
   MdHome,
   MdHub,
@@ -59,6 +62,7 @@ import {
   MdPsychology,
   MdRefresh,
   MdSave,
+  MdSchedule,
   MdShowChart,
   MdSmartToy,
   MdSpeed,
@@ -767,6 +771,111 @@ class ReactFlowErrorBoundary extends Component {
   }
 }
 
+// SubOutputPreview Component - displays output data from input nodes
+const SubOutputPreview = ({ inputNodeId, analyzerNodeId }) => {
+  const { getEdges } = useReactFlow();
+  const [outputData, setOutputData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const loadEdgeData = () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        // Find the edge connecting the input data agent to the analyzer
+        const edges = getEdges();
+        const edge = edges.find(
+          e => e.source === inputNodeId && e.target === analyzerNodeId
+        );
+
+        console.log('[SubOutputPreview] Looking for edge:', { inputNodeId, analyzerNodeId });
+        console.log('[SubOutputPreview] Found edge:', edge);
+        console.log('[SubOutputPreview] Edge data.output:', edge?.data?.output);
+
+        if (edge && edge.data?.output) {
+          setOutputData({
+            result: edge.data.output,
+            timestamp: edge.data.timestamp || new Date().toISOString(),
+            status: 'success',
+          });
+        } else {
+          console.warn('[SubOutputPreview] ⚠️ No output data on edge');
+          console.warn('  → The data agent may not have been run yet');
+          setError('No output data available - data agent may not have run yet');
+        }
+      } catch (err) {
+        console.error(`[SubOutputPreview] Failed to load edge data for ${inputNodeId}:`, err);
+        setError('Failed to load output');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadEdgeData();
+  }, [inputNodeId, analyzerNodeId, getEdges]);
+
+  if (loading) {
+    return (
+      <Box p="12px" bg="gray.50" textAlign="center">
+        <Spinner size="sm" color="blue.500" />
+        <Text fontSize="xs" color="gray.500" mt="8px">Loading output...</Text>
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box p="12px" bg="red.50">
+        <Text fontSize="xs" color="red.600">{error}</Text>
+      </Box>
+    );
+  }
+
+  return (
+    <Box p="12px" bg="gray.50">
+      {outputData?.timestamp && (
+        <HStack spacing="8px" mb="8px">
+          <Icon as={MdSchedule} boxSize="14px" color="gray.400" />
+          <Text fontSize="xs" color="gray.500">
+            {new Date(outputData.timestamp).toLocaleString()}
+          </Text>
+          {outputData.status && (
+            <Badge colorScheme="green" fontSize="2xs">
+              {outputData.status}
+            </Badge>
+          )}
+        </HStack>
+      )}
+      <Box
+        p="10px"
+        bg="white"
+        borderRadius="6px"
+        maxH="250px"
+        overflowY="auto"
+        border="1px solid"
+        borderColor="gray.200"
+      >
+        <pre style={{
+          fontSize: '10px',
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-word',
+          lineHeight: '1.4',
+          margin: 0,
+        }}>
+          {outputData?.result
+            ? typeof outputData.result === 'string'
+              ? outputData.result
+              : JSON.stringify(outputData.result, null, 2)
+            : 'No data available'
+          }
+        </pre>
+      </Box>
+    </Box>
+  );
+};
+
 function PipelineBuilderInner() {
   const { id } = useParams(); // Get horizon ID from URL
   const navigate = useNavigate();
@@ -896,6 +1005,9 @@ function PipelineBuilderInner() {
   const { isOpen: isRenameOpen, onOpen: onRenameOpen, onClose: onRenameClose } = useDisclosure();
   const { isOpen: isPortfolioOpen, onOpen: onPortfolioOpen, onClose: onPortfolioClose } = useDisclosure();
   const { isOpen: isDataAgentOpen, onOpen: onDataAgentOpen, onClose: onDataAgentClose } = useDisclosure();
+
+  // State for managing expanded/collapsed sub-output sections in revision detail
+  const [expandedSubOutputs, setExpandedSubOutputs] = useState({});
 
   // State for data agent suggestion modal (when thinking agent pauses)
   const [dataAgentModal, setDataAgentModal] = useState({
@@ -5329,51 +5441,126 @@ function PipelineBuilderInner() {
                     
                     return (
                       <>
-                        {/* Summary Info */}
-                        <Box
-                          p="16px"
-                          bg="gray.50"
-                          borderRadius="12px"
-                          border="1px solid"
-                          borderColor="gray.200"
-                        >
-                          <VStack align="start" spacing="8px">
-                            <HStack justify="space-between" w="full">
-                              <Text fontSize="sm" fontWeight="600" color="gray.700">
-                                Run:
-                              </Text>
-                              <Text fontSize="sm" color="gray.800" fontWeight="600">
-                                #{revisions.length - selectedRevisionIndex}
-                              </Text>
-                            </HStack>
-                            <HStack justify="space-between" w="full">
-                              <Text fontSize="sm" fontWeight="600" color="gray.700">
-                                Status:
-                              </Text>
-                              <Badge colorScheme="green" fontSize="sm">
-                                {displayResult?.status || 'success'}
-                              </Badge>
-                            </HStack>
-                            <HStack justify="space-between" w="full">
-                              <Text fontSize="sm" fontWeight="600" color="gray.700">
-                                Symbols:
-                              </Text>
-                              <Text fontSize="sm" color="gray.800">
-                                {displayResult?.total_symbols || 0}
-                              </Text>
-                            </HStack>
-                            {currentOutput?.createdAt && (
-                              <HStack justify="space-between" w="full">
-                                <Text fontSize="sm" fontWeight="600" color="gray.700">
-                                  Executed:
+                        {/* Input Data Sources Section */}
+                        {(() => {
+                          const agentNode = nodes.find(n => n.id === currentOutput?.parentId);
+                          console.log('[Input Data Sources] currentOutput?.parentId:', currentOutput?.parentId);
+                          console.log('[Input Data Sources] agentNode:', agentNode);
+                          console.log('[Input Data Sources] agentNode.data:', agentNode?.data);
+                          console.log('[Input Data Sources] agentNode.data.inputNodeIds:', agentNode?.data?.inputNodeIds);
+                          console.log('[Input Data Sources] agentNode.inputNodeIds (root level):', agentNode?.inputNodeIds);
+
+                          if (!agentNode) {
+                            console.log('[Input Data Sources] No agent node found');
+                            return null;
+                          }
+
+                          // Check both data.inputNodeIds and root level inputNodeIds
+                          const inputNodeIds = agentNode.data?.inputNodeIds || agentNode.inputNodeIds || [];
+                          const isAnalyzer = agentNode.data?.agent?.system === 'analyzer';
+
+                          if (inputNodeIds.length === 0) {
+                            console.log('[Input Data Sources] No input node IDs found in either location');
+                            return null;
+                          }
+
+                          console.log('[Input Data Sources] Rendering section with', inputNodeIds.length, 'inputs');
+
+                          return (
+                            <Box
+                              p="16px"
+                              bg="blue.50"
+                              borderRadius="12px"
+                              border="1px solid"
+                              borderColor="blue.200"
+                              mb="16px"
+                            >
+                              <VStack align="start" spacing="12px">
+                                <HStack spacing="8px">
+                                  <Icon as={MdDataset} color="blue.600" boxSize="20px" />
+                                  <Text fontWeight="700" fontSize="md" color="blue.800">
+                                    {isAnalyzer ? 'Input Data Sources' : 'Data Assembly'}
+                                  </Text>
+                                  <Badge colorScheme="blue" fontSize="xs">
+                                    {inputNodeIds.length} source{inputNodeIds.length !== 1 ? 's' : ''}
+                                  </Badge>
+                                </HStack>
+
+                                <Text fontSize="sm" color="gray.700">
+                                  {isAnalyzer
+                                    ? 'Data agents used in this analysis:'
+                                    : 'Sub-data sources assembled for this output:'}
                                 </Text>
-                                <Text fontSize="sm" color="gray.800">
-                                  {new Date(currentOutput.createdAt).toLocaleString()}
-                                </Text>
-                              </HStack>
-                            )}
-                          </VStack>
-                        </Box>
+
+                                <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing="10px" w="full">
+                                  {inputNodeIds.map((inputNodeId) => {
+                                    const inputNode = nodes.find(n => n.id === inputNodeId);
+                                    if (!inputNode) return null;
+
+                                    const isExpanded = expandedSubOutputs[inputNodeId];
+
+                                    return (
+                                      <Box
+                                        key={inputNodeId}
+                                        bg="white"
+                                        borderRadius="8px"
+                                        border="1px solid"
+                                        borderColor="blue.200"
+                                        overflow="hidden"
+                                        transition="all 0.2s"
+                                        _hover={{ borderColor: "blue.400", shadow: "md" }}
+                                        gridColumn={isExpanded ? { base: "1 / -1", md: "1 / -1", lg: "1 / -1" } : "auto"}
+                                      >
+                                        <HStack
+                                          justify="space-between"
+                                          cursor="pointer"
+                                          onClick={() => {
+                                            setExpandedSubOutputs(prev => ({
+                                              ...prev,
+                                              [inputNodeId]: !prev[inputNodeId]
+                                            }));
+                                          }}
+                                          _hover={{ bg: "blue.50" }}
+                                          p="12px"
+                                          transition="background 0.2s"
+                                        >
+                                          <HStack spacing="8px" flex="1" minW="0">
+                                            <Icon as={MdSmartToy} color="blue.500" boxSize="18px" flexShrink="0" />
+                                            <VStack align="start" spacing="2px" flex="1" minW="0">
+                                              <Text fontWeight="600" fontSize="sm" color="gray.800" noOfLines={1}>
+                                                {inputNode.data?.agent?.name || inputNode.data?.config?.name || 'Unknown Agent'}
+                                              </Text>
+                                              {inputNode.data?.agent?.type && (
+                                                <Badge colorScheme="teal" fontSize="2xs">
+                                                  {inputNode.data.agent.type}
+                                                </Badge>
+                                              )}
+                                            </VStack>
+                                          </HStack>
+                                          <Icon
+                                            as={isExpanded ? MdExpandLess : MdExpandMore}
+                                            boxSize="20px"
+                                            color="blue.600"
+                                            flexShrink="0"
+                                          />
+                                        </HStack>
+
+                                        <Collapse in={isExpanded} animateOpacity>
+                                          <Box borderTop="1px solid" borderColor="blue.100">
+                                            <SubOutputPreview
+                                              inputNodeId={inputNodeId}
+                                              analyzerNodeId={currentOutput?.parentId}
+                                            />
+                                          </Box>
+                                        </Collapse>
+                                      </Box>
+                                    );
+                                  })}
+                                </SimpleGrid>
+                              </VStack>
+                            </Box>
+                          );
+                        })()}
 
                         {/* Render Charts for each symbol */}
                         {(() => {
