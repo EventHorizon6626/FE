@@ -35,6 +35,8 @@ export const CustomAgentNode = ({ data, id, selected }) => {
     getEdges,
     horizonId: data.horizonId, // Pass horizonId for backend auto-save
     refetchHorizon: data.refetchHorizon, // Pass refetch function
+    onAutoLayout: data.onAutoLayout, // Pass auto-layout function for when data agents are spawned
+    setIsAutoLayouting: data.setIsAutoLayouting, // Pass state setter for loading overlay
   });
 
   const handlePlay = (e) => {

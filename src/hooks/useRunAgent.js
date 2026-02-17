@@ -12,6 +12,8 @@ export const useRunAgent = ({
   getEdges,
   horizonId,  // Add horizonId parameter
   refetchHorizon,  // Add refetchHorizon parameter
+  onAutoLayout,  // Add auto-layout callback for when data agents are spawned
+  setIsAutoLayouting,  // Add state setter for loading overlay
 }) => {
   const toast = useToast();
 
@@ -291,10 +293,38 @@ export const useRunAgent = ({
             isClosable: true,
           });
 
+          // Show loading overlay to hide messy initial layout
+          if (setIsAutoLayouting) {
+            setIsAutoLayouting(true);
+          }
+
           // Refetch horizon to load the new nodes and edges from DB
           if (refetchHorizon) {
             console.log('[useRunAgent] Refetching horizon to load new data agents');
-            refetchHorizon();
+            await refetchHorizon();
+
+            // Auto-layout after data agents are loaded
+            if (onAutoLayout) {
+              console.log('[useRunAgent] Triggering auto-layout after data agents spawned');
+              // Use setTimeout to ensure nodes are rendered before layout
+              setTimeout(() => {
+                onAutoLayout();
+
+                // Hide loading overlay after layout completes
+                if (setIsAutoLayouting) {
+                  setTimeout(() => {
+                    setIsAutoLayouting(false);
+                  }, 300); // Small delay for smooth transition
+                }
+              }, 100);
+            } else {
+              // No auto-layout, just hide overlay
+              if (setIsAutoLayouting) {
+                setTimeout(() => {
+                  setIsAutoLayouting(false);
+                }, 300);
+              }
+            }
           }
 
           return;

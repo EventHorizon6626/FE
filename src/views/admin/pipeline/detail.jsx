@@ -1077,6 +1077,9 @@ function PipelineBuilderInner() {
   const [selectedRevisionIndex, setSelectedRevisionIndex] = useState(0);
   const [isLoadingRevisions, setIsLoadingRevisions] = useState(false);
   const [sidebarView, setSidebarView] = useState(SIDEBAR_VIEW.LIST);
+
+  // State for auto-layout overlay when spawning data agents
+  const [isAutoLayouting, setIsAutoLayouting] = useState(false);
   
   // Ref for Console Log
   const consoleLogRef = useRef(null);
@@ -3164,6 +3167,7 @@ function PipelineBuilderInner() {
   const handleConfigChildNodeRef = useRef(handleConfigChildNode);
   const handleExtractAndDragRef = useRef(handleExtractAndDrag);
   const handleNodeResizeRef = useRef(handleNodeResize);
+  const handleGlobalAutoLayoutRef = useRef(handleGlobalAutoLayout);
 
   useEffect(() => {
     console.log('[PipelineDetail] 🔄 Updating refs, handleAddChildNode:', typeof handleAddChildNode);
@@ -3176,6 +3180,7 @@ function PipelineBuilderInner() {
     handleConfigChildNodeRef.current = handleConfigChildNode;
     handleExtractAndDragRef.current = handleExtractAndDrag;
     handleNodeResizeRef.current = handleNodeResize;
+    handleGlobalAutoLayoutRef.current = handleGlobalAutoLayout;
     console.log('[PipelineDetail] ✅ Refs updated, handleAddChildNodeRef.current:', typeof handleAddChildNodeRef.current);
   }, [
     handleNodeDelete,
@@ -3187,6 +3192,7 @@ function PipelineBuilderInner() {
     handleConfigChildNode,
     handleExtractAndDrag,
     handleNodeResize,
+    handleGlobalAutoLayout,
   ]);
 
   // Reset deleted nodes tracking when horizon changes
@@ -3286,6 +3292,8 @@ function PipelineBuilderInner() {
             horizonId: horizonData.id,
             onDelete: handleNodeDeleteRef.current,
             refetchHorizon: refetchHorizonRef.current,
+            onAutoLayout: handleGlobalAutoLayoutRef.current,
+            setIsAutoLayouting: setIsAutoLayouting,
             onAddChildNode: handleAddChildNodeRef.current,
             ...(node.type === 'block' ? {
               onAddToBlock: handleAddToBlockRef.current,
@@ -3969,6 +3977,35 @@ function PipelineBuilderInner() {
 
       {/* Main Canvas */}
       <Box h="100%" position="relative" transition="all 0.3s">
+        {/* Auto-layout loading overlay */}
+        {isAutoLayouting && (
+          <Box
+            position="absolute"
+            top="0"
+            left="0"
+            w="100%"
+            h="100%"
+            bg="rgba(255, 255, 255, 0.95)"
+            zIndex="1000"
+            display="flex"
+            alignItems="center"
+            justifyContent="center"
+            backdropFilter="blur(4px)"
+          >
+            <VStack spacing="16px">
+              <Spinner size="xl" color="purple.500" thickness="4px" speed="0.8s" />
+              <VStack spacing="4px">
+                <Text fontSize="lg" fontWeight="600" color="purple.700">
+                  Organizing workspace...
+                </Text>
+                <Text fontSize="sm" color="gray.600">
+                  Auto-layout in progress
+                </Text>
+              </VStack>
+            </VStack>
+          </Box>
+        )}
+
         <ReactFlowErrorBoundary 
           nodes={nodes} 
           onError={(error) => {
